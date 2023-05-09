@@ -19,24 +19,9 @@ kotlin {
         }
     }
     js(IR) {
-        browser {
-            commonWebpackConfig {
-                cssSupport {
-                    enabled.set(true)
-                }
-            }
-        }
         nodejs {
             binaries.executable()
         }
-    }
-    val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
 
     sourceSets {
@@ -60,7 +45,34 @@ kotlin {
         val jvmTest by getting
         val jsMain by getting
         val jsTest by getting
-        val nativeMain by getting
-        val nativeTest by getting
+    }
+}
+
+publishing {
+    publications.configureEach {
+        this as MavenPublication
+        pom {
+            name.set("forte")
+            description.set("Twig like template engine")
+            url.set("https://github.com/b8b/forte")
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                }
+            }
+            developers {
+                developer {
+                    id.set("b8b@cikit.org")
+                    name.set("b8b@cikit.org")
+                    email.set("b8b@cikit.org")
+                }
+            }
+            scm {
+                connection.set("scm:git:https://github.com/b8b/forte.git")
+                developerConnection.set("scm:git:ssh://github.com/b8b/forte.git")
+                url.set("https://github.com/b8b/forte.git")
+            }
+        }
     }
 }
