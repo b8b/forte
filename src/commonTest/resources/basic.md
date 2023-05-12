@@ -47,6 +47,15 @@ hello yes true
 hello {{ "yes #{true}" }}
 ```
 
+## String Escapes
+```Twig
+"* \b \t \f \n \r \\ \" ' *"
+"* \b \t \f \n \r \\ \" ' *"
+~
+{{ '* \b \t \f \n \r \\ " \' *'|json }}
+{{ "* \b \t \f \n \r \\ \" ' *"|json }}
+```
+
 ## Undefined
 ```Twig
 x: null

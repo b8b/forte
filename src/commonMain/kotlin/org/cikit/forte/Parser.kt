@@ -489,6 +489,18 @@ private class ExpressionParserImpl(
         return mutLhs
     }
 
+    private fun evalEscape(ch: Char): String? = when (ch) {
+        'b' -> "\u0008"
+        't' -> "\u0009"
+        'f' -> "\u000c"
+        'n' -> "\u000a"
+        'r' -> "\u000d"
+        '\\' -> "\\"
+        '"' -> "\""
+        '\'' -> "'"
+        else -> null
+    }
+
     private fun parseSingleQuotedString(t: Token): Node.StringLiteral {
         val content = StringBuilder()
         while (true) {
@@ -499,7 +511,9 @@ private class ExpressionParserImpl(
                     return Node.StringLiteral(t, t2, content.toString())
                 }
                 is Token.Escape -> {
-                    content.append(input[t2.last])
+                    val s = evalEscape(input[t2.last])
+                        ?: throw ParseException(t2, t2, "invalid escape")
+                    content.append(s)
                 }
                 is Token.UnicodeEscape -> {
                     val hex = input.substring(
@@ -538,10 +552,11 @@ private class ExpressionParserImpl(
                     return Node.StringInterpolation(content)
                 }
                 is Token.Escape -> {
+                    val s = evalEscape (input[t2.last])
+                        ?: throw ParseException(t2, t2, "invalid escape")
                     if (isConstString) {
-                        constContent.append(input[t2.last])
+                        constContent.append(s)
                     }
-                    val s = "${input[t2.last]}"
                     content += Node.StringLiteral(t2, t2, s)
                 }
                 is Token.UnicodeEscape -> {

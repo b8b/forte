@@ -169,10 +169,27 @@ private class JsTranspiler(
     }
 
     private fun escape(input: String): String {
-        return input
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
+        val result = StringBuilder()
+        for (ch in input) {
+            when (ch) {
+                '\\' -> result.append("\\\\")
+                '"' -> result.append("\\\"")
+                '\n' -> result.append("\\n")
+                '\r' -> result.append("\\r")
+                else -> if (ch < ' ') {
+                    val hex = ch.code.toString(16)
+                    val escape = when (hex.length) {
+                        1 -> "\\u000$hex"
+                        2 -> "\\u00$hex"
+                        else -> error("invalid hex for ${ch.code}: $hex")
+                    }
+                    result.append(escape)
+                } else {
+                    result.append(ch)
+                }
+            }
+        }
+        return result.toString()
     }
 
     fun transpileCommand(cmd: Node, indent: String = this.indent) {
