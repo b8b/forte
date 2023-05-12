@@ -277,7 +277,7 @@ private class JsTranspiler(
                     target.append(indent)
                         .append(RT.emit.qName)
                         .append("(\"")
-                        .append(escape(text))
+                        .append(escape(trimmed))
                         .append("\");")
                     appendLine()
                 }

@@ -356,9 +356,16 @@ class TemplateParser private constructor(
                 content.last(),
                 "expected end command ${decl.endAliases}"
             )
+            val firstNode = if (input[branchStart.last.first] == '-') {
+                (content.first() as? Node.Text)?.let { txt ->
+                    Node.Text(txt.content, trimLeft = true, txt.trimRight)
+                } ?: content.first()
+            } else {
+                content.first()
+            }
             branches += Node.Branch(
                 branchStart,
-                content.subList(0, content.size - 1),
+                listOf(firstNode) + content.subList(1, content.size - 1),
                 last
             )
             branchStart = last

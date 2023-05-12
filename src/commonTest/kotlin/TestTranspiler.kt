@@ -79,6 +79,9 @@ class TestTranspiler {
     fun testBasic() = runTests("basic.md")
 
     @Test
+    fun testTrim() = runTests("trim.md")
+
+    @Test
     fun testCustomControl() = runTests(
         fileName = "custom_tags.md",
         declarations = defaultDeclarations + listOf(
