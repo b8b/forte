@@ -73,3 +73,12 @@ apply_int: 123
 ~
 apply_int: {{ '123'|int }}
 ```
+
+## Macro
+```Twig
+11
+~
+{% macro test1(a, b = 1) %}
+{{- a + b -}}
+{% endmacro %}{{ test1(5, 6) }}
+```
