@@ -1,4 +1,4 @@
-package org.cikit.forte
+package org.cikit.forte.core
 
 class Glob(val pattern: String) {
 

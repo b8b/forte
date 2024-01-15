@@ -1,10 +1,10 @@
 plugins {
-    kotlin("multiplatform") version "1.8.20"
+    kotlin("multiplatform")
     `maven-publish`
 }
 
 group = "org.cikit"
-version = "0.0.3"
+version = "0.2.0"
 
 repositories {
     mavenCentral()
@@ -13,7 +13,6 @@ repositories {
 kotlin {
     jvm {
         jvmToolchain(8)
-        withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
@@ -23,55 +22,51 @@ kotlin {
             binaries.executable()
         }
     }
-
     sourceSets {
-        val commonMain by getting {
+        commonMain {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
-                api("com.squareup.okio:okio:3.3.0")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+                api("com.squareup.okio:okio:3.7.0")
             }
         }
-        val commonTest by getting {
+        commonTest {
             dependencies {
                 implementation(kotlin("test"))
             }
         }
-        val jvmMain by getting {
-            dependencies {
-                implementation("org.mozilla:rhino:1.7.14")
-            }
-        }
-        val jvmTest by getting
-        val jsMain by getting
-        val jsTest by getting
+        jvmMain {}
+        jvmTest {}
+        jsMain {}
+        jsTest {}
     }
 }
 
 publishing {
-    publications.configureEach {
-        this as MavenPublication
-        pom {
-            name.set("forte")
-            description.set("Twig like template engine")
-            url.set("https://github.com/b8b/forte")
-            licenses {
-                license {
-                    name.set("The Apache License, Version 2.0")
-                    url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+    publications {
+        withType(MavenPublication::class.java).configureEach {
+            pom {
+                name = "forte"
+                description = "Twig like template engine"
+                url = "https://github.com/b8b/forte"
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
                 }
-            }
-            developers {
-                developer {
-                    id.set("b8b@cikit.org")
-                    name.set("b8b@cikit.org")
-                    email.set("b8b@cikit.org")
+                developers {
+                    developer {
+                        id = "b8b@cikit.org"
+                        name = "b8b@cikit.org"
+                        email = "b8b@cikit.org"
+                    }
                 }
-            }
-            scm {
-                connection.set("scm:git:https://github.com/b8b/forte.git")
-                developerConnection.set("scm:git:ssh://github.com/b8b/forte.git")
-                url.set("https://github.com/b8b/forte.git")
+                scm {
+                    connection = "scm:git:https://github.com/b8b/forte.git"
+                    developerConnection = "scm:git:ssh://github.com/b8b/forte.git"
+                    url = "https://github.com/b8b/forte.git"
+                }
             }
         }
     }

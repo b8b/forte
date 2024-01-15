@@ -1,14 +1,14 @@
-package org.cikit.forte
+package org.cikit.forte.parser
 
 val defaultDeclaredCommands = listOf(
     Declarations.Command("set") {
         val variable = expect<Token.Identifier>()
-        args["varName"] = Node.StringLiteral(
+        args["varName"] = Expression.StringLiteral(
             variable,
             variable,
-            input.substring(variable.first .. variable.last)
+            input.substring(variable.first..variable.last)
         )
-        expect<Token.Operator>("=")
+        expect<Token.Assign>()
         args["value"] = parseExpression()
     },
     Declarations.Command(
@@ -16,7 +16,7 @@ val defaultDeclaredCommands = listOf(
         endAliases = setOf("endif"),
         branchAliases = setOf("else", "elif", "elseif"),
     ) {
-        if (name.endsWith("if")) {
+        if (name.endsWith("if") && name != "endif") {
             args["condition"] = parseExpression()
         }
     },
@@ -26,20 +26,20 @@ val defaultDeclaredCommands = listOf(
         branchAliases = setOf("else")
     ) {
         if (name == "for") {
-            val vars = mutableListOf<Node.StringLiteral>()
+            val vars = mutableListOf<Expression.StringLiteral>()
             while (true) {
                 val variable = expect<Token.Identifier>()
-                vars += Node.StringLiteral(
+                vars += Expression.StringLiteral(
                     variable,
                     variable,
-                    input.substring(variable.first .. variable.last)
+                    input.substring(variable.first..variable.last)
                 )
                 when (val next = tokenizer.peek(skipSpace = true)) {
                     is Token.Comma -> tokenizer.consume(next)
                     else -> break
                 }
             }
-            args["varNames"] = Node.ArrayLiteral(
+            args["varNames"] = Expression.ArrayLiteral(
                 vars.first().first,
                 vars.last().last,
                 vars.toList()
@@ -51,16 +51,18 @@ val defaultDeclaredCommands = listOf(
                 if (t !is Token.Identifier) {
                     break
                 }
-                when (input.substring(t.first .. t.last)) {
+                when (input.substring(t.first..t.last)) {
                     "recursive" -> {
                         tokenizer.consume(t)
-                        args["recursive"] = Node.BooleanLiteral(t, true)
+                        args["recursive"] = Expression.BooleanLiteral(t, true)
                     }
+
                     "if" -> {
                         tokenizer.consume(t)
                         args["condition"] = parseExpression()
                         break
                     }
+
                     else -> error("unrecognized option in for loop: $t")
                 }
             }
@@ -72,42 +74,45 @@ val defaultDeclaredCommands = listOf(
     ) {
         if (name == "macro") {
             val name = expect<Token.Identifier>()
-            args["name"] = Node.StringLiteral(
+            args["name"] = Expression.StringLiteral(
                 name,
                 name,
-                input.substring(name.first .. name.last)
+                input.substring(name.first..name.last)
             )
-            val lPar = expect<Token.LPar>()
-            val rPar: Token.RPar
-            val macroArgs =
-                mutableListOf<Pair<Node.Expression, Node.Expression>>()
-            while (true) {
-                val argName = expect<Token.Identifier>()
-                val next = tokenizer.peek(skipSpace = true)
-                val argDefault = if (next is Token.Operator &&
-                    input.substring(next.first .. next.last) == "=") {
-                    tokenizer.consume(next)
-                    parsePrimary()
-                } else {
-                    Node.NullLiteral(next)
-                }
-                macroArgs.add(
-                    Node.StringLiteral(
-                        argName,
-                        argName,
-                        input.substring(argName.first .. argName.last)
-                    ) to argDefault
+            val lPar = tokenizer.peek(skipSpace = true)
+                    as? Token.LPar ?: return@Command
+            tokenizer.consume(lPar)
+            val argNames = mutableListOf<Expression.StringLiteral>()
+            val argDefaults = mutableListOf<Pair<Expression, Expression>>()
+
+            var argName = tokenizer.tokenize(skipSpace = true)
+
+            while (argName is Token.Identifier) {
+                val argNameExpression = Expression.StringLiteral(
+                    argName,
+                    argName,
+                    input.substring(argName.first..argName.last)
                 )
-                when (val t = tokenizer.tokenize(skipSpace = true)) {
-                    is Token.RPar -> {
-                        rPar = t
-                        break
-                    }
-                    is Token.Comma -> continue
-                    else -> error("expected ',' or ')', found: $t")
+                argNames += argNameExpression
+                val next = tokenizer.peek(skipSpace = true)
+                if (next is Token.Assign) {
+                    tokenizer.consume(next)
+                    argDefaults += argNameExpression to parseExpression()
+                }
+                argName = tokenizer.tokenize(skipSpace = true)
+                if (argName is Token.Comma) {
+                    argName = tokenizer.tokenize(skipSpace = true)
                 }
             }
-            args["args"] = Node.ObjectLiteral(lPar, rPar, macroArgs.toList())
+
+            val rPar = argName as? Token.RPar
+                ?: error("expected ')', found: $argName")
+            args["argNames"] = Expression.ArrayLiteral(
+                lPar, rPar, argNames.toList()
+            )
+            args["argDefaults"] = Expression.ObjectLiteral(
+                lPar, rPar, argDefaults.toList()
+            )
         }
     }
 )
@@ -119,13 +124,13 @@ val defaultDeclaredUnaryOperations = listOf(
 )
 
 val defaultDeclaredOperations = listOf(
-    Declarations.BinOp(90, "|",  name = "pipe", left = true),
+    Declarations.TransformOp(90, "|", name = "pipe", left = true),
 
     Declarations.BinOp(80, "**", name = "pow", right = true),
 
-    Declarations.BinOp(60, "*",  name = "mul", left = true),
-    Declarations.BinOp(60, "/",  name = "div", left = true),
-    Declarations.BinOp(60, "%",  name = "rem", left = true),
+    Declarations.BinOp(60, "*", name = "mul", left = true),
+    Declarations.BinOp(60, "/", name = "div", left = true),
+    Declarations.BinOp(60, "%", name = "rem", left = true),
 
     // compat with jinja
     Declarations.BinOp(60, "//", name = "tdiv", left = true),
@@ -134,29 +139,25 @@ val defaultDeclaredOperations = listOf(
     // compat with pebble
     Declarations.BinOp(55, "..", name = "range", left = true),
 
-    Declarations.BinOp(50, "+",  name = "plus", left = true),
-    Declarations.BinOp(50, "-",  name = "minus", left = true),
+    Declarations.BinOp(50, "+", name = "plus", left = true),
+    Declarations.BinOp(50, "-", name = "minus", left = true),
 
     Declarations.BinOp(40, "in"),
     Declarations.BinOp(40, "not in", name = "not_in"),
 
-    Declarations.BinOp(40, "is",     name = "is"),
-    Declarations.BinOp(40, "is not", name = "is_not"),
+    Declarations.TransformOp(40, "is", name = "is"),
+    Declarations.TransformOp(40, "is not", name = "is_not"),
 
-    Declarations.BinOp(40, "<",  name = "lt"),
+    Declarations.BinOp(40, "<", name = "lt"),
     Declarations.BinOp(40, "<=", name = "le"),
-    Declarations.BinOp(40, ">",  name = "gt"),
+    Declarations.BinOp(40, ">", name = "gt"),
     Declarations.BinOp(40, ">=", name = "ge"),
 
     Declarations.BinOp(30, "==", name = "eq"),
     Declarations.BinOp(30, "!=", name = "ne"),
 
     Declarations.BinOp(20, "and", "&&", left = true),
-    Declarations.BinOp(20, "or",  "||", left = true),
-
-    Declarations.BinOp(10, "=",  name = "assign"),
-    Declarations.BinOp( 5, ":",  name = "pair"),
-    Declarations.BinOp( 4, ",",  name = "tuple", left = true),
+    Declarations.BinOp(20, "or", "||", left = true),
 )
 
 val defaultDeclarations = listOf(
@@ -179,7 +180,27 @@ sealed class Declarations {
         }
     }
 
-    class BinOp(
+    class TransformOp(
+        precedence: Int,
+        aliases: Set<String>,
+        name: String = aliases.first(),
+        left: Boolean = false,
+        right: Boolean = false
+    ) : BinOp(precedence, aliases, name, left, right) {
+        constructor(
+            precedence: Int,
+            vararg aliases: String,
+            name: String = aliases.first(),
+            left: Boolean = false,
+            right: Boolean = false
+        ) : this(precedence, aliases.toSet(), name, left, right)
+
+        override fun toString(): String {
+            return "XOp($precedence, `$name`)"
+        }
+    }
+
+    open class BinOp(
         val precedence: Int,
         val aliases: Set<String>,
         val name: String = aliases.first(),
@@ -232,4 +253,64 @@ sealed class Declarations {
             return result.toMap()
         }
     }
+}
+
+inline fun <reified T: Token> ExpressionParser.expect(
+    skipSpace: Boolean = true
+): T {
+    val t = tokenizer.tokenize(skipSpace = skipSpace)
+    if (t !is T) {
+        throw ParseException(t, "expected ${T::class}")
+    }
+    return t
+}
+
+inline fun <reified T: Token> ExpressionParser.expect(
+    value: String,
+    skipSpace: Boolean = true
+) {
+    val t = expect<T>(skipSpace = skipSpace)
+    val actual = tokenizer.input.substring(t.first .. t.last)
+    if (value != actual) {
+        throw ParseException(t, "expected '$value', actual '$actual'")
+    }
+}
+
+inline fun <reified N: Expression> ExpressionParser.expect(): N {
+    val n = parsePrimaryOrNull()
+        ?: throw ParseException(tokenizer.peek(), "expected ${N::class}")
+    if (n !is N) {
+        throw ParseException(n, "expected ${N::class}")
+    }
+    return n
+}
+
+fun ExpressionParser.expect(value: Boolean): Expression.BooleanLiteral {
+    val n = this.expect<Expression.BooleanLiteral>()
+    if (n.value == value) {
+        return n
+    }
+    throw ParseException(
+        n,
+        "expected boolean literal $value, actual: ${n.value}"
+    )
+}
+
+fun ExpressionParser.expect(value: Number): Expression.NumericLiteral {
+    val n = this.expect<Expression.NumericLiteral>()
+    if (n.value == value) {
+        return n
+    }
+    throw ParseException(
+        n,
+        "expected numeric literal $value, actual: ${n.value}"
+    )
+}
+
+fun ExpressionParser.expect(value: String): Expression.StringLiteral {
+    val n = this.expect<Expression.StringLiteral>()
+    if (n.value == value) {
+        return n
+    }
+    throw ParseException(n, "expected string literal '$value', actual: $n")
 }

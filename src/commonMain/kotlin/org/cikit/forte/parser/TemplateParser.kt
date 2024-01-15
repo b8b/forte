@@ -1,110 +1,4 @@
-package org.cikit.forte
-
-import okio.Path
-
-interface ExpressionParser {
-    val tokenizer: ExpressionTokenizer
-    val input: String get() = tokenizer.input
-
-    fun copy(declarations: List<Declarations> = emptyList()): ExpressionParser
-
-    fun parsePrimary(): Node.Expression
-    fun parseExpression(): Node.Expression
-    fun parseExpression(
-        lhs: Node.Expression,
-        minPrecedence: Int
-    ): Node.Expression
-}
-
-inline fun <reified T: Token> ExpressionParser.expect(
-    skipSpace: Boolean = true
-): T {
-    val t = tokenizer.tokenize(skipSpace = skipSpace)
-    if (t !is T) {
-        throw ParseException(t, "expected ${T::class}")
-    }
-    return t
-}
-
-inline fun <reified T: Token> ExpressionParser.expect(
-    value: String,
-    skipSpace: Boolean = true
-) {
-    val t = expect<T>(skipSpace = skipSpace)
-    val actual = tokenizer.input.substring(t.first .. t.last)
-    if (value != actual) {
-        throw ParseException(t, "expected '$value', actual '$actual'")
-    }
-}
-
-inline fun <reified N: Node.Expression> ExpressionParser.expect(): N {
-    val n = parsePrimary()
-    if (n !is N) {
-        throw ParseException(n, "expected ${N::class}")
-    }
-    return n
-}
-
-fun ExpressionParser.expect(value: Boolean): Node.BooleanLiteral {
-    val n = this.expect<Node.BooleanLiteral>()
-    if (n.value == value) {
-        return n
-    }
-    throw ParseException(
-        n,
-        "expected boolean literal $value, actual: ${n.value}"
-    )
-}
-
-fun ExpressionParser.expect(value: Number): Node.NumericLiteral {
-    val n = this.expect<Node.NumericLiteral>()
-    if (n.value == value) {
-        return n
-    }
-    throw ParseException(
-        n,
-        "expected numeric literal $value, actual: ${n.value}"
-    )
-}
-
-fun ExpressionParser.expect(value: String): Node.StringLiteral {
-    val n = this.expect<Node.StringLiteral>()
-    if (n.value == value) {
-        return n
-    }
-    throw ParseException(n, "expected string literal '$value', actual: $n")
-}
-
-interface CommandArgBuilder : ExpressionParser {
-    val name: String
-    val args: MutableMap<String, Node.Expression>
-}
-
-private val emptyTokenizer = Tokenizer("")
-private val defaultParser = TemplateParser(emptyTokenizer)
-
-fun parseTemplate(input: String, path: Path? = null) =
-    defaultParser.copy(Tokenizer(input, path)).parseTemplate()
-
-fun parseTemplate(
-    input: String,
-    path: Path? = null,
-    declarations: List<Declarations> = defaultDeclarations
-) = TemplateParser(Tokenizer(input, path), declarations).parseTemplate()
-
-fun parseTemplate(tokenizer: TemplateTokenizer) =
-    defaultParser.copy(tokenizer).parseTemplate()
-
-fun parseTemplate(
-    tokenizer: TemplateTokenizer,
-    declarations: List<Declarations>
-) = TemplateParser(tokenizer, declarations).parseTemplate()
-
-class ParsedTemplate(
-    val input: String,
-    val path: Path?,
-    val nodes: List<Node>
-)
+package org.cikit.forte.parser
 
 class TemplateParser private constructor(
     val tokenizer: TemplateTokenizer,
@@ -139,6 +33,24 @@ class TemplateParser private constructor(
     fun parseTemplate(): ParsedTemplate {
         val nodes = parse()
         return ParsedTemplate(tokenizer.input, tokenizer.path, nodes)
+    }
+
+    fun parseExpression(): Expression {
+        val exprParser = ExpressionParserImpl(
+            tokenizer,
+            unaryOpDeclarations,
+            binaryOpDeclarations
+        )
+        return exprParser.parseExpression()
+    }
+
+    fun parseExpressionOrNull(): Expression? {
+        val exprParser = ExpressionParserImpl(
+            tokenizer,
+            unaryOpDeclarations,
+            binaryOpDeclarations
+        )
+        return exprParser.parseExpressionOrNull()
     }
 
     fun copy(
@@ -291,14 +203,14 @@ class TemplateParser private constructor(
             binaryOpDeclarations
         )
         if (argsParser != null) {
-            val args = mutableMapOf<String, Node.Expression>()
+            val args = mutableMapOf<String, Expression>()
             val argBuilder = object :
                 CommandArgBuilder,
                 ExpressionParser by exprParser
             {
                 override val name: String
                     get() = name
-                override val args: MutableMap<String, Node.Expression>
+                override val args: MutableMap<String, Expression>
                     get() = args
             }
             try {
@@ -310,7 +222,10 @@ class TemplateParser private constructor(
                 return Node.Command(
                     startToken,
                     name,
-                    args.toList(),
+                    Expression.NamedArgs(
+                        args.keys.toList(),
+                        args.values.toList()
+                    ),
                     endToken
                 )
             } catch (ex: Throwable) {
@@ -322,10 +237,10 @@ class TemplateParser private constructor(
             }
         }
         // generic
-        val args = mutableListOf<Node.Expression>()
+        val args = mutableListOf<Expression>()
         while (true) {
-            val arg = exprParser.parsePrimary()
-            if (arg !is Node.Empty) {
+            val arg = exprParser.parsePrimaryOrNull()
+            if (arg != null) {
                 args += arg
             }
             return when (val t = tokenizer.tokenize()) {
@@ -333,9 +248,7 @@ class TemplateParser private constructor(
                 is Token.EndCommand -> Node.Command(
                     startToken,
                     name,
-                    args.mapIndexed { index, expression ->
-                        index.toString() to expression
-                    },
+                    Expression.NamedArgs(values = args.toList()),
                     t
                 )
 
@@ -416,9 +329,9 @@ private class ExpressionParserImpl(
         )
     }
 
-    override fun parseExpression(): Node.Expression {
-        return when (val lhs = parsePrimary()) {
-            is Node.Empty -> lhs
+    override fun parseExpressionOrNull(): Expression? {
+        return when (val lhs = parsePrimaryOrNull()) {
+            null -> null
             else -> parseExpression(lhs, minPrecedence = 0)
         }
     }
@@ -435,7 +348,7 @@ private class ExpressionParserImpl(
         while(true) {
             when (t) {
                 is Token.Identifier,
-                is Token.Dot, is Token.Comma, is Token.Colon,
+                is Token.Dot, is Token.Comma, is Token.Colon, is Token.Assign,
                 is Token.LPar, is Token.LBracket,
                 is Token.Operator,
                 is Token.Space -> {
@@ -456,9 +369,9 @@ private class ExpressionParserImpl(
     }
 
     override fun parseExpression(
-        lhs: Node.Expression,
+        lhs: Expression,
         minPrecedence: Int
-    ) : Node.Expression {
+    ) : Expression {
         var mutLhs = lhs
         while (true) {
             val (op1, tokens1) = peekOp(binaryOpDeclarations) ?: break
@@ -468,7 +381,25 @@ private class ExpressionParserImpl(
             }
             tokenizer.consume(tokens1.last())
 
-            var rhs = parsePrimary()
+            var rhs: Expression = parsePrimary()
+
+            if (op1 is Declarations.TransformOp) {
+                mutLhs = when (rhs) {
+                    is Expression.Variable -> Expression.TransformOp(
+                        tokens1, op1, mutLhs, rhs.name, Expression.NamedArgs()
+                    )
+                    is Expression.FunctionCall -> Expression.TransformOp(
+                        tokens1, op1, mutLhs, rhs.name, rhs.args
+                    )
+                    else -> throw ParseException(
+                        tokens1.first(),
+                        tokens1.last(),
+                        "expected extension function call"
+                    )
+                }
+                continue
+            }
+
             while (true) {
                 val (op2, tokens2) = peekOp(binaryOpDeclarations) ?: break
                 when {
@@ -490,7 +421,7 @@ private class ExpressionParserImpl(
                 })
             }
 
-            mutLhs = Node.BinOp(tokens1, op1, mutLhs, rhs)
+            mutLhs = Expression.BinOp(tokens1, op1, mutLhs, rhs)
         }
 
         return mutLhs
@@ -508,14 +439,14 @@ private class ExpressionParserImpl(
         else -> null
     }
 
-    private fun parseSingleQuotedString(t: Token): Node.StringLiteral {
+    private fun parseSingleQuotedString(t: Token): Expression.StringLiteral {
         val content = StringBuilder()
         while (true) {
             val (txt, t2) = tokenizer.tokenizeSingleString()
             content.append(input, txt.first, txt.last + 1)
             when (t2) {
                 is Token.SingleQuote -> {
-                    return Node.StringLiteral(t, t2, content.toString())
+                    return Expression.StringLiteral(t, t2, content.toString())
                 }
                 is Token.Escape -> {
                     val s = evalEscape(input[t2.last])
@@ -536,27 +467,27 @@ private class ExpressionParserImpl(
         }
     }
 
-    private fun parseDoubleQuotedString(t: Token): Node.Expression {
+    private fun parseDoubleQuotedString(t: Token): Expression {
         val constContent = StringBuilder()
         var isConstString = true
-        val content = mutableListOf<Node.Expression>()
+        val content = mutableListOf<Expression>()
         while (true) {
             val (txt, t2) = tokenizer.tokenizeDoubleString()
             if (isConstString) {
                 constContent.append(input, txt.first, txt.last + 1)
             }
-            content += Node.StringLiteral(
+            content += Expression.StringLiteral(
                 txt,
                 txt,
-                input.substring(txt.first .. txt.last)
+                input.substring(txt.first..txt.last)
             )
             when (t2) {
                 is Token.DoubleQuote -> {
                     if (isConstString) {
                         val s = constContent.toString()
-                        return Node.StringLiteral(t, t2, s)
+                        return Expression.StringLiteral(t, t2, s)
                     }
-                    return Node.StringInterpolation(content)
+                    return Expression.StringInterpolation(content)
                 }
                 is Token.Escape -> {
                     val s = evalEscape (input[t2.last])
@@ -564,7 +495,7 @@ private class ExpressionParserImpl(
                     if (isConstString) {
                         constContent.append(s)
                     }
-                    content += Node.StringLiteral(t2, t2, s)
+                    content += Expression.StringLiteral(t2, t2, s)
                 }
                 is Token.UnicodeEscape -> {
                     val hex = input.substring(
@@ -574,7 +505,7 @@ private class ExpressionParserImpl(
                     if (isConstString) {
                         constContent.append(c)
                     }
-                    content += Node.StringLiteral(t2, t2, "$c")
+                    content += Expression.StringLiteral(t2, t2, "$c")
                 }
                 is Token.BeginInterpolation -> {
                     isConstString = false
@@ -593,14 +524,14 @@ private class ExpressionParserImpl(
         }
     }
 
-    override fun parsePrimary(): Node.Expression {
+    override fun parsePrimaryOrNull(): Expression? {
         peekOp(unaryOpDeclarations)?.let { (unOpDecl, unOpTokens) ->
             tokenizer.consume(unOpTokens.last())
             val p = parsePrimary()
             val rhs = parseExpression(p, minPrecedence = unOpDecl.precedence)
-            return Node.UnOp(unOpTokens, unOpDecl, rhs)
+            return Expression.UnOp(unOpTokens, unOpDecl, rhs)
         }
-        var primary: Node.Expression
+        var primary: Expression
         while (true) {
             when (val t = tokenizer.peek()) {
                 is Token.Space -> {
@@ -627,44 +558,36 @@ private class ExpressionParserImpl(
                     if (t2 !is Token.RPar) {
                         throw ParseException(t2, "expected closing parenthesis")
                     }
-                    primary = Node.SubExpression(content)
+                    primary = Expression.SubExpression(content)
                     break
                 }
 
                 is Token.LBracket -> {
                     tokenizer.consume(t)
-                    val args = parseExpression()
+                    val args = parseList()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBracket) {
                         throw ParseException(t2, "expected closing bracket")
                     }
-                    val itemList = when (args) {
-                        is Node.Empty -> emptyList()
-                        else -> flattenList(args)
-                    }
-                    primary = Node.ArrayLiteral(t, t2, itemList)
+                    primary = Expression.ArrayLiteral(t, t2, args)
                     break
                 }
 
                 is Token.LBrace -> {
                     tokenizer.consume(t)
-                    val args = parseExpression()
+                    val args = parsePairs()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBrace) {
                         throw ParseException(t2, "expected closing brace")
                     }
-                    val itemList = when (args) {
-                        is Node.Empty -> emptyList()
-                        else -> flattenPairs(args)
-                    }
-                    primary = Node.ObjectLiteral(t, t2, itemList)
+                    primary = Expression.ObjectLiteral(t, t2, args)
                     break
                 }
 
                 is Token.Identifier -> {
                     tokenizer.consume(t)
                     val name = input.substring(t.first .. t.last)
-                    primary = Node.Variable(t, name)
+                    primary = Expression.Variable(t, name)
                     break
                 }
 
@@ -672,19 +595,19 @@ private class ExpressionParserImpl(
                     tokenizer.consume(t)
                     val s = input.substring(t.first..t.last)
                     primary = when (s.lowercase()) {
-                        "null" -> Node.NullLiteral(t)
-                        "true" -> Node.BooleanLiteral(t, true)
-                        "false" -> Node.BooleanLiteral(t, false)
-                        "nan" -> Node.NumericLiteral(
+                        "null" -> Expression.NullLiteral(t)
+                        "true" -> Expression.BooleanLiteral(t, true)
+                        "false" -> Expression.BooleanLiteral(t, false)
+                        "nan" -> Expression.NumericLiteral(
                             t, t, Double.NaN
                         )
-                        "-infinity" -> Node.NumericLiteral(
+                        "-infinity" -> Expression.NumericLiteral(
                             t, t, Double.NEGATIVE_INFINITY
                         )
-                        "+infinity" -> Node.NumericLiteral(
+                        "+infinity" -> Expression.NumericLiteral(
                             t, t, Double.POSITIVE_INFINITY
                         )
-                        else -> Node.Malformed(listOf(t))
+                        else -> Expression.Malformed(listOf(t))
                     }
                     break
                 }
@@ -696,7 +619,7 @@ private class ExpressionParserImpl(
                         '.' in s -> s.toDouble()
                         else -> s.toInt()
                     }
-                    primary = Node.NumericLiteral(t, t, v)
+                    primary = Expression.NumericLiteral(t, t, v)
                     break
                 }
 
@@ -706,11 +629,12 @@ private class ExpressionParserImpl(
                 is Token.EndEmit,
                 is Token.RPar, is Token.RBrace, is Token.RBracket -> {
                     // empty expression
-                    return Node.Empty
+                    return null
                 }
 
                 is Token.Comma,
                 is Token.Colon,
+                is Token.Assign,
                 is Token.Dot,
                 is Token.Operator,
                 is Token.Text,
@@ -722,7 +646,10 @@ private class ExpressionParserImpl(
                 is Token.BeginCommand,
                 is Token.BeginEmit,
                 is Token.Word,
-                is Token.End -> throw ParseException(t, "unexpected token")
+                is Token.End -> {
+                    // unexpected token
+                    return null
+                }
             }
         }
         while (true) {
@@ -735,32 +662,47 @@ private class ExpressionParserImpl(
                     }
                     tokenizer.consume(t2)
                     val name = input.substring(t2.first .. t2.last)
-                    primary = Node.Access(t, t2, primary, name)
+                    primary = Expression.Access(t, t2, primary, name)
                 }
                 is Token.LBracket -> {
                     tokenizer.consume(t)
-                    val args = parseExpression()
+                    val args = parseExpressionOrNull()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBracket) {
                         throw ParseException(t2, "expected closing bracket")
                     }
                     val arg = when (args) {
-                        is Node.Empty -> throw ParseException(
+                        null -> throw ParseException(
                             t2,
                             "unexpected token"
                         )
                         else -> args
                     }
-                    primary = Node.CompAccess(t, primary, arg)
+                    primary = Expression.CompAccess(t, primary, arg)
                 }
                 is Token.LPar -> {
                     tokenizer.consume(t)
-                    val args = parseExpression()
+                    val args = parseArgList()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RPar) {
                         throw ParseException(t2, "expected closing parenthesis")
                     }
-                    primary = createCall(primary, args)
+                    primary = when (primary) {
+                        is Expression.Variable -> {
+                            Expression.FunctionCall(
+                                primary.first,
+                                primary.name,
+                                args
+                            )
+                        }
+                        else -> {
+                            Expression.InvokeOp(
+                                t, t2,
+                                primary,
+                                args
+                            )
+                        }
+                    }
                 }
                 else -> break
             }
@@ -768,69 +710,78 @@ private class ExpressionParserImpl(
         return primary
     }
 
-    private fun createCall(
-        left: Node.Expression,
-        args: Node.Expression
-    ): Node.Expression {
+    private fun parseList(): List<Expression> {
+        val result = mutableListOf<Expression>()
+        while (true) {
+            val expression = parseExpressionOrNull() ?: break
+            result += expression
+            val t = tokenizer.peek(true)
+            if (t !is Token.Comma) {
+                break
+            }
+            tokenizer.consume(t)
+        }
+        return result.toList()
+    }
+
+    private fun parsePairs(): List<Pair<Expression, Expression>> {
+        val result = mutableListOf<Pair<Expression, Expression>>()
+        while (true) {
+            val key = parseExpressionOrNull() ?: break
+            val finalKey = if (key is Expression.Variable) {
+                Expression.StringLiteral(key.first, key.first, key.name)
+            } else {
+                key
+            }
+            val t = tokenizer.peek(true)
+            if (t !is Token.Colon) {
+                throw ParseException(t, "expected colon")
+            }
+            tokenizer.consume(t)
+            val value = parseExpression()
+            result += finalKey to value
+            val t2 = tokenizer.peek(true)
+            if (t2 !is Token.Comma) {
+                break
+            }
+            tokenizer.consume(t2)
+        }
+        return result.toList()
+    }
+
+    private fun parseArgList(): Expression.NamedArgs {
         var argIndex = 0
-        val argList: List<Pair<String, Node.Expression>> = when (args) {
-            is Node.Empty -> emptyList()
-            else -> flattenList(args).map { item ->
-                if ((item as? Node.BinOp)?.decl?.name == "pair") {
-                    val name = item.left
-                    if (name !is Node.Variable) {
-                        throw ParseException(name, "expected argument name")
-                    }
-                    name.name to item
-                } else {
-                    require(argIndex >= 0) {
-                        throw ParseException(item, "expected named argument")
-                    }
-                    val name = argIndex.toString()
-                    argIndex++
-                    name to item
+        var haveNamedArg = false
+        val names = mutableListOf<String>()
+        val values = mutableListOf<Expression>()
+        while (true) {
+            val expression = parseExpressionOrNull() ?: break
+            val t = tokenizer.peek(true)
+            if (t is Token.Assign) {
+                haveNamedArg = true
+                if (expression !is Expression.Variable) {
+                    throw ParseException(expression, "expected arg name")
                 }
-            }
-        }
-        return when (left) {
-            is Node.Variable -> {
-                Node.FunctionCall(left.first, left.name, argList)
-            }
-            is Node.Access -> {
-                Node.ExtensionCall(left.first, left.left, left.name, argList)
-            }
-            else -> Node.MethodCall(left, argList)
-        }
-    }
-
-    private fun flattenList(node: Node.Expression): List<Node.Expression> {
-        return when (node) {
-            is Node.BinOp -> {
-                if (node.decl.name == "tuple") {
-                    flattenList(node.left) + flattenList(node.right)
-                } else {
-                    listOf(node)
+                tokenizer.consume(t)
+                names += expression.name
+                values += parseExpression()
+                val t2 = tokenizer.peek(true)
+                if (t2 !is Token.Comma) {
+                    break
                 }
-            }
-
-            else -> listOf(node)
-        }
-    }
-
-    private fun flattenPairs(
-        node: Node.Expression
-    ): List<Pair<Node.Expression, Node.Expression>> {
-        return flattenList(node).map { item ->
-            when (item) {
-                is Node.BinOp -> {
-                    when (item.decl.name) {
-                        "pair" -> item.left to item.right
-                        else -> throw ParseException(item, "expected pair")
-                    }
+                tokenizer.consume(t2)
+            } else {
+                if (haveNamedArg) {
+                    throw ParseException(expression, "expected named arg")
                 }
-
-                else -> throw ParseException(item, "expected pair")
+                values += expression
+                argIndex++
+                if (t !is Token.Comma) {
+                    break
+                }
+                tokenizer.consume(t)
             }
         }
+        return Expression.NamedArgs(names, values)
     }
 }

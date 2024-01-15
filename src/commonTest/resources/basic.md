@@ -58,12 +58,12 @@ hello {{ "yes #{true}" }}
 
 ## Undefined
 ```Twig
-x: null
-BAD
+x: 1
+OK
 true
 ~
-x: {{ x }}
-{% if x == true %}OK{% else %}BAD{% endif %}
+x: {{ x|default(1) }}
+{% if x is not defined %}OK{% else %}BAD{% endif %}
 {{ jinja is not defined }}
 ```
 
@@ -76,9 +76,32 @@ apply_int: {{ '123'|int }}
 
 ## Macro
 ```Twig
-11
+13
 ~
-{% macro test1(a, b = 1) %}
+{% macro test1(a, b = 4 * 2) %}
 {{- a + b -}}
-{% endmacro %}{{ test1(5, 6) }}
+{% endmacro %}{{ test1(a = 5) }}
+```
+
+## Nested Macro
+```Twig
+13
+~
+{% macro test1(a, b = 4 * 2) %}
+{%- macro test2(x = a + b) -%}
+{{- x -}}
+{%- endmacro -%}
+{{- test2() -}}
+{% endmacro %}{{ test1(a = 5) }}
+```
+
+## Access vars from Macro
+```Twig
+3
+~
+{%- set a = 1 -%}
+{%- set b = 2 -%}
+{% macro test1() %}
+{{- a + b -}}
+{% endmacro %}{{ test1() }}
 ```
