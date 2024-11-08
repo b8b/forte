@@ -27,9 +27,14 @@ interface Emitter {
         when (value) {
             null -> emitNull()
             is Map<*, *> -> {
-                emitObject(value.mapKeys { (k, _) -> k.toString() })
+                emitObject {
+                    for ((k, v) in value) {
+                        emit(k)
+                        emit(v)
+                    }
+                }
             }
-            is List<*> -> {
+            is Iterable<*> -> {
                 emitArray(value)
             }
             is ByteString -> {

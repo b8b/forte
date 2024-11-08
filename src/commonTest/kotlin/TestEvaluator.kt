@@ -1,5 +1,4 @@
 import kotlinx.serialization.json.*
-import okio.Path.Companion.toPath
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
 import org.cikit.forte.core.evalExpression
@@ -84,27 +83,25 @@ class TestEvaluator {
                     }
                 }
             )
-            context.setControl("load_json") { ctx, branches ->
+            context.defineControl("load_json") { ctx, branches ->
                 // expect single branch
                 val branch = branches.single()
                 val jsonSource = ctx.scope()
                     .captureToString()
-                    .apply(branch.body)
+                    .evalTemplate(branch.body)
                     .result
                 val result = Json.decodeFromString<JsonElement>(jsonSource)
-                val (varName) = branch.args.read("varName").map { x ->
-                    ctx.evalExpression(x!!)
-                }
+                val varName = ctx.evalExpression(
+                    branch.args.getValue("varName")
+                )
                 ctx.setVar(varName as String, result.toAny())
             }
             declarations += Declarations.Command(
                 "debug",
                 parser = { args["value"] = parseExpression() }
             )
-            context.setCommand("debug") { ctx, args ->
-                val (value) = args.read("value").map { x ->
-                    ctx.evalExpression(x!!)
-                }
+            context.defineCommand("debug") { ctx, args ->
+                val value = ctx.evalExpression(args.getValue("value"))
                 println("debug: $value")
             }
         }
@@ -170,5 +167,21 @@ class TestEvaluator {
             "grains" to mapOf("zpool" to emptyMap<String, Any?>())
         )
         assertEquals("", result)
+    }
+
+    @Test
+    fun testInvoke() {
+        val result = Forte.evalExpression(
+            "a.keys()",
+            "a" to mapOf("x" to 1)
+        )
+        assertEquals(listOf("x"), result)
+        val result2 = Forte {
+            context.defineMethod("invoke") { _, subject, args ->
+                args.requireEmpty()
+                subject
+            }
+        }.evalExpression("'test'()")
+        assertEquals("test", result2)
     }
 }

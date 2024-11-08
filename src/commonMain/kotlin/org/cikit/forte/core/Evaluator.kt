@@ -4,52 +4,63 @@ import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.Node
 import org.cikit.forte.parser.ParsedTemplate
 
-class Command(
+class Branch(
     val name: String,
-    val args: Expression.NamedArgs,
-    val body: (ctx: Context.Builder<*>) -> Unit
+    val args: Map<String, Expression>,
+    val body: ParsedTemplate
 )
 
 fun interface CommandFunction {
-    operator fun invoke(ctx: Context.Builder<*>, args: Expression.NamedArgs)
+    operator fun invoke(ctx: Context.Builder<*>, args: Map<String, Expression>)
 }
 
 fun interface ControlFunction {
-    operator fun invoke(ctx: Context.Builder<*>, branches: List<Command>)
+    operator fun invoke(ctx: Context.Builder<*>, branches: List<Branch>)
 }
 
-sealed interface Invokable
-
-fun interface UnaryOpFunction : Invokable {
-    operator fun invoke(ctx: Context<*>, arg: Expression): Any?
+fun interface UnOpFunction {
+    operator fun invoke(ctx: Context<*>, arg: Any?): Any?
 }
 
-fun interface UnaryFunction : Invokable {
-    operator fun invoke(ctx: Context<*>, arg: Expression.NamedArgs): Any?
+fun interface BinOpFunction {
+    operator fun invoke(ctx: Context<*>, left: Any?, right: Any?): Any?
 }
 
-fun interface BinaryFunction : Invokable {
-    operator fun invoke(
-        ctx: Context<*>,
-        left: Any?,
-        right: Expression.NamedArgs
-    ): Any?
+interface ConditionalBinOpFunction : BinOpFunction, UnOpFunction {
+    fun condition(ctx: Context<*>, arg: Any?): Boolean
+
+    override fun invoke(ctx: Context<*>, left: Any?, right: Any?): Any? {
+        return if (condition(ctx, left)) {
+            invoke(ctx, right)
+        } else {
+            left
+        }
+    }
 }
 
-fun interface BinaryOpFunction : Invokable {
-    operator fun invoke(ctx: Context<*>, left: Any?, right: Expression): Any?
+fun interface Function {
+    operator fun invoke(ctx: Context<*>, args: NamedArgs): Any?
+}
+
+fun interface Method {
+    operator fun invoke(ctx: Context<*>, subject: Any?, args: NamedArgs): Any?
 }
 
 open class Undefined(open val message: String)
 
-fun <R> Context.Builder<R>.evalTemplate(template: ParsedTemplate): Context.Builder<R> {
+fun <R> Context.Builder<R>.evalTemplate(
+    template: ParsedTemplate
+): Context.Builder<R> {
     for (node in template.nodes) {
         evalCommand(template, node)
     }
     return this
 }
 
-private fun Context.Builder<*>.evalCommand(template: ParsedTemplate, cmd: Node) {
+private fun Context.Builder<*>.evalCommand(
+    template: ParsedTemplate,
+    cmd: Node
+) {
     when (cmd) {
         is Node.Comment -> {}
         is Node.Command -> {
@@ -58,14 +69,14 @@ private fun Context.Builder<*>.evalCommand(template: ParsedTemplate, cmd: Node) 
 
         is Node.Control -> {
             val branches = (listOf(cmd.first) + cmd.branches).map { branch ->
-                Command(
+                Branch(
                     name = branch.first.name,
                     args = branch.first.content,
-                    body = { ctx: Context.Builder<*> ->
-                        for (x in branch.body) {
-                            ctx.evalCommand(template, x)
-                        }
-                    }
+                    body = ParsedTemplate(
+                        template.input,
+                        template.path,
+                        branch.body
+                    )
                 )
             }
             cmd.callControl(this, cmd.first.first.name, branches)
@@ -121,7 +132,7 @@ private fun Context<*>.evalExpressionInternal(
         } catch (ex: EvalException) {
             throw ex
         } catch (ex: Exception) {
-            throw EvalException(expression, ex.message, ex)
+            throw EvalException(expression, ex.toString(), ex)
         }
         if (result is Undefined) {
             UndefinedResult(expression, result)
@@ -151,11 +162,14 @@ private fun Context<*>.evalExpressionInternal(
             is UndefinedResult -> subject
             else -> {
                 val result = try {
-                    get(subject, evalExpression(expression.right))
+                    val key = evalExpression(expression.right)
+                    getBinaryOpFunction("get")
+                        ?.invoke(this, subject, key)
+                        ?: Undefined("get operator function not defined")
                 } catch (ex: EvalException) {
                     throw ex
                 } catch (ex: Exception) {
-                    throw EvalException(expression, ex.message, ex)
+                    throw EvalException(expression, ex.toString(), ex)
                 }
                 if (result is Undefined) {
                     UndefinedResult(expression, result)
@@ -170,11 +184,13 @@ private fun Context<*>.evalExpressionInternal(
             is UndefinedResult -> subject
             else -> {
                 val result = try {
-                    get(subject, expression.name)
+                    getBinaryOpFunction("get")
+                        ?.invoke(this, subject, expression.name)
+                        ?: Undefined("get operator function not defined")
                 } catch (ex: EvalException) {
                     throw ex
                 } catch (ex: Exception) {
-                    throw EvalException(expression, ex.message, ex)
+                    throw EvalException(expression, ex.toString(), ex)
                 }
                 if (result is Undefined) {
                     UndefinedResult(expression, result)
@@ -187,14 +203,14 @@ private fun Context<*>.evalExpressionInternal(
     is Expression.FunctionCall -> {
         val function = getFunction(expression.name) ?: throw EvalException(
             expression,
-            "undeclared function ${expression.name}"
+            "undefined function ${expression.name}"
         )
         val result = try {
-            function.invoke(this, expression.args)
+            function(this, evalArgs(expression.args))
         } catch (ex: EvalException) {
             throw ex
         } catch (ex: Exception) {
-            throw EvalException(expression, ex.message, ex)
+            throw EvalException(expression, ex.toString(), ex)
         }
         if (result is Undefined) {
             UndefinedResult(expression, result)
@@ -206,14 +222,14 @@ private fun Context<*>.evalExpressionInternal(
         val function = getOpFunction(expression.decl.name)
             ?: throw EvalException(
                 expression,
-                "undeclared binary function ${expression.decl.name}"
+                "undefined unary operator function ${expression.decl.name}"
             )
         val result = try {
-            function.invoke(this, expression.right)
+            function.invoke(this, evalExpression(expression.right))
         } catch (ex: EvalException) {
             throw ex
         } catch (ex: Exception) {
-            throw EvalException(expression, ex.message, ex)
+            throw EvalException(expression, ex.toString(), ex)
         }
         if (result is Undefined) {
             UndefinedResult(expression, result)
@@ -225,18 +241,18 @@ private fun Context<*>.evalExpressionInternal(
         when (expression.left) {
             is Expression.Access -> {
                 val subject = evalExpression(expression.left.left)
-                val functionName = "invoke_${expression.left.name}"
-                val function = getBinaryFunction(functionName)
+                val methodName = expression.left.name
+                val function = getMethod(methodName)
                     ?: throw EvalException(
                         expression,
-                        "undeclared binary function $functionName"
+                        "undefined method $methodName"
                     )
                 val result = try {
-                    function.invoke(this, subject, expression.args)
+                    function.invoke(this, subject, evalArgs(expression.args))
                 } catch (ex: EvalException) {
                     throw ex
                 } catch (ex: Exception) {
-                    throw EvalException(expression.left, ex.message, ex)
+                    throw EvalException(expression.left, ex.toString(), ex)
                 }
                 if (result is Undefined) {
                     UndefinedResult(expression.left, result)
@@ -244,50 +260,51 @@ private fun Context<*>.evalExpressionInternal(
                     result
                 }
             }
-            else -> when (val function = evalExpression(expression.left)) {
-                is UnaryFunction -> {
-                    val result = try {
-                        function.invoke(this, expression.args)
-                    } catch (ex: EvalException) {
-                        throw ex
-                    } catch (ex: Exception) {
-                        throw EvalException(expression.left, ex.message, ex)
-                    }
-                    if (result is Undefined) {
-                        UndefinedResult(expression.left, result)
-                    } else {
-                        result
-                    }
+            else -> {
+                val subject = evalExpression(expression.left)
+                val function = getMethod("invoke")
+                    ?: throw EvalException(
+                        expression,
+                        "invoke method not defined"
+                    )
+                val result = try {
+                    function.invoke(this, subject, evalArgs(expression.args))
+                } catch (ex: EvalException) {
+                    throw ex
+                } catch (ex: Exception) {
+                    throw EvalException(expression.left, ex.toString(), ex)
                 }
-                else -> throw EvalException(
-                    expression,
-                    "cannot call $function as ${UnaryFunction::class}"
-                )
+                if (result is Undefined) {
+                    UndefinedResult(expression.left, result)
+                } else {
+                    result
+                }
             }
         }
     }
     is Expression.TransformOp -> {
-        val functionName = "${expression.decl.name}_${expression.name}"
+        val operator = expression.decl.name
+        val method = expression.name
         val subject = evalExpressionInternal(expression.left)
         val (function, finalSubject) = if (subject is UndefinedResult) {
-            val f = getRescueFunction(functionName) ?: throw EvalException(
+            val f = getRescueMethod(method, operator) ?: throw EvalException(
                 subject.expression,
                 subject.value.message
             )
             f to subject.value
         } else {
-            val f = getBinaryFunction(functionName) ?: throw EvalException(
+            val f = getMethod(method, operator) ?: throw EvalException(
                 expression,
-                "undeclared binary function $functionName"
+                "undefined `$operator` operator method $method"
             )
             f to subject
         }
         val result = try {
-            function.invoke(this, finalSubject, expression.args)
+            function.invoke(this, finalSubject, evalArgs(expression.args))
         } catch (ex: EvalException) {
             throw ex
         } catch (ex: Exception) {
-            throw EvalException(expression, ex.message, ex)
+            throw EvalException(expression, ex.toString(), ex)
         }
         if (result is Undefined) {
             UndefinedResult(expression, result)
@@ -300,14 +317,22 @@ private fun Context<*>.evalExpressionInternal(
         val function = getBinaryOpFunction(expression.decl.name)
             ?: throw EvalException(
                 expression,
-                "undeclared binary op function ${expression.decl.name}"
+                "undefined operator function ${expression.decl.name}"
             )
         val result = try {
-            function.invoke(this, subject, expression.right)
+            if (function is ConditionalBinOpFunction) {
+                if (function.condition(this, subject)) {
+                    function.invoke(this, evalExpression(expression.right))
+                } else {
+                    subject
+                }
+            } else {
+                function.invoke(this, subject, evalExpression(expression.right))
+            }
         } catch (ex: EvalException) {
             throw ex
         } catch (ex: Exception) {
-            throw EvalException(expression, ex.message, ex)
+            throw EvalException(expression, ex.toString(), ex)
         }
         if (result is Undefined) {
             UndefinedResult(expression, result)
@@ -320,31 +345,43 @@ private fun Context<*>.evalExpressionInternal(
 private fun Node.callCommand(
     ctx: Context.Builder<*>,
     name: String,
-    args: Expression.NamedArgs
+    args: Map<String, Expression>
 ) {
     val function = ctx.getCommand(name)
-        ?: throw EvalException(this, "undeclared command $name")
+        ?: throw EvalException(this, "undefined command $name")
     return try {
         function.invoke(ctx, args)
     } catch (ex: EvalException) {
         throw ex
     } catch (ex: Exception) {
-        throw EvalException(this, ex.message, ex)
+        throw EvalException(this, ex.toString(), ex)
     }
 }
 
 private fun Node.callControl(
     ctx: Context.Builder<*>,
     name: String,
-    branches: List<Command>
+    branches: List<Branch>
 ) {
     val function = ctx.getControl(name)
-        ?: throw EvalException(this, "undeclared command $name")
+        ?: throw EvalException(this, "undefined command $name")
     return try {
         function.invoke(ctx, branches)
     } catch (ex: EvalException) {
         throw ex
     } catch (ex: Exception) {
-        throw EvalException(this, ex.message, ex)
+        throw EvalException(this, ex.toString(), ex)
     }
+}
+
+private fun Context<*>.evalArgs(
+    namedArgs: Expression.NamedArgs
+): NamedArgs {
+    if (namedArgs.values.isEmpty()) {
+        return NamedArgs.Empty
+    }
+    val providedValues = namedArgs.values.map { expression ->
+        evalExpression(expression)
+    }
+    return NamedArgs(providedValues, namedArgs.names)
 }

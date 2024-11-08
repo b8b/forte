@@ -159,7 +159,7 @@ private class YamlShallowEmitter(
     }
 
     override fun emitScalar(value: String) {
-        if (value.endsWith("\n")) {
+        if (value.endsWith("\n") && !value.first().isWhitespace()) {
             val lines = value.split("\n")
             val encoded = Array(lines.size + 1) { i ->
                 if (i == 0) {

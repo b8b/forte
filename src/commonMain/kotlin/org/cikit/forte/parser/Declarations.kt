@@ -260,7 +260,7 @@ inline fun <reified T: Token> ExpressionParser.expect(
 ): T {
     val t = tokenizer.tokenize(skipSpace = skipSpace)
     if (t !is T) {
-        throw ParseException(t, "expected ${T::class}")
+        throw ParseException(tokenizer, t, "expected ${T::class}")
     }
     return t
 }
@@ -272,15 +272,22 @@ inline fun <reified T: Token> ExpressionParser.expect(
     val t = expect<T>(skipSpace = skipSpace)
     val actual = tokenizer.input.substring(t.first .. t.last)
     if (value != actual) {
-        throw ParseException(t, "expected '$value', actual '$actual'")
+        throw ParseException(
+            tokenizer,
+            t,
+            "expected '$value', actual '$actual'"
+        )
     }
 }
 
 inline fun <reified N: Expression> ExpressionParser.expect(): N {
-    val n = parsePrimaryOrNull()
-        ?: throw ParseException(tokenizer.peek(), "expected ${N::class}")
+    val n = parsePrimaryOrNull() ?: throw ParseException(
+        tokenizer,
+        tokenizer.peek(),
+        "expected ${N::class}"
+    )
     if (n !is N) {
-        throw ParseException(n, "expected ${N::class}")
+        throw ParseException(tokenizer, n, "expected ${N::class}")
     }
     return n
 }
@@ -291,6 +298,7 @@ fun ExpressionParser.expect(value: Boolean): Expression.BooleanLiteral {
         return n
     }
     throw ParseException(
+        tokenizer,
         n,
         "expected boolean literal $value, actual: ${n.value}"
     )
@@ -302,6 +310,7 @@ fun ExpressionParser.expect(value: Number): Expression.NumericLiteral {
         return n
     }
     throw ParseException(
+        tokenizer,
         n,
         "expected numeric literal $value, actual: ${n.value}"
     )
@@ -312,5 +321,9 @@ fun ExpressionParser.expect(value: String): Expression.StringLiteral {
     if (n.value == value) {
         return n
     }
-    throw ParseException(n, "expected string literal '$value', actual: $n")
+    throw ParseException(
+        tokenizer,
+        n,
+        "expected string literal '$value', actual: $n"
+    )
 }

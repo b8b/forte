@@ -8,7 +8,7 @@ sealed class Node {
         }
     }
 
-    class Command(val first: Token, val name: String, val content: Expression.NamedArgs, val last: Token) : Node() {
+    class Command(val first: Token, val name: String, val content: Map<String, Expression>, val last: Token) : Node() {
         override fun toString(): String {
             return "Command(${first.first}..${last.last}: %$name $content)"
         }

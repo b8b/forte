@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "org.cikit"
-version = "0.2.0"
+version = "0.3.0"
 
 repositories {
     mavenCentral()
@@ -27,7 +27,7 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-                api("com.squareup.okio:okio:3.7.0")
+                api("com.squareup.okio:okio:3.9.1")
             }
         }
         commonTest {

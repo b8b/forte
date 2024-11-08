@@ -1,9 +1,6 @@
 package org.cikit.forte.core
 
-import org.cikit.forte.parser.Expression
-import org.cikit.forte.parser.Node
-import org.cikit.forte.parser.Token
-import org.cikit.forte.parser.sourceTokenRange
+import org.cikit.forte.parser.*
 
 class EvalException private constructor(
     val startToken: Token,
@@ -13,6 +10,7 @@ class EvalException private constructor(
     message: String?,
     cause: Throwable?
 ) : RuntimeException(message, cause) {
+
     private constructor(
         tokens: Pair<Token, Token>,
         node: Node?,
@@ -20,19 +18,6 @@ class EvalException private constructor(
         message: String?,
         cause: Throwable?
     ) : this(tokens.first, tokens.second, node, expression, message, cause)
-
-    constructor(
-        startToken: Token,
-        message: String? = null,
-        cause: Throwable? = null
-    )  : this(startToken, startToken, null, null, message, cause)
-
-    constructor(
-        startToken: Token,
-        endToken: Token,
-        message: String? = null,
-        cause: Throwable? = null
-    )  : this(startToken, endToken, null, null, message, cause)
 
     constructor(
         node: Node,

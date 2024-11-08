@@ -25,50 +25,6 @@ sealed class Expression {
                 append(")")
             }
         }
-
-        fun read(vararg args: String): List<Expression?> {
-            val result = mutableListOf<Expression?>()
-            val nameOff = values.size - names.size
-            require(nameOff >= 0)
-            val valueByName = mutableMapOf<String, Expression>()
-            for (i in names.indices) {
-                valueByName[names[i]] = values[i + nameOff]
-            }
-            for (i in args.indices) {
-                val name = args[i]
-                val (realName, optional) = when (val suffix = name.indexOf('?')) {
-                    name.length - 1 -> name.substring(0, suffix) to true
-                    else -> name to false
-                }
-                if (i < nameOff) {
-                    if (i >= this.values.size) {
-                        if (!optional) {
-                            error("missing required argument $realName")
-                        }
-                        result += null
-                        continue
-                    }
-                    if (valueByName.containsKey(realName)) {
-                        error("argument $realName is already passed")
-                    }
-                    result += this.values[i]
-                } else {
-                    val v = valueByName.remove(realName)
-                    if (v == null) {
-                        if (!optional) {
-                            error("missing required argument $realName")
-                        }
-                        result += null
-                        continue
-                    }
-                    result += v
-                }
-            }
-            if (valueByName.isNotEmpty()) {
-                error("unknown argument(s): ${valueByName.keys}")
-            }
-            return result.toList()
-        }
     }
 
     class SubExpression(val content: Expression) : Expression() {

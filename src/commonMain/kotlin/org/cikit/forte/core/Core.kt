@@ -9,18 +9,6 @@ import org.cikit.forte.parser.Expression
 import kotlin.math.roundToInt
 
 object Core {
-    private fun readArgs(
-        ctx: Context<*>,
-        args: Expression.NamedArgs,
-        vararg names: String,
-    ): List<Any?> = args.read(*names).map { v ->
-        if (v == null) {
-            null
-        } else {
-            ctx.evalExpression(v)
-        }
-    }
-
     private fun eq(subject: Any?, other: Any?) = subject == other
 
     private fun `in`(subject: Any?, listValue: Any?): Boolean = when (listValue) {
@@ -83,37 +71,119 @@ object Core {
         else -> error("cannot convert to string: $subject")
     }
 
-    private fun toJson(subject: Any?): String = JsonEmitter.encodeToString {
-        emit(subject)
+    private fun toJsonFilter(
+        @Suppress("UNUSED_PARAMETER")
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ): String {
+        args.requireEmpty()
+        return JsonEmitter.encodeToString { emit(subject) }
     }
 
-    private fun toYaml(subject: Any?): String = YamlEmitter.encodeToString {
-        emit(subject)
+    private fun toYamlFilter(
+        @Suppress("UNUSED_PARAMETER")
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ): String {
+        args.requireEmpty()
+        return YamlEmitter.encodeToString { emit(subject) }
     }
 
-    private fun isString(subject: Any?): Boolean = subject is String
+    private fun eqTest(
+        @Suppress("UNUSED_PARAMETER")
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ) : Boolean {
+        return args.use {
+            val other = requireAny("other")
+            eq(subject, other)
+        }
+    }
 
-    private fun isIterable(subject: Any?): Boolean =
-        subject is List<*> || subject is String
+    private fun notEqTest(
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ) : Boolean {
+        return !eqTest(ctx, subject, args)
+    }
+
+    private fun isStringTest(
+        @Suppress("UNUSED_PARAMETER")
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ) : Boolean {
+        args.requireEmpty()
+        return subject is String
+    }
+
+    private fun isNotStringTest(
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ) : Boolean {
+        return !isStringTest(ctx, subject, args)
+    }
+
+    private fun isIterableTest(
+        @Suppress("UNUSED_PARAMETER")
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ) : Boolean {
+        args.requireEmpty()
+        return subject is List<*> || subject is String
+    }
+
+    private fun isNotIterableTest(
+        ctx: Context<*>,
+        subject: Any?,
+        args: NamedArgs
+    ) : Boolean {
+        return !isIterableTest(ctx, subject, args)
+    }
+
+    private fun <T> Context.Builder<T>.defineFilter(
+        name: String,
+        implementation: Method
+    ) = defineMethod(name, "pipe", implementation)
+
+    private fun <T> Context.Builder<T>.defineTest(
+        name: String,
+        implementation: Method,
+        negateImplementation: Method
+    ): Context.Builder<T> {
+        defineMethod(name, "is", implementation)
+        defineMethod(name, "is_not", negateImplementation)
+        return this
+    }
 
     val context = Context.builder()
-        .setCommand("set") { ctx, args ->
-            val (varName, value) = readArgs(ctx, args, "varName", "value")
-            ctx.setVar(varName as String, value)
+        .defineCommand("set") { ctx, args ->
+            val varName = args.getValue("varName")
+            val value = args.getValue("value")
+            ctx.setVar(
+                ctx.evalExpression(varName) as String,
+                ctx.evalExpression(value)
+            )
         }
 
-        .setControl("if") { ctx, branches ->
+        .defineControl("if") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {
                     "else" -> {
-                        cmd.body(ctx)
+                        ctx.evalTemplate(cmd.body)
                         break
                     }
 
                     else -> {
-                        val (condition) = readArgs(ctx, cmd.args, "condition")
-                        if (condition == true) {
-                            cmd.body(ctx)
+                        val condition = cmd.args.getValue("condition")
+                        if (ctx.evalExpression(condition) as Boolean) {
+                            ctx.evalTemplate(cmd.body)
                             break
                         }
                     }
@@ -121,40 +191,27 @@ object Core {
             }
         }
 
-        .setControl("for") { ctx, branches ->
+        .defineControl("for") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {
                     "else" -> {
-                        cmd.body(ctx)
+                        ctx.evalTemplate(cmd.body)
                         break
                     }
 
                     else -> {
-                        val (varNames, listValue, recursive, condition) =
-                            readArgs(
-                                ctx,
-                                cmd.args,
-                                "varNames",
-                                "listValue",
-                                "recursive?",
-                                "condition?"
+                        val varNames = cmd.args.getValue("varNames")
+                        val listValue = cmd.args.getValue("listValue")
+                        val varName = (ctx.evalExpression(varNames) as List<*>)
+                            .singleOrNull() ?: error(
+                                "destructuring in for loop is not implemented"
                             )
-                        varNames as List<*>
-                        listValue as List<*>
-                        val varName = varNames.singleOrNull() as? String
-                            ?: error("destructuring in for loop is not implemented")
-                        if (recursive != null) {
-                            error("recursive for loop is not implemented")
-                        }
-                        if (condition != null) {
-                            error("conditional for loop is not implemented")
-                        }
                         var done = false
-                        for (item in listValue) {
+                        for (item in ctx.evalExpression(listValue) as List<*>) {
                             done = true
                             ctx.scope()
-                                .setVar(varName, item)
-                                .apply(cmd.body)
+                                .setVar(varName as String, item)
+                                .evalTemplate(cmd.body)
                         }
                         if (done) {
                             break
@@ -164,124 +221,162 @@ object Core {
             }
         }
 
-        .setControl("macro") { ctx, branches ->
+        .defineControl("macro") { ctx, branches ->
             val cmd = branches.single()
-            val (functionNameExpr, argNamesExpr, argDefaultsExpr) = cmd.args.read(
-                "name", "argNames", "argDefaults"
-            )
-            val functionName = ctx.evalExpression(functionNameExpr!!) as String
-            val argNames = ctx.evalExpression(argNamesExpr!!) as List<*>
+            val functionNameExpr = cmd.args.getValue("name")
+            val argNamesExpr = cmd.args.getValue("argNames")
+            val argDefaultsExpr = cmd.args.getValue("argDefaults")
+            val functionName = ctx.evalExpression(functionNameExpr) as String
+            val argNames = ctx.evalExpression(argNamesExpr) as List<*>
             argDefaultsExpr as Expression.ObjectLiteral
 
             val finalArgDefaults = argDefaultsExpr.pairs.associate { (k, v) ->
                 ctx.evalExpression(k).toString() to v
             }
-            val finalArgNames = argNames.map { name ->
-                if (finalArgDefaults.containsKey(name)) {
-                    "${name}?"
-                } else {
-                    name.toString()
-                }
-            }
+            val finalArgNames = argNames.map { name -> name as String }
 
             val defCtx = ctx.build()
 
-            ctx.setFunction(functionName) { ctx, macroArgs ->
-                val argValues = macroArgs.read(*finalArgNames.toTypedArray())
-                with (defCtx.builder()) {
+            ctx.defineFunction(functionName) { _, args ->
+                val macroCtx = defCtx.builder()
+                args.use {
                     for (i in finalArgNames.indices) {
-                        val k = finalArgNames[i].removeSuffix("?")
-                        val valueExpr = argValues[i]
-                        val value = if (valueExpr != null) {
-                            // evaluate in the caller context
-                            ctx.evalExpression(valueExpr)
+                        val name = finalArgNames[i]
+                        val defaultValue = finalArgDefaults[name]
+                        val value = if (defaultValue == null) {
+                            requireAny(name)
                         } else {
-                            // evaluate default in the macro context
-                            evalExpression(finalArgDefaults.getValue(k))
+                            optionalNullable(
+                                name,
+                                { it },
+                                { macroCtx.evalExpression(defaultValue) }
+                            )
                         }
-                        setVar(k, value)
+                        macroCtx.setVar(name, value)
                     }
-                    captureToString()
-                        .apply(cmd.body)
-                        .result
                 }
+                macroCtx.captureToString()
+                    .evalTemplate(cmd.body)
+                    .result
             }
         }
 
-        .setOpFunction("not") { ctx, arg ->
-            !(ctx.evalExpression(arg) as Boolean)
+        .defineBinaryOpFunction("get") { _, subject, key ->
+            when (subject) {
+                null -> Undefined("cannot access property $key of null")
+                is Map<*, *> -> {
+                    if (!subject.containsKey(key)) {
+                        Undefined("$subject does not contain key '$key'")
+                    } else {
+                        subject[key]
+                    }
+                }
+                is List<*> -> when (key) {
+                    is Int -> subject.getOrElse(key) {
+                        Undefined("index out of bounds: $subject[$key]")
+                    }
+                    else -> Undefined(
+                        "cannot access property '$key' of list $subject"
+                    )
+                }
+                else -> Undefined("cannot access property '$key' of '$subject'")
+            }
         }
 
-        .setFunction("range") { ctx, args ->
-            val (start, end) = readArgs(ctx, args, "start", "end_inclusive")
-            range(start, end)
+        .defineOpFunction("not") { _, arg ->
+            !(arg as Boolean)
         }
 
-        .setBinaryOpFunction("eq") { ctx, left, right ->
-            eq(left, ctx.evalExpression(right))
-        }
-        .setBinaryOpFunction("ne") { ctx, left, right ->
-            !eq(left, ctx.evalExpression(right))
+        .defineFunction("range") { _, args ->
+            args.use {
+                val start: Int = require("start")
+                val end: Int  = require("end_inclusive")
+                range(start, end)
+            }
         }
 
-        .setBinaryOpFunction("gt") { ctx, left, right ->
+        .defineBinaryOpFunction("eq") { _, left, right ->
+            eq(left, right)
+        }
+        .defineBinaryOpFunction("ne") { _, left, right ->
+            !eq(left, right)
+        }
+
+        .defineBinaryOpFunction("gt") { _, left, right ->
             when (left) {
-                is String -> left > (ctx.evalExpression(right) as String)
-                is Float -> left > (ctx.evalExpression(right) as Float)
-                is Double -> left > (ctx.evalExpression(right) as Double)
-                is Int -> left > (ctx.evalExpression(right) as Int)
+                is String -> left > (right as String)
+                is Float -> left > (right as Float)
+                is Double -> left > (right as Double)
+                is Int -> left > (right as Int)
                 else -> Undefined("invalid type for gt: $left")
             }
         }
 
-        .setBinaryOpFunction("ge") { ctx, left, right ->
+        .defineBinaryOpFunction("ge") { _, left, right ->
             when (left) {
-                is String -> left >= (ctx.evalExpression(right) as String)
-                is Float -> left >= (ctx.evalExpression(right) as Float)
-                is Double -> left >= (ctx.evalExpression(right) as Double)
-                is Int -> left >= (ctx.evalExpression(right) as Int)
+                is String -> left >= (right as String)
+                is Float -> left >= (right as Float)
+                is Double -> left >= (right as Double)
+                is Int -> left >= (right as Int)
                 else -> Undefined("invalid type for ge: $left")
             }
         }
 
-        .setBinaryOpFunction("lt") { ctx, left, right ->
+        .defineBinaryOpFunction("lt") { _, left, right ->
             when (left) {
-                is String -> left < (ctx.evalExpression(right) as String)
-                is Float -> left < (ctx.evalExpression(right) as Float)
-                is Double -> left < (ctx.evalExpression(right) as Double)
-                is Int -> left < (ctx.evalExpression(right) as Int)
+                is String -> left < (right as String)
+                is Float -> left < (right as Float)
+                is Double -> left < (right as Double)
+                is Int -> left < (right as Int)
                 else -> Undefined("invalid type for lt: $left")
             }
         }
 
-        .setBinaryOpFunction("le") { ctx, left, right ->
+        .defineBinaryOpFunction("le") { _, left, right ->
             when (left) {
-                is String -> left <= (ctx.evalExpression(right) as String)
-                is Float -> left <= (ctx.evalExpression(right) as Float)
-                is Double -> left <= (ctx.evalExpression(right) as Double)
-                is Int -> left <= (ctx.evalExpression(right) as Int)
+                is String -> left <= (right as String)
+                is Float -> left <= (right as Float)
+                is Double -> left <= (right as Double)
+                is Int -> left <= (right as Int)
                 else -> Undefined("invalid type for le: $left")
             }
         }
 
-        .setBinaryOpFunction("or") { ctx, left, right ->
-            (left as Boolean) || (ctx.evalExpression(right) as Boolean)
+        .defineBinaryOpFunction("or", condition = false) { _, right ->
+            right as Boolean
         }
 
-        .setBinaryOpFunction("and") { ctx, left, right ->
-            (left as Boolean) && (ctx.evalExpression(right) as Boolean)
+        .defineBinaryOpFunction("and", condition = true) { _, right ->
+            right as Boolean
         }
 
-        .setBinaryOpFunction("range") { ctx, left, right -> range(left, ctx.evalExpression(right)) }
+        .defineBinaryOpFunction("range") { _, left, right ->
+            range(left, right)
+        }
 
-        .setBinaryOpFunction("plus") { ctx, left, right -> plus(left, ctx.evalExpression(right)) }
-        .setBinaryOpFunction("minus") { ctx, left, right -> minus(left, ctx.evalExpression(right)) }
-        .setBinaryOpFunction("mul") { ctx, left, right -> mul(left, ctx.evalExpression(right)) }
-        .setBinaryOpFunction("div") { ctx, left, right -> div(left, ctx.evalExpression(right)) }
+        .defineBinaryOpFunction("plus") { _, left, right ->
+            plus(left, right)
+        }
 
-        .setBinaryFunction("pipe_int") { _, subject, _ -> toInt(subject) }
+        .defineBinaryOpFunction("minus") { _, left, right ->
+            minus(left, right)
+        }
 
-        .setBinaryFunction("pipe_float") { _, subject, _ ->
+        .defineBinaryOpFunction("mul") { _, left, right ->
+            mul(left, right)
+        }
+
+        .defineBinaryOpFunction("div") { _, left, right ->
+            div(left, right)
+        }
+
+        .defineFilter("int") { _, subject, args ->
+            args.requireEmpty()
+            toInt(subject)
+        }
+
+        .defineFilter("float") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is Boolean -> if (subject) 1.0 else 0.0
                 is Int -> subject.toDouble()
@@ -292,60 +387,74 @@ object Core {
             }
         }
 
-        .setBinaryFunction("pipe_string") { _, subject, _ -> toString(subject) }
+        .defineFilter("string") { _, subject, args ->
+            args.requireEmpty()
+            toString(subject)
+        }
 
-        .setBinaryFunction("pipe_list") { ctx, subject, args ->
-            val (strings) = readArgs(ctx, args, "strings?")
-            strings as String?
+        .defineFilter("list") { _, subject, args ->
+            val strings: String
+            args.use {
+                strings = optional("strings") { "codePoints" }
+            }
             when (subject) {
                 is List<*> -> subject
-                is String -> when (strings ?: "codePoints") {
-                    "empty" -> emptyList<String>()
-                    "chars" -> subject.map { it.toString() }
-                    "codePoints" -> {
-                        val result = mutableListOf<String>()
-                        val charIt = subject.iterator()
-                        while (charIt.hasNext()) {
-                            val ch1 = charIt.next()
-                            result += if (ch1.isHighSurrogate()) {
-                                val ch2 = charIt.next()
-                                charArrayOf(ch1, ch2).concatToString()
-                            } else {
-                                ch1.toString()
+                is String -> {
+                    when (strings) {
+                        "empty" -> emptyList<String>()
+                        "chars" -> subject.map { it.toString() }
+                        "codePoints" -> {
+                            val result = mutableListOf<String>()
+                            val charIt = subject.iterator()
+                            while (charIt.hasNext()) {
+                                val ch1 = charIt.next()
+                                result += if (ch1.isHighSurrogate()) {
+                                    val ch2 = charIt.next()
+                                    charArrayOf(ch1, ch2).concatToString()
+                                } else {
+                                    ch1.toString()
+                                }
                             }
+                            result.toList()
                         }
-                        result.toList()
-                    }
 
-                    else -> Undefined("invalid option for strings: $strings")
+                        else -> Undefined(
+                            "invalid option for strings: $strings"
+                        )
+                    }
                 }
 
                 else -> Undefined("cannot convert to list: $subject")
             }
         }
 
-        .setRescueFunction("pipe_default") { ctx, _, args ->
-            val (defaultValue) = readArgs(ctx, args, "default_value")
-            defaultValue
+        .defineRescueMethod("default", "pipe") { _, _, args ->
+            args.use { requireAny("default_value") }
         }
 
-        .setBinaryFunction("pipe_default") { _, subject, _ -> subject }
+        .defineFilter("default") { _, subject, args ->
+            args.use { requireAny("default_value") }
+            subject
+        }
 
-        .setBinaryFunction("pipe_first") { _, subject, _ ->
+        .defineFilter("first") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is List<*> -> subject.firstOrNull()
                 else -> Undefined("invalid type for first: $subject")
             }
         }
 
-        .setBinaryFunction("pipe_last") { _, subject, _ ->
+        .defineFilter("last") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is List<*> -> subject.lastOrNull()
                 else -> Undefined("invalid type for last: $subject")
             }
         }
 
-        .setBinaryFunction("pipe_keys") { _, subject, _ ->
+        .defineFilter("keys") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is Map<*, *> -> subject.keys.toList()
                 is List<*> -> listOf("size") + (0 until subject.size).toList()
@@ -353,7 +462,8 @@ object Core {
             }
         }
 
-        .setBinaryFunction("pipe_length") { _, subject, _ ->
+        .defineFilter("length") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is List<*> -> subject.size
                 is Map<*, *> -> subject.size
@@ -362,171 +472,216 @@ object Core {
             }
         }
 
-        .setBinaryFunction("pipe_reject") { ctx, subject, args ->
-            val (test, arg) = readArgs(ctx, args, "test", "arg?")
-            val filter: (Any?) -> Boolean = when (test) {
-                "==", "eq", "equalto" -> { x -> eq(x, arg) }
-                else -> return@setBinaryFunction Undefined(
-                    "unimplemented reject test: $test"
+        .defineFilter("select") { ctx, subject, args ->
+            args.use {
+                val test: String = require("test")
+                val filterArgs = optional(
+                    "arg",
+                    { NamedArgs(listOf(it), emptyList()) },
+                    { NamedArgs(emptyList(), emptyList()) }
                 )
-            }
-            when (subject) {
-                is List<*> -> subject.filterNot(filter)
-                else -> Undefined("invalid type for reject: $subject")
+                val filter = ctx.getMethod(test, "is")
+                    ?: error("undefined test: $test")
+                when (subject) {
+                    is List<*> -> subject.filter { item ->
+                        filter(ctx, item, filterArgs) as Boolean
+                    }
+
+                    else -> Undefined("invalid type for reject: $subject")
+                }
             }
         }
 
-        .setBinaryFunction("pipe_unique") { _, subject, _ ->
+        .defineFilter("reject") { ctx, subject, args ->
+            args.use {
+                val test: String = require("test")
+                val filterArgs = optional(
+                    "arg",
+                    { NamedArgs(listOf(it), emptyList()) },
+                    { NamedArgs(emptyList(), emptyList()) }
+                )
+                val filter = ctx.getMethod(test, "is")
+                    ?: error("undefined test: $test")
+                when (subject) {
+                    is List<*> -> subject.filterNot { item ->
+                        filter(ctx, item, filterArgs) as Boolean
+                    }
+
+                    else -> Undefined("invalid type for reject: $subject")
+                }
+            }
+        }
+
+        .defineFilter("unique") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is List<*> -> subject.toSet().toList()
                 else -> Undefined("invalid type for unique: $subject")
             }
         }
 
-        .setBinaryFunction("pipe_join") { ctx, subject, args ->
-            val (separator) = readArgs(ctx, args, "separator")
-            separator as String
-            when (subject) {
-                is List<*> -> subject.joinToString(separator) { v ->
-                    toString(v)
+        .defineFilter("join") { _, subject, args ->
+            args.use {
+                val separator: String = optional("separator") { ", " }
+                when (subject) {
+                    is List<*> -> subject.joinToString(separator) { v ->
+                        toString(v)
+                    }
+
+                    else -> Undefined("invalid type for join: $subject")
                 }
-
-                else -> Undefined("invalid type for join: $subject")
             }
         }
 
-        .setBinaryFunction("pipe_sort") { _, subject, _ ->
-            when (subject) {
-                is List<*> -> subject.sortedBy { toString(it) }
-                else -> Undefined("invalid type for sort: $subject")
-            }
-        }
-
-        .setBinaryFunction("pipe_startswith") { ctx, subject, args ->
-            val (prefix) = readArgs(ctx, args, "prefix")
-            prefix as String
-            when (subject) {
-                is String -> subject.startsWith(prefix)
-                else -> Undefined("invalid type for startswith: $subject")
-            }
-        }
-
-        .setBinaryFunction("pipe_endswith") { ctx, subject, args ->
-            val (suffix) = readArgs(ctx, args, "suffix")
-            suffix as String
-            when (subject) {
-                is String -> subject.endsWith(suffix)
-                else -> Undefined("invalid type for endswith: $subject")
-            }
-        }
-
-        .setBinaryFunction("pipe_matches_glob") { ctx, subject, args ->
-            val (pattern, ignoreCase) = readArgs(
-                ctx, args, "pattern", "ignore_case?"
-            )
-            pattern as String
-            ignoreCase as Boolean?
-            val options = when (ignoreCase ?: true) {
-                true -> setOf(RegexOption.IGNORE_CASE)
-                else -> emptySet()
-            }
-            val re = Glob(pattern).toRegex(options)
-            when (subject) {
-                is String -> re.matches(subject)
-                else -> Undefined("invalid type for matchesGlob: $subject")
-            }
-        }
-
-        .setBinaryFunction("pipe_matches_regex") { ctx, subject, args ->
-            val (pattern, ignoreCase) = readArgs(
-                ctx, args, "pattern", "ignore_case?"
-            )
-            pattern as String
-            ignoreCase as Boolean?
-            val options = when (ignoreCase ?: true) {
-                true -> setOf(RegexOption.IGNORE_CASE)
-                else -> emptySet()
-            }
-            val re = pattern.toRegex(options)
-            when (subject) {
-                is String -> re.matches(subject)
-                else -> Undefined("invalid type for matchesRegex: $subject")
-            }
-        }
-
-        .setBinaryFunction("pipe_regex_replace") { ctx, subject, args ->
-            val (pattern, replacement, ignoreCase) = readArgs(
-                ctx, args, "pattern", "replacement", "ignore_case?"
-            )
-            pattern as String
-            replacement as String
-            ignoreCase as Boolean?
-            val options = when (ignoreCase ?: true) {
-                true -> setOf(RegexOption.IGNORE_CASE)
-                else -> emptySet()
-            }
-            val re = pattern.toRegex(options)
-            when (subject) {
-                is String -> subject.replace(re, replacement)
-                else -> Undefined("invalid type for regex_replace: $subject")
-            }
-        }
-
-        .setBinaryFunction("pipe_replace") { ctx, subject, args ->
-            val (search, replacement, ignoreCase) = readArgs(
-                ctx, args, "search", "replacement", "ignore_case?"
-            )
-            search as String
-            replacement as String
-            ignoreCase as Boolean?
-            when (subject) {
-                is String -> subject.replace(
-                    search,
-                    replacement,
-                    ignoreCase = ignoreCase ?: false
-                )
-
-                else -> Undefined("invalid type for replace: $subject")
-            }
-        }
-
-        .setBinaryOpFunction("in") { ctx, subject, listValue ->
-            `in`(subject, ctx.evalExpression(listValue))
-        }
-
-        .setBinaryOpFunction("not_in") { ctx, subject, listValue ->
-            !`in`(subject, ctx.evalExpression(listValue))
-        }
-
-        .setBinaryFunction("pipe_trim") { ctx, subject, args ->
-            val (chars) = readArgs(ctx, args, "chars?")
-            chars as String?
-            when (subject) {
-                is String -> if (chars == null) {
-                    subject.trim()
+        .defineFilter("sort") { _, subject, args ->
+            args.use {
+                val reverse = optional("reverse") { false }
+                val caseSensitive = optional("case_sensitive") { false }
+                val comparator: Comparator<Any?> = if (reverse) {
+                    Comparator { a, b ->
+                        toString(b).compareTo(toString(a), !caseSensitive)
+                    }
                 } else {
-                    subject.trim(*chars.toCharArray())
+                    Comparator { a, b ->
+                        toString(a).compareTo(toString(b), !caseSensitive)
+                    }
                 }
-
-                else -> Undefined("invalid type for trim: $subject")
+                when (subject) {
+                    is List<*> -> subject.sortedWith(comparator)
+                    else -> Undefined("invalid type for sort: $subject")
+                }
             }
         }
 
-        .setBinaryFunction("pipe_lower") { _, subject, _ ->
+        .defineFilter("startswith") { _, subject, args ->
+            args.use {
+                val prefix: String = require("prefix")
+                when (subject) {
+                    is String -> subject.startsWith(prefix)
+                    else -> Undefined("invalid type for startswith: $subject")
+                }
+            }
+        }
+
+        .defineFilter("endswith") { _, subject, args ->
+            args.use {
+                val suffix: String = require("suffix")
+                when (subject) {
+                    is String -> subject.endsWith(suffix)
+                    else -> Undefined("invalid type for endswith: $subject")
+                }
+            }
+        }
+
+        .defineFilter("matches_glob") { _, subject, args ->
+            args.use {
+                val pattern: String = require("pattern")
+                val ignoreCase: Boolean = optional("ignore_case") { true }
+                val re = if (ignoreCase) {
+                    Glob(pattern).toRegex(RegexOption.IGNORE_CASE)
+                } else {
+                    Glob(pattern).toRegex()
+                }
+                when (subject) {
+                    is String -> re.matches(subject)
+                    else -> Undefined("invalid type for matchesGlob: $subject")
+                }
+            }
+        }
+
+        .defineFilter("matches_regex") { _, subject, args ->
+            args.use {
+                val pattern: String = require("pattern")
+                val ignoreCase: Boolean = optional("ignore_case") { true }
+                val re = if (ignoreCase) {
+                    Regex(pattern, RegexOption.IGNORE_CASE)
+                } else {
+                    Regex(pattern)
+                }
+                when (subject) {
+                    is String -> re.matches(subject)
+                    else -> Undefined("invalid type for matchesRegex: $subject")
+                }
+            }
+        }
+
+        .defineFilter("regex_replace") { _, subject, args ->
+            args.use {
+                val pattern: String = require("pattern")
+                val replacement: String = require("replacement")
+                val ignoreCase: Boolean = optional("ignore_case") { true }
+                val re = if (ignoreCase) {
+                    Regex(pattern, RegexOption.IGNORE_CASE)
+                } else {
+                    Regex(pattern)
+                }
+                when (subject) {
+                    is String -> subject.replace(re, replacement)
+                    else -> Undefined(
+                        "invalid type for regex_replace: $subject"
+                    )
+                }
+            }
+        }
+
+        .defineFilter("replace") { _, subject, args ->
+            args.use {
+                val search: String = require("search")
+                val replacement: String = require("replacement")
+                val ignoreCase: Boolean = optional("ignore_case") { false }
+                when (subject) {
+                    is String -> subject.replace(
+                        search,
+                        replacement,
+                        ignoreCase = ignoreCase
+                    )
+
+                    else -> Undefined("invalid type for replace: $subject")
+                }
+            }
+        }
+
+        .defineBinaryOpFunction("in") { _, subject, listValue ->
+            `in`(subject, listValue)
+        }
+
+        .defineBinaryOpFunction("not_in") { _, subject, listValue ->
+            !`in`(subject, listValue)
+        }
+
+        .defineFilter("trim") { _, subject, args ->
+            args.use {
+                val chars: String = optional("chars") { "" }
+                when (subject) {
+                    is String -> if (chars.isEmpty()) {
+                        subject.trim()
+                    } else {
+                        subject.trim(*chars.toCharArray())
+                    }
+
+                    else -> Undefined("invalid type for trim: $subject")
+                }
+            }
+        }
+
+        .defineFilter("lower") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is String -> subject.lowercase()
                 else -> Undefined("invalid type for lower: $subject")
             }
         }
 
-        .setBinaryFunction("pipe_upper") { _, subject, _ ->
+        .defineFilter("upper") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is String -> subject.uppercase()
                 else -> Undefined("invalid type for upper: $subject")
             }
         }
 
-        .setBinaryFunction("pipe_base64decode") { _, subject, _ ->
+        .defineFilter("base64decode") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is String -> subject.decodeBase64()?.toByteArray()
                     ?: Undefined("error decoding base64")
@@ -535,7 +690,8 @@ object Core {
             }
         }
 
-        .setBinaryFunction("pipe_base64encode") { _, subject, _ ->
+        .defineFilter("base64encode") { _, subject, args ->
+            args.requireEmpty()
             when (subject) {
                 is ByteString -> subject.base64()
                 is ByteArray -> subject.toByteString().base64()
@@ -552,41 +708,47 @@ object Core {
             }
         }
 
-        .setBinaryFunction("pipe_to_json") { _, subject, _ -> toJson(subject) }
-        .setBinaryFunction("pipe_tojson") { _, subject, _ -> toJson(subject) }
-        .setBinaryFunction("pipe_json") { _, subject, _ -> toJson(subject) }
-        .setBinaryFunction("pipe_to_yaml") { _, subject, _ -> toYaml(subject) }
-        .setBinaryFunction("pipe_toyaml") { _, subject, _ -> toYaml(subject) }
-        .setBinaryFunction("pipe_yaml") { _, subject, _ -> toYaml(subject) }
+        .defineFilter("to_json", ::toJsonFilter)
+        .defineFilter("tojson", ::toJsonFilter)
+        .defineFilter("json", ::toJsonFilter)
+        .defineFilter("to_yaml", ::toYamlFilter)
+        .defineFilter("toyaml", ::toYamlFilter)
+        .defineFilter("yaml", ::toYamlFilter)
 
-        .setRescueFunction("is_defined") { _, _, _ -> false }
-        .setRescueFunction("is_not_defined") { _, _, _ -> true }
-        .setBinaryFunction("is_defined") { _, _, _ -> true }
-        .setBinaryFunction("is_not_defined") { _, _, _ -> false }
+        .defineTest("eq", ::eqTest, ::notEqTest)
+        .defineTest("equalto", ::eqTest, ::notEqTest)
+        .defineTest("==", ::eqTest, ::notEqTest)
 
-        .setBinaryFunction("is_string") { _, subject, _ -> isString(subject) }
-        .setBinaryFunction("is_not_string") { _, subject, _ -> !isString(subject) }
-
-        .setBinaryFunction("is_iterable") { _, subject, _ -> isIterable(subject) }
-        .setBinaryFunction("is_not_iterable") { _, subject, _ -> !isIterable(subject) }
-
-        .setBinaryFunction("invoke_keys") { _, subject, _ ->
-            when (subject) {
-                is Map<*, *> -> subject.keys.toList()
-                is List<*> -> listOf("size") + (0 until subject.size).toList()
-                else -> Undefined("$subject.keys() is not a function")
-            }
+        .defineRescueMethod("defined", "is") { _, _, args ->
+            args.requireEmpty()
+            false
         }
 
-        .setBinaryFunction("invoke") { ctx, subject, args ->
-            when (subject) {
-                is UnaryFunction -> {
-                    subject.invoke(ctx, args)
-                }
+        .defineRescueMethod("defined", "is_not") { _, _, args ->
+            args.requireEmpty()
+            true
+        }
 
-                else -> {
-                    Undefined("$subject is not a function")
-                }
+        .defineTest("defined",
+            { _, _, args ->
+                args.requireEmpty()
+                true
+            },
+            { _, _, args ->
+                args.requireEmpty()
+                false
+            }
+        )
+
+        .defineTest("string", ::isStringTest, ::isNotStringTest)
+        .defineTest("iterable", ::isIterableTest, ::isNotIterableTest)
+
+        .defineMethod("keys") { _, subject, args ->
+            args.requireEmpty()
+            when (subject) {
+                is Map<*, *> -> subject.keys.toList()
+                is List<*> -> (0 until subject.size).toList()
+                else -> Undefined("$subject.keys() is not a function")
             }
         }
 

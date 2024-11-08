@@ -2,6 +2,7 @@ import org.cikit.forte.*
 import org.cikit.forte.parser.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class TestParser {
@@ -153,6 +154,13 @@ class TestParser {
                 v is Expression.BooleanLiteral && v.value
             })
             op.left as Expression.ObjectLiteral
+        }
+    }
+
+    @Test
+    fun testError() {
+        assertFails {
+            Forte.parseTemplate("xxx\n{% fu ")
         }
     }
 }

@@ -129,7 +129,11 @@ class TemplateParser private constructor(
                     nodes += parseEmit(t)
                 }
 
-                else -> throw ParseException(t, "unexpected token")
+                else -> throw ParseException(
+                    tokenizer,
+                    t,
+                    "unexpected token $t"
+                )
             }
         }
         return nodes.toList()
@@ -138,7 +142,11 @@ class TemplateParser private constructor(
     private fun parseComment(startToken: Token): Node.Comment {
         val (txt, t) = tokenizer.tokenizeEndComment()
         if (t !is Token.EndComment) {
-            throw ParseException(startToken, t, "unclosed comment")
+            throw ParseException(
+                tokenizer,
+                t,
+                "expected 'end comment' token"
+            )
         }
         return Node.Comment(startToken, txt, t)
     }
@@ -146,7 +154,7 @@ class TemplateParser private constructor(
     private fun parseCommand(startToken: Token): Node.Command {
         val nameToken = tokenizer.tokenize(skipSpace = true)
         if (nameToken !is Token.Identifier) {
-            throw ParseException(nameToken, "expected command name")
+            throw ParseException(tokenizer, nameToken, "expected command name")
         }
         val name = input.substring(nameToken.first..nameToken.last)
         val argsParser = when {
@@ -170,7 +178,8 @@ class TemplateParser private constructor(
                 }
                 if (endToken.first < t.first) {
                     throw ParseException(
-                        startToken, t,
+                        tokenizer,
+                        t,
                         "parsing command exceeded command end token"
                     )
                 }
@@ -213,28 +222,21 @@ class TemplateParser private constructor(
                 override val args: MutableMap<String, Expression>
                     get() = args
             }
-            try {
-                argsParser(argBuilder)
-                val endToken = tokenizer.tokenize(skipSpace = true)
-                require(endToken is Token.EndCommand) {
-                    "expected end command, found: $endToken"
-                }
-                return Node.Command(
-                    startToken,
-                    name,
-                    Expression.NamedArgs(
-                        args.keys.toList(),
-                        args.values.toList()
-                    ),
-                    endToken
-                )
-            } catch (ex: Throwable) {
+            argsParser(argBuilder)
+            val endToken = tokenizer.tokenize(skipSpace = true)
+            if (endToken !is Token.EndCommand) {
                 throw ParseException(
-                    startToken,
-                    "error parsing args for command '$name'",
-                    ex
+                    tokenizer,
+                    endToken,
+                    "expected 'end command' token"
                 )
             }
+            return Node.Command(
+                startToken,
+                name,
+                args.toMap(),
+                endToken
+            )
         }
         // generic
         val args = mutableListOf<Expression>()
@@ -248,11 +250,15 @@ class TemplateParser private constructor(
                 is Token.EndCommand -> Node.Command(
                     startToken,
                     name,
-                    Expression.NamedArgs(values = args.toList()),
+                    args.mapIndexed { i, v -> i.toString() to v }.toMap(),
                     t
                 )
 
-                else -> throw ParseException(t, "unexpected token")
+                else -> throw ParseException(
+                    tokenizer,
+                    t,
+                    "unexpected token $t"
+                )
             }
         }
     }
@@ -266,6 +272,7 @@ class TemplateParser private constructor(
         while (true) {
             val content = copy(context = decl).parse()
             val last = content.last() as? Node.Command ?: throw ParseException(
+                tokenizer,
                 content.last(),
                 "expected end command ${decl.endAliases}"
             )
@@ -301,7 +308,11 @@ class TemplateParser private constructor(
         val content = exprParser.parseExpression()
         val t = tokenizer.tokenize(skipSpace = true)
         if (t !is Token.EndEmit) {
-            throw ParseException(startToken, t, "unclosed emit")
+            throw ParseException(
+                tokenizer,
+                t,
+                "expected 'end emit' token"
+            )
         }
         return Node.Emit(startToken, content, t)
     }
@@ -392,8 +403,8 @@ private class ExpressionParserImpl(
                         tokens1, op1, mutLhs, rhs.name, rhs.args
                     )
                     else -> throw ParseException(
+                        tokenizer,
                         tokens1.first(),
-                        tokens1.last(),
                         "expected extension function call"
                     )
                 }
@@ -408,8 +419,8 @@ private class ExpressionParserImpl(
                         op1.left && op2.left -> break
                         !op1.right || !op2.right -> {
                             throw ParseException(
+                                tokenizer,
                                 tokens2.first(),
-                                tokens2.last(),
                                 "unexpected operator"
                             )
                         }
@@ -449,8 +460,11 @@ private class ExpressionParserImpl(
                     return Expression.StringLiteral(t, t2, content.toString())
                 }
                 is Token.Escape -> {
-                    val s = evalEscape(input[t2.last])
-                        ?: throw ParseException(t2, t2, "invalid escape")
+                    val s = evalEscape(input[t2.last]) ?: throw ParseException(
+                        tokenizer,
+                        t2,
+                        "invalid escape"
+                    )
                     content.append(s)
                 }
                 is Token.UnicodeEscape -> {
@@ -460,8 +474,9 @@ private class ExpressionParserImpl(
                     content.append(hex.toInt(16).toChar())
                 }
                 else -> throw ParseException(
-                    t, t2,
-                    "unexpected token in string"
+                    tokenizer,
+                    t,
+                    "unexpected token $t in string"
                 )
             }
         }
@@ -490,8 +505,11 @@ private class ExpressionParserImpl(
                     return Expression.StringInterpolation(content)
                 }
                 is Token.Escape -> {
-                    val s = evalEscape (input[t2.last])
-                        ?: throw ParseException(t2, t2, "invalid escape")
+                    val s = evalEscape (input[t2.last]) ?: throw ParseException(
+                        tokenizer,
+                        t2,
+                        "invalid escape"
+                    )
                     if (isConstString) {
                         constContent.append(s)
                     }
@@ -512,13 +530,18 @@ private class ExpressionParserImpl(
                     val subExpr = parseExpression()
                     val t3 = tokenizer.tokenize(skipSpace = true)
                     if (t3 !is Token.RBrace) {
-                        throw ParseException(t3, "expected closing brace")
+                        throw ParseException(
+                            tokenizer,
+                            t3,
+                            "expected closing brace"
+                        )
                     }
                     content += subExpr
                 }
                 else -> throw ParseException(
-                    t, t2,
-                    "unexpected token in string"
+                    tokenizer,
+                    t,
+                    "unexpected token $t in string"
                 )
             }
         }
@@ -556,7 +579,11 @@ private class ExpressionParserImpl(
                     val content = parseExpression()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RPar) {
-                        throw ParseException(t2, "expected closing parenthesis")
+                        throw ParseException(
+                            tokenizer,
+                            t2,
+                            "expected closing parenthesis"
+                        )
                     }
                     primary = Expression.SubExpression(content)
                     break
@@ -567,7 +594,11 @@ private class ExpressionParserImpl(
                     val args = parseList()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBracket) {
-                        throw ParseException(t2, "expected closing bracket")
+                        throw ParseException(
+                            tokenizer,
+                            t2,
+                            "expected closing bracket"
+                        )
                     }
                     primary = Expression.ArrayLiteral(t, t2, args)
                     break
@@ -578,7 +609,11 @@ private class ExpressionParserImpl(
                     val args = parsePairs()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBrace) {
-                        throw ParseException(t2, "expected closing brace")
+                        throw ParseException(
+                            tokenizer,
+                            t2,
+                            "expected closing brace"
+                        )
                     }
                     primary = Expression.ObjectLiteral(t, t2, args)
                     break
@@ -669,12 +704,17 @@ private class ExpressionParserImpl(
                     val args = parseExpressionOrNull()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBracket) {
-                        throw ParseException(t2, "expected closing bracket")
+                        throw ParseException(
+                            tokenizer,
+                            t2,
+                            "expected closing bracket"
+                        )
                     }
                     val arg = when (args) {
                         null -> throw ParseException(
+                            tokenizer,
                             t2,
-                            "unexpected token"
+                            "unexpected token $t2"
                         )
                         else -> args
                     }
@@ -685,7 +725,11 @@ private class ExpressionParserImpl(
                     val args = parseArgList()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RPar) {
-                        throw ParseException(t2, "expected closing parenthesis")
+                        throw ParseException(
+                            tokenizer,
+                            t2,
+                            "expected closing parenthesis"
+                        )
                     }
                     primary = when (primary) {
                         is Expression.Variable -> {
@@ -735,7 +779,7 @@ private class ExpressionParserImpl(
             }
             val t = tokenizer.peek(true)
             if (t !is Token.Colon) {
-                throw ParseException(t, "expected colon")
+                throw ParseException(tokenizer, t, "expected colon")
             }
             tokenizer.consume(t)
             val value = parseExpression()
@@ -760,7 +804,11 @@ private class ExpressionParserImpl(
             if (t is Token.Assign) {
                 haveNamedArg = true
                 if (expression !is Expression.Variable) {
-                    throw ParseException(expression, "expected arg name")
+                    throw ParseException(
+                        tokenizer,
+                        expression,
+                        "expected arg name"
+                    )
                 }
                 tokenizer.consume(t)
                 names += expression.name
@@ -772,7 +820,11 @@ private class ExpressionParserImpl(
                 tokenizer.consume(t2)
             } else {
                 if (haveNamedArg) {
-                    throw ParseException(expression, "expected named arg")
+                    throw ParseException(
+                        tokenizer,
+                        expression,
+                        "expected named arg"
+                    )
                 }
                 values += expression
                 argIndex++

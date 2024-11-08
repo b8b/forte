@@ -105,3 +105,20 @@ apply_int: {{ '123'|int }}
 {{- a + b -}}
 {% endmacro %}{{ test1() }}
 ```
+
+## Regex
+```Twig
+true,xxc,abc
+~
+{{- "abc"|matches_regex("[a-z]+") -}},
+{{- "abc"|regex_replace("[A-B]", "x") -}},
+{{- "abc"|regex_replace("[A-B]", "x", ignore_case = false) -}}
+```
+
+## Reject
+```Twig
+[1,3],[2]
+~
+{{- [1, 2, 3]|reject("==", 2)|json -}},
+{{- [1, 2, 3]|select("==", 2)|json -}}
+```

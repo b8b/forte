@@ -5,31 +5,18 @@ sealed class Context<R> {
     abstract fun getVar(name: String): Any?
     abstract fun getCommand(name: String): CommandFunction?
     abstract fun getControl(name: String): ControlFunction?
-    abstract fun getOpFunction(name: String): UnaryOpFunction?
-    abstract fun getFunction(name: String): UnaryFunction?
-    abstract fun getBinaryOpFunction(name: String): BinaryOpFunction?
-    abstract fun getBinaryFunction(name: String): BinaryFunction?
-    abstract fun getRescueFunction(name: String): BinaryFunction?
+    abstract fun getOpFunction(name: String): UnOpFunction?
+    abstract fun getBinaryOpFunction(name: String): BinOpFunction?
+    abstract fun getFunction(name: String): Function?
+    abstract fun getMethod(name: String, operator: String = "invoke"): Method?
+    abstract fun getRescueMethod(name: String, operator: String = "invoke"): Method?
 
     abstract fun builder(): Builder<Unit>
 
     open fun get(subject: Any?, key: Any?): Any? {
-        return when (subject) {
-            null -> Undefined("cannot access property $key of null")
-            is Map<*, *> -> subject[key] ?: Undefined(
-                "$subject does not contain key '$key'"
-            )
-            is List<*> -> when (key) {
-                "size" -> subject.size
-                is Int -> subject.getOrElse(key) {
-                    Undefined("index out of bounds: $subject[$key]")
-                }
-                else -> Undefined(
-                    "cannot access property '$key' of list $subject"
-                )
-            }
-            else -> Undefined("cannot access property '$key' of '$subject'")
-        }
+        return getBinaryOpFunction("get")
+            ?.invoke(this, subject, key)
+            ?: Undefined("get operator function not defined")
     }
 
     interface ResultBuilder<R> {
@@ -75,11 +62,11 @@ sealed class Context<R> {
             Undefined("undefined variable: $name")
         override fun getCommand(name: String): CommandFunction? = null
         override fun getControl(name: String): ControlFunction? = null
-        override fun getOpFunction(name: String): UnaryOpFunction? = null
-        override fun getFunction(name: String): UnaryFunction? = null
-        override fun getBinaryOpFunction(name: String): BinaryOpFunction? = null
-        override fun getBinaryFunction(name: String): BinaryFunction? = null
-        override fun getRescueFunction(name: String): BinaryFunction? = null
+        override fun getOpFunction(name: String): UnOpFunction? = null
+        override fun getBinaryOpFunction(name: String): BinOpFunction? = null
+        override fun getFunction(name: String): Function? = null
+        override fun getMethod(name: String, operator: String): Method? = null
+        override fun getRescueMethod(name: String, operator: String): Method? = null
         override fun builder(): Builder<Unit> = Builder(
             rootContext = this,
             resultBuilder = UnitResultBuilder
@@ -128,7 +115,7 @@ sealed class Context<R> {
             return rootContext.getVar(name)
         }
 
-        fun setCommand(
+        fun defineCommand(
             name: String,
             implementation: CommandFunction
         ): Builder<R> {
@@ -142,7 +129,7 @@ sealed class Context<R> {
                 ?: rootContext.getCommand(name)
         }
 
-        fun setControl(
+        fun defineControl(
             name: String,
             implementation: ControlFunction
         ): Builder<R> {
@@ -156,74 +143,120 @@ sealed class Context<R> {
                 ?: rootContext.getControl(name)
         }
 
-        fun setOpFunction(
+        fun defineOpFunction(
             name: String,
-            implementation: UnaryOpFunction
+            implementation: UnOpFunction
         ): Builder<R> {
-            scope["call_$name"] = implementation
+            scope["unary_$name"] = implementation
             return this
         }
 
-        override fun getOpFunction(name: String): UnaryOpFunction? {
-            return scope["call_$name"]
-                ?.let { it as UnaryOpFunction }
+        override fun getOpFunction(name: String): UnOpFunction? {
+            return scope["unary_$name"]
+                ?.let { it as UnOpFunction }
                 ?: rootContext.getOpFunction(name)
         }
 
-        fun setFunction(
+        fun defineBinaryOpFunction(
             name: String,
-            implementation: UnaryFunction
+            implementation: BinOpFunction
+        ): Builder<R> {
+            scope["binary_$name"] = implementation
+            return this
+        }
+
+        fun defineBinaryOpFunction(
+            name: String,
+            condition: Any?,
+            implementation: UnOpFunction
+        ): Builder<R> {
+            scope["binary_$name"] = object : ConditionalBinOpFunction {
+                override fun condition(ctx: Context<*>, arg: Any?) = arg == condition
+                override fun invoke(ctx: Context<*>, arg: Any?): Any? {
+                    return implementation.invoke(ctx, arg)
+                }
+            }
+            return this
+        }
+
+        fun defineBinaryOpFunction(
+            name: String,
+            condition: (ctx: Context<*>, arg: Any?) -> Boolean,
+            implementation: UnOpFunction
+        ): Builder<R> {
+            scope["binary_$name"] = object : ConditionalBinOpFunction {
+                override fun condition(ctx: Context<*>, arg: Any?) = condition(ctx, arg)
+                override fun invoke(ctx: Context<*>, arg: Any?): Any? {
+                    return implementation.invoke(ctx, arg)
+                }
+            }
+            return this
+        }
+
+        override fun getBinaryOpFunction(name: String): BinOpFunction? {
+            return scope["binary_$name"]
+                ?.let { it as BinOpFunction }
+                ?: rootContext.getBinaryOpFunction(name)
+        }
+
+        fun defineFunction(
+            name: String,
+            implementation: Function
         ): Builder<R> {
             scope["call_$name"] = implementation
             return this
         }
 
-        override fun getFunction(name: String): UnaryFunction? {
+        override fun getFunction(name: String): Function? {
             return scope["call_$name"]
-                ?.let { it as UnaryFunction }
+                ?.let { it as Function }
                 ?: rootContext.getFunction(name)
         }
 
-        fun setBinaryOpFunction(
+        fun defineMethod(
             name: String,
-            implementation: BinaryOpFunction
+            implementation: Method
         ): Builder<R> {
-            scope["apply_$name"] = implementation
+            scope["apply_invoke_$name"] = implementation
             return this
         }
 
-        override fun getBinaryOpFunction(name: String): BinaryOpFunction? {
-            return scope["apply_$name"]
-                ?.let { it as BinaryOpFunction }
-                ?: rootContext.getBinaryOpFunction(name)
-        }
-
-        fun setBinaryFunction(
+        fun defineMethod(
             name: String,
-            implementation: BinaryFunction
+            operator: String,
+            implementation: Method
         ): Builder<R> {
-            scope["apply_$name"] = implementation
+            scope["apply_${operator}_$name"] = implementation
             return this
         }
 
-        override fun getBinaryFunction(name: String): BinaryFunction? {
-            return scope["apply_$name"]
-                ?.let { it as BinaryFunction }
-                ?: rootContext.getBinaryFunction(name)
+        override fun getMethod(name: String, operator: String): Method? {
+            return scope["apply_${operator}_$name"]
+                ?.let { it as Method }
+                ?: rootContext.getMethod(name, operator)
         }
 
-        fun setRescueFunction(
+        fun defineRescueMethod(
             name: String,
-            implementation: BinaryFunction
+            implementation: Method
         ): Builder<R> {
-            scope["rescue_$name"] = implementation
+            scope["rescue_invoke_$name"] = implementation
             return this
         }
 
-        override fun getRescueFunction(name: String): BinaryFunction? {
-            return scope["rescue_$name"]
-                ?.let { it as BinaryFunction }
-                ?: rootContext.getRescueFunction(name)
+        fun defineRescueMethod(
+            name: String,
+            operator: String,
+            implementation: Method
+        ): Builder<R> {
+            scope["rescue_${operator}_$name"] = implementation
+            return this
+        }
+
+        override fun getRescueMethod(name: String, operator: String): Method? {
+            return scope["rescue_${operator}_$name"]
+                ?.let { it as Method }
+                ?: rootContext.getRescueMethod(name, operator)
         }
 
         override fun builder(): Builder<Unit> = Builder(
@@ -292,16 +325,16 @@ sealed class Context<R> {
             scope["cmd_$name"] as CommandFunction?
         override fun getControl(name: String): ControlFunction? =
             scope["control_$name"] as ControlFunction?
-        override fun getOpFunction(name: String): UnaryOpFunction? =
-            scope["call_$name"] as UnaryOpFunction?
-        override fun getFunction(name: String): UnaryFunction? =
-            scope["call_$name"] as UnaryFunction?
-        override fun getBinaryOpFunction(name: String): BinaryOpFunction? =
-            scope["apply_$name"] as BinaryOpFunction?
-        override fun getBinaryFunction(name: String): BinaryFunction? =
-            scope["apply_$name"] as BinaryFunction?
-        override fun getRescueFunction(name: String): BinaryFunction? =
-            scope["rescue_$name"] as BinaryFunction?
+        override fun getOpFunction(name: String): UnOpFunction? =
+            scope["unary_$name"]?.let { it as UnOpFunction }
+        override fun getBinaryOpFunction(name: String): BinOpFunction? =
+            scope["binary_$name"]?.let { it as BinOpFunction }
+        override fun getFunction(name: String): Function? =
+            scope["call_$name"]?.let { it as Function }
+        override fun getMethod(name: String, operator: String): Method? =
+            scope["apply_${operator}_$name"]?.let { it as Method }
+        override fun getRescueMethod(name: String, operator: String): Method? =
+            scope["rescue_${operator}_$name"]?.let { it as Method }
         override fun builder(): Builder<Unit> = Builder(
             rootContext = this,
             resultBuilder = UnitResultBuilder
@@ -332,34 +365,34 @@ sealed class Context<R> {
                 ?: rootContext.getControl(name)
         }
 
-        override fun getOpFunction(name: String): UnaryOpFunction? {
-            return scope["call_$name"]
-                ?.let { it as UnaryOpFunction }
+        override fun getOpFunction(name: String): UnOpFunction? {
+            return scope["unary_$name"]
+                ?.let { it as UnOpFunction }
                 ?: rootContext.getOpFunction(name)
         }
 
-        override fun getFunction(name: String): UnaryFunction? {
-            return scope["call_$name"]
-                ?.let { it as UnaryFunction }
-                ?: rootContext.getFunction(name)
-        }
-
-        override fun getBinaryOpFunction(name: String): BinaryOpFunction? {
-            return scope["apply_$name"]
-                ?.let { it as BinaryOpFunction }
+        override fun getBinaryOpFunction(name: String): BinOpFunction? {
+            return scope["binary_$name"]
+                ?.let { it as BinOpFunction }
                 ?: rootContext.getBinaryOpFunction(name)
         }
 
-        override fun getBinaryFunction(name: String): BinaryFunction? {
-            return scope["apply_$name"]
-                ?.let { it as BinaryFunction }
-                ?: rootContext.getBinaryFunction(name)
+        override fun getFunction(name: String): Function? {
+            return scope["call_$name"]
+                ?.let { it as Function }
+                ?: rootContext.getFunction(name)
         }
 
-        override fun getRescueFunction(name: String): BinaryFunction? {
-            return scope["rescue_$name"]
-                ?.let { it as BinaryFunction }
-                ?: rootContext.getRescueFunction(name)
+        override fun getMethod(name: String, operator: String): Method? {
+            return scope["apply_${operator}_$name"]
+                ?.let { it as Method }
+                ?: rootContext.getMethod(name, operator)
+        }
+
+        override fun getRescueMethod(name: String, operator: String): Method? {
+            return scope["rescue_${operator}_$name"]
+                ?.let { it as Method }
+                ?: rootContext.getRescueMethod(name, operator)
         }
 
         override fun builder(): Builder<Unit> = Builder(
