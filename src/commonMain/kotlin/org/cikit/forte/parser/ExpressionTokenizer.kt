@@ -1,10 +1,10 @@
 package org.cikit.forte.parser
 
-import okio.Path
+import org.cikit.forte.core.UPath
 
 interface ExpressionTokenizer {
     val input: String
-    val path: Path?
+    val path: UPath?
     fun tokenizeSingleString(): Pair<Token, Token>
     fun tokenizeDoubleString(): Pair<Token, Token>
     fun tokenize(skipSpace: Boolean = false): Token

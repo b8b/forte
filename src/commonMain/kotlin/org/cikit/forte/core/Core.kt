@@ -1,11 +1,13 @@
 package org.cikit.forte.core
 
-import okio.ByteString
-import okio.ByteString.Companion.decodeBase64
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.decodeToByteString
+import kotlinx.io.bytestring.encode
 import org.cikit.forte.emitter.JsonEmitter
 import org.cikit.forte.emitter.YamlEmitter
 import org.cikit.forte.parser.Expression
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.roundToInt
 
 object Core {
@@ -682,9 +684,9 @@ object Core {
 
         .defineFilter("base64decode") { _, subject, args ->
             args.requireEmpty()
+            @OptIn(ExperimentalEncodingApi::class)
             when (subject) {
-                is String -> subject.decodeBase64()?.toByteArray()
-                    ?: Undefined("error decoding base64")
+                is String -> Base64.decodeToByteString(subject)
 
                 else -> Undefined("invalid type for base64decode: $subject")
             }
@@ -692,15 +694,16 @@ object Core {
 
         .defineFilter("base64encode") { _, subject, args ->
             args.requireEmpty()
+            @OptIn(ExperimentalEncodingApi::class)
             when (subject) {
-                is ByteString -> subject.base64()
-                is ByteArray -> subject.toByteString().base64()
+                is ByteString -> Base64.UrlSafe.encode(subject)
+                is ByteArray -> Base64.UrlSafe.encode(subject)
                 else -> when (subject) {
                     is List<*> -> {
                         val result = ByteArray(subject.size) { i ->
                             (subject[i] as Int).toByte()
                         }
-                        result.toByteString().base64()
+                        Base64.UrlSafe.encode(result)
                     }
 
                     else -> Undefined("invalid type for base64encode: $subject")

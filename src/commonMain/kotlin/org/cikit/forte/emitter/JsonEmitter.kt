@@ -1,10 +1,12 @@
 package org.cikit.forte.emitter
 
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.encode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class JsonEmitter(
     val target: Appendable,
@@ -104,6 +106,7 @@ class JsonEmitter(
     override fun emitNull() {
         emitEncoded("null")
     }
+
     override fun emitScalar(value: Boolean) {
         when (value) {
             true -> emitEncoded("true")
@@ -124,22 +127,23 @@ class JsonEmitter(
                     emitScalar(element)
                 }
             }
-            else -> emit(value.toByteString())
+            else -> emit(ByteString(value))
         }
     }
 
     override fun emitScalar(value: ByteString) {
+        @OptIn(ExperimentalEncodingApi::class)
         when (byteStringEncoding) {
             ByteStringEncoding.ARRAY -> emitArray {
                 for (i in 0 until value.size) {
                     emitScalar(value[i])
                 }
             }
-            ByteStringEncoding.BASE64 -> emit(value.base64())
+            ByteStringEncoding.BASE64 -> emit(Base64.Mime.encode(value))
             ByteStringEncoding.YAML -> {
                 val encoded = buildString {
                     append("!!binary ")
-                    append(Json.encodeToString(value.base64()))
+                    append(Json.encodeToString(Base64.Mime.encode(value)))
                 }
                 emitEncoded(encoded)
             }

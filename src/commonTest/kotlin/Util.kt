@@ -1,5 +1,5 @@
-import okio.Path.Companion.toPath
 import org.cikit.forte.Forte
+import org.cikit.forte.core.UPath
 import kotlin.test.assertEquals
 
 expect fun readTests(fileName: String): String
@@ -8,7 +8,7 @@ private fun Forte.runTest(testName: String, testSource: String) {
     println("--- $testName ---")
     val expect = testSource.substringBefore("\n~\n")
     val templateSource = testSource.substringAfter("\n~\n")
-    val result = evalTemplateToString(templateSource, testName.toPath())
+    val result = evalTemplateToString(templateSource, UPath(testName))
     assertEquals(expect, result)
 }
 

@@ -1,10 +1,6 @@
 package org.cikit.forte
 
-import okio.Path
-import org.cikit.forte.core.Context
-import org.cikit.forte.core.Core
-import org.cikit.forte.core.evalExpression
-import org.cikit.forte.core.evalTemplate
+import org.cikit.forte.core.*
 import org.cikit.forte.parser.*
 
 sealed class Forte(
@@ -13,13 +9,13 @@ sealed class Forte(
 ) {
     companion object Default : Forte()
 
-    fun parser(input: String, path: Path? = null) =
+    fun parser(input: String, path: UPath? = null) =
         parser(Tokenizer(input, path))
 
     fun parser(tokenizer: TemplateTokenizer) =
         TemplateParser(tokenizer, declarations)
 
-    fun parseTemplate(input: String, path: Path? = null) =
+    fun parseTemplate(input: String, path: UPath? = null) =
         parser(input, path).parseTemplate()
 
     fun parseTemplate(tokenizer: TemplateTokenizer) =
@@ -61,7 +57,7 @@ sealed class Forte(
 
     fun evalTemplate(
         input: String,
-        path: Path? = null,
+        path: UPath? = null,
         vars: Map<String, Any?> = emptyMap()
     ): Context<Unit> {
         val parsedTemplate = parseTemplate(input, path)
@@ -71,7 +67,7 @@ sealed class Forte(
     fun evalTemplate(
         input: String,
         vararg vars: Pair<String, Any?>,
-        path: Path? = null
+        path: UPath? = null
     ): Context<Unit> {
         val parsedTemplate = parseTemplate(input, path)
         return scope().setVars(*vars).evalTemplate(parsedTemplate)
@@ -79,7 +75,7 @@ sealed class Forte(
 
     fun evalTemplateToString(
         input: String,
-        path: Path? = null,
+        path: UPath? = null,
         vars: Map<String, Any?> = emptyMap()
     ): String {
         val parsedTemplate = parseTemplate(input, path)
@@ -92,7 +88,7 @@ sealed class Forte(
     fun evalTemplateToString(
         input: String,
         vararg vars: Pair<String, Any?>,
-        path: Path? = null
+        path: UPath? = null
     ): String {
         val parsedTemplate = parseTemplate(input, path)
         return captureToString()

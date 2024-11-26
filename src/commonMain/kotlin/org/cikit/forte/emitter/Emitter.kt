@@ -1,10 +1,7 @@
 package org.cikit.forte.emitter
 
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
 
 interface Emitter {
     fun emitNull()

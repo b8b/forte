@@ -1,6 +1,6 @@
 package org.cikit.forte.parser
 
-import okio.Path
+import org.cikit.forte.core.UPath
 
 private object Patterns {
     val beginComment =   """\{#-?""".toRegex() to Token::BeginComment
@@ -72,7 +72,7 @@ private val doubleEscapeTokenizer = RegexTokenizer(
 
 class Tokenizer(
     override val input: String,
-    override val path: Path? = null,
+    override val path: UPath? = null,
     val tokenInspector: ((Token) -> Unit)? = null
 ) : TemplateTokenizer {
     private var startIndex: Int = 0

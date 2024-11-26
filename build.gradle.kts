@@ -4,20 +4,20 @@ plugins {
 }
 
 group = "org.cikit"
-version = "0.3.0"
+version = "0.4.0"
 
 repositories {
     mavenCentral()
 }
 
 kotlin {
+    jvmToolchain(8)
     jvm {
-        jvmToolchain(8)
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
     }
-    js(IR) {
+    js {
         nodejs {
             binaries.executable()
         }
@@ -25,9 +25,9 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-                api("com.squareup.okio:okio:3.9.1")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                api("org.jetbrains.kotlinx:kotlinx-io-bytestring:0.6.0")
             }
         }
         commonTest {

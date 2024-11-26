@@ -1,9 +1,9 @@
 package org.cikit.forte.parser
 
-import okio.Path
+import org.cikit.forte.core.UPath
 
 class ParsedTemplate(
     val input: String,
-    val path: Path?,
+    val path: UPath?,
     val nodes: List<Node>
 )

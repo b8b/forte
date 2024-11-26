@@ -1,10 +1,12 @@
 package org.cikit.forte.emitter
 
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.encode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * TODO: push lines to target Appendable on every emitEnd() rather than buffering the whole output
@@ -20,7 +22,7 @@ class YamlEmitter(val target: Appendable) : Emitter {
     override fun emitScalar(value: ByteString) = emitter.emitScalar(value)
 
     override fun emitScalar(value: ByteArray) {
-        emitter.emitScalar(value.toByteString())
+        emitter.emitScalar(ByteString(value))
     }
 
     override fun <T> emit(serializer: KSerializer<T>, value: T) {
@@ -174,10 +176,11 @@ private class YamlShallowEmitter(
         }
     }
 
-    override fun emitScalar(value: ByteArray) = emitScalar(value.toByteString())
+    override fun emitScalar(value: ByteArray) = emitScalar(ByteString(value))
 
     override fun emitScalar(value: ByteString) {
-        val base64 = value.base64().chunked(76)
+        @OptIn(ExperimentalEncodingApi::class)
+        val base64 = Base64.Mime.encode(value).split('\n')
         val encoded = Array(base64.size + 1) { i ->
             if (i == 0) {
                 "!!binary |-"
