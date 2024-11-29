@@ -7,6 +7,11 @@ class TestGlob {
     @Test
     fun testBasic() {
         assertEquals("abc", Glob("abc").toRegex().pattern)
+        assertEquals("abc", Glob("abc").pattern)
+        assertTrue(Glob("Icon\r").toRegex().matches("Icon\r"))
+        assertTrue(Glob("abc\ndef", ignoreCase = true).toRegex().matches("ABC\ndef"))
+        assertEquals("Icon\\\$", Glob("Icon\$").regexPattern.getOrThrow())
+        assertEquals("Icon\\^", Glob("Icon^").regexPattern.getOrThrow())
     }
 
     @Test
@@ -20,15 +25,90 @@ class TestGlob {
 
     @Test
     fun testMatchingPower() {
-        assertEquals(Glob.MatchingPower.ALL, Glob("*").matchingPower)
-        assertEquals(Glob.MatchingPower.ONE, Glob("foo").matchingPower)
-        assertEquals(Glob.MatchingPower.SOME, Glob("foo*").matchingPower)
+        Glob("*?*").let { glob ->
+            assertEquals(Glob.MatchingPower.ALL, glob.matchingPower)
+            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
+        }
+
+        Glob("***", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.ALL, glob.matchingPower)
+            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
+        }
+
+        Glob("*?*", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
+            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
+        }
+
+        Glob("foo").let { glob ->
+            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
+            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
+        }
+
+        Glob("foo*").let { glob ->
+            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
+            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
+        }
+
+        Glob("/foo", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
+            assertEquals(
+                Glob.MatchingProperties(
+                    requireAbsolutePath = true
+                ),
+                glob.matchingProperties
+            )
+        }
+
+        Glob("//foo", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
+            assertEquals(
+                Glob.MatchingProperties(
+                    requireAbsolutePath = true,
+                    requireNormalized = false
+                ),
+                glob.matchingProperties
+            )
+        }
+
+        Glob("a/foo", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
+            assertEquals(
+                Glob.MatchingProperties(
+                    requireRelativePath = true
+                ),
+                glob.matchingProperties
+            )
+        }
+
+        Glob("a/foo?/", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
+            assertEquals(
+                Glob.MatchingProperties(
+                    requireRelativePath = true,
+                    requireDirectory = true
+                ),
+                glob.matchingProperties
+            )
+        }
+
+        Glob("a/foo?//", Glob.Flavor.Git).let { glob ->
+            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
+            assertEquals(
+                Glob.MatchingProperties(
+                    requireRelativePath = true,
+                    requireDirectory = true,
+                    requireNormalized = false
+                ),
+                glob.matchingProperties
+            )
+        }
     }
 
     @Test
     fun testGitIgnore() {
-        assertGitTranspiles("(.*?/)*",                  "")
-        assertGitTranspiles("(.*?/)*foo",               "foo")
+        assertGitTranspiles("",                         "")
+        assertGitTranspiles("foo",                      "foo")
         assertGitTranspiles("/(.*?/)*a/b/c",            "/**/a/b/c")
         assertGitTranspiles("/[^/]*/a/b/c",             "/*/a/b/c")
         assertGitTranspiles("a/b/c",                    "a/b/c")
@@ -36,10 +116,16 @@ class TestGlob {
         assertGitTranspiles("a/(.*?/)*c",               "a/***/c")
         assertGitTranspiles("a/a[^/]*/c",               "a/a**/c")
         assertGitTranspiles("\\u0061/a[^/]*/c",         "\\a/a**/c")
-        assertGitTranspiles("(.*?/)*\\u002f",           "\\/")
         assertGitTranspiles("(.*?/)*bar/.*",            "**/bar/**")
-        assertGitTranspiles("(.*?/)*[\\u005b-\\u005d]", "[[-\\]]")
+        assertGitTranspiles("[\\u005b-\\u005d]",        "[[-\\]]")
         assertGitTranspiles("[^/]*/bar/.*",             "*/bar/**")
+    }
+
+    @Test
+    fun testEscapedSeparator() {
+        assertFails {
+            Glob("\\/").toRegex()
+        }
     }
 
     @Test

@@ -579,11 +579,7 @@ object Core {
             args.use {
                 val pattern: String = require("pattern")
                 val ignoreCase: Boolean = optional("ignore_case") { true }
-                val re = if (ignoreCase) {
-                    Glob(pattern).toRegex(RegexOption.IGNORE_CASE)
-                } else {
-                    Glob(pattern).toRegex()
-                }
+                val re = Glob(pattern, ignoreCase = ignoreCase).toRegex()
                 when (subject) {
                     is String -> re.matches(subject)
                     else -> Undefined("invalid type for matchesGlob: $subject")

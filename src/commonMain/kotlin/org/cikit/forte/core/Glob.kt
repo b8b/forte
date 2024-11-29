@@ -31,36 +31,49 @@ package org.cikit.forte.core
  * equivalent to `[[:alnum:]_]`.
  *
  */
-class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
-
+class Glob(
+    val pattern: String,
+    val flavor: Flavor = Flavor.Default,
+    val ignoreCase: Boolean = false
+) {
     val matchingPower: MatchingPower
+    val matchingProperties: MatchingProperties
     val regexPattern: Result<String>
+    val regex: Result<Regex>
 
     init {
         val source = Scanner(pattern)
-        regexPattern = try {
-            Result.success(convertPattern(source))
-        } catch (ex: Throwable) {
-            Result.failure(ex)
+        regexPattern = kotlin.runCatching { convertPattern(source) }
+        regex = runCatching {
+            if (ignoreCase) {
+                regexPattern.getOrThrow().toRegex(RegexOption.IGNORE_CASE)
+            } else {
+                regexPattern.getOrThrow().toRegex()
+            }
         }
         matchingPower = source.matchingPower ?: MatchingPower.ALL
+        matchingProperties = MatchingProperties(
+            requireAbsolutePath = source.requireAbsolutePath,
+            requireRelativePath = source.requireRelativePath,
+            requireDirectory = source.requireDirectory,
+            requireNormalized = source.requireNormalized
+        )
     }
 
-    fun toRegex() = regexPattern.getOrThrow().toRegex()
-
-    fun toRegex(option: RegexOption): Regex {
-        return regexPattern.getOrThrow().toRegex(option)
-    }
-
-    fun toRegex(options: Set<RegexOption>): Regex {
-        return regexPattern.getOrThrow().toRegex(options)
-    }
+    fun toRegex() = regex.getOrThrow()
 
     enum class MatchingPower {
         ALL,
         ONE,
         SOME
     }
+
+    data class MatchingProperties(
+        val requireAbsolutePath: Boolean = false,
+        val requireRelativePath: Boolean = false,
+        val requireDirectory: Boolean = false,
+        val requireNormalized: Boolean = true
+    )
 
     sealed class Flavor(
         /**
@@ -101,6 +114,36 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
             backslashEscapes = backslashEscapes,
             regexNegate = regexNegate
         )
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Flavor) return false
+
+            if (matchPathName != other.matchPathName) return false
+            if (backslashEscapes != other.backslashEscapes) return false
+            if (regexNegate != other.regexNegate) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = matchPathName.hashCode()
+            result = 31 * result + backslashEscapes.hashCode()
+            result = 31 * result + regexNegate.hashCode()
+            return result
+        }
+
+        override fun toString(): String {
+            return buildString {
+                append("Flavor(matchPathName=")
+                append(matchPathName)
+                append(", backslashEscapes=")
+                append(backslashEscapes)
+                append(", regexNegate=")
+                append(regexNegate)
+                append(")")
+            }
+        }
     }
 
     private companion object {
@@ -216,11 +259,15 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
         }
     }
 
-    private class Scanner(val input: CharSequence) {
+    private inner class Scanner(val input: CharSequence) {
         var index = 0
         var allowDoubleStar = true
         var pathSeparatorCount = 0
         var matchingPower: MatchingPower? = null
+        var requireAbsolutePath: Boolean = false
+        var requireRelativePath: Boolean = false
+        var requireDirectory: Boolean = false
+        var requireNormalized: Boolean = true
 
         fun hasNext() = index < input.length
 
@@ -248,7 +295,11 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
         }
 
         fun haveWildcard() {
-            matchingPower = MatchingPower.SOME
+            if (flavor.matchPathName) {
+                matchingPower = MatchingPower.SOME
+            } else {
+                haveMatchAll()
+            }
         }
 
         fun haveMatchAll() {
@@ -310,6 +361,9 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
                     convertSet(source, target)
                 }
                 '\\' -> {
+                    require(source.peek() != Separator) {
+                        "escaped separator"
+                    }
                     source.haveLiteral()
                     source.allowDoubleStar = false
                     if (flavor.backslashEscapes) {
@@ -330,10 +384,17 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
                     target.append(ch)
                 }
                 '/' -> {
+                    if (target.isEmpty()) {
+                        source.requireAbsolutePath = true
+                    } else if (target.last() == Separator) {
+                        source.requireNormalized = false
+                    }
                     source.haveLiteral()
                     target.append(ch)
                     source.allowDoubleStar = true
-                    if (source.peek() != null) {
+                    if (source.peek() == null) {
+                        source.requireDirectory = true
+                    } else {
                         source.pathSeparatorCount++
                     }
                 }
@@ -345,9 +406,8 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
                 }
             }
         }
-        if (flavor.matchPathName && source.pathSeparatorCount == 0) {
-            source.haveMatchAll()
-            return "(.*?/)*$target"
+        if (source.pathSeparatorCount > 0 && !source.requireAbsolutePath) {
+            source.requireRelativePath = true
         }
         return target.toString()
     }
@@ -454,5 +514,27 @@ class Glob(val pattern: String, val flavor: Flavor = Flavor.Default) {
         if (chars.size > 1) {
             source.haveWildcard()
         }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Glob) return false
+
+        if (pattern != other.pattern) return false
+        if (flavor != other.flavor) return false
+        if (ignoreCase != other.ignoreCase) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = pattern.hashCode()
+        result = 31 * result + flavor.hashCode()
+        result = 31 * result + ignoreCase.hashCode()
+        return result
+    }
+
+    override fun toString(): String {
+        return "Glob(pattern='$pattern')"
     }
 }
