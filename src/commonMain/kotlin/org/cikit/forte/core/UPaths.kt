@@ -78,15 +78,18 @@ class UPath private constructor (
     fun toUrlPath(): String = buildString {
         for (i in encoded.indices) {
             val b = encoded[i].toInt()
-            if (b < 0) {
+            if (b == '/'.code ||
+                b in '0'.code .. '9'.code ||
+                b in 'a'.code .. 'z'.code ||
+                b in 'A'.code .. 'Z'.code) {
+                append(b.toChar())
+            } else {
                 append('%')
-                val hex = (b and 0xFF).toString(16)
+                val hex = (b and 0xFF).toString(16).uppercase()
                 if (hex.length == 1) {
                     append("0")
                 }
                 append(hex)
-            } else {
-                append(b.toChar())
             }
         }
     }

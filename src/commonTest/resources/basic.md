@@ -58,11 +58,11 @@ hello {{ "yes #{true}" }}
 
 ## Undefined
 ```Twig
-x: 1
+x: -1
 OK
 true
 ~
-x: {{ x|default(1) }}
+x: {{ x|default(-1) }}
 {% if x is not defined %}OK{% else %}BAD{% endif %}
 {{ jinja is not defined }}
 ```

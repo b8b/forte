@@ -1,3 +1,5 @@
+import kotlinx.io.bytestring.ByteStringBuilder
+import kotlinx.io.bytestring.append
 import kotlinx.io.bytestring.isEmpty
 import org.cikit.forte.core.*
 import org.junit.jupiter.api.Assertions.*
@@ -294,4 +296,27 @@ class TestPath {
         assertEquals("../c", Path("/a/../../c").relativeTo(Path("/d")).pathString)
         assertEquals("../c", UPath("/a/../../c").relativeTo(UPath("/d")).pathString)
     }
+
+    @Test
+    fun testSpecial() {
+        assertEquals("/usr/bin/%5B", UPath("/usr/bin/[").toUrlPath())
+        if ("unix" in Path("test").javaClass.simpleName.lowercase()) {
+            println("testing unix path")
+            assertEquals(Path("/usr/bin/["), UPath("/usr/bin/[").toNioPath())
+        }
+    }
+
+    @Test
+    fun testTrailingSlash() {
+        val name = UPath("1/2")
+        val dirName = UPath(
+            ByteStringBuilder(name.encoded.size + 1).apply {
+                append(name.encoded)
+                append('/'.code.toByte())
+            }.toByteString()
+        )
+        assertEquals("1/2/", dirName.pathString)
+        assertEquals("1/2", dirName.normalize().pathString)
+    }
+
 }
