@@ -79,6 +79,7 @@ class UPath private constructor (
         for (i in encoded.indices) {
             val b = encoded[i].toInt()
             if (b == '/'.code ||
+                b == '.'.code ||
                 b in '0'.code .. '9'.code ||
                 b in 'a'.code .. 'z'.code ||
                 b in 'A'.code .. 'Z'.code) {
