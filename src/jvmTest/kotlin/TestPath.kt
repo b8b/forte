@@ -319,4 +319,107 @@ class TestPath {
         assertEquals("1/2", dirName.normalize().pathString)
     }
 
+    @Test
+    fun testAllChars() {
+        for (ch in 1 .. 255) {
+            val p1 = UPath("%%%02x".format(ch), DecodeUrlPath)
+            val p2 = p1.toNioPath()
+            val p3 = p2.toUPath()
+            println(p2.pathString)
+            println(p3.toUrlPath())
+            assertEquals(p1.encoded, p3.encoded)
+        }
+    }
+
+    @Test
+    fun testRoot() {
+        val p1 = UPath("/")
+        assertTrue(p1.isAbsolute)
+        assertNull(p1.parent)
+        assertTrue(p1.segments.count() == 0)
+        assertEquals("", p1.extension)
+        assertEquals("", p1.name)
+        assertEquals("", p1.nameWithoutExtension)
+        assertEquals("/", p1.pathString)
+        val p2 = p1.toNioPath()
+        assertTrue(p2.isAbsolute)
+        assertNull(p2.parent)
+        assertTrue(p2.nameCount == 0)
+        assertEquals("", p2.extension)
+        assertEquals("", p2.name)
+        assertEquals("", p2.nameWithoutExtension)
+        assertEquals("/", p2.pathString)
+        println(Path("/bin").toUri().rawPath)
+        assertEquals(p1, p2.toUPath())
+    }
+
+    @Test
+    fun testSingleDot() {
+        val p1 = UPath(".")
+        assertEquals(".", p1.pathString)
+        assertEquals(".", p1.toUrlPath())
+        assertNull(p1.parent)
+        assertEquals(listOf(p1), p1.segments.toList())
+        assertEquals("", p1.extension)
+        assertEquals("", p1.nameWithoutExtension)
+        assertEquals(".", p1.name)
+        assertFalse(p1.isAbsolute)
+        val p2 = p1.toNioPath()
+        assertEquals(".", p2.pathString)
+        assertNull(p2.parent)
+        assertEquals(listOf(p2),
+            (0 until p2.nameCount).map { p2.getName(it) })
+        assertEquals("", p2.extension)
+        assertEquals("", p2.nameWithoutExtension)
+        assertEquals(".", p2.name)
+        assertFalse(p2.isAbsolute)
+        assertEquals(p1, p2.toUPath())
+    }
+
+    @Test
+    fun testEmpty() {
+        val p1 = UPath("")
+        assertEquals("", p1.pathString)
+        assertEquals("", p1.toUrlPath())
+        assertNull(p1.parent)
+        assertEquals(listOf(p1), p1.segments.toList())
+        assertEquals("", p1.extension)
+        assertEquals("", p1.nameWithoutExtension)
+        assertEquals("", p1.name)
+        assertFalse(p1.isAbsolute)
+        val p2 = p1.toNioPath()
+        assertEquals("", p2.pathString)
+        assertNull(p2.parent)
+        assertEquals(listOf(p2),
+            (0 until p2.nameCount).map { p2.getName(it) })
+        assertEquals("", p2.extension)
+        assertEquals("", p2.nameWithoutExtension)
+        assertEquals("", p2.name)
+        assertFalse(p2.isAbsolute)
+        println(Path(".").toUPath())
+        assertEquals(p1, p2.toUPath())
+    }
+
+    @Test
+    fun testDotDot() {
+        val p1 = UPath("..")
+        assertEquals("..", p1.pathString)
+        assertEquals("..", p1.toUrlPath())
+        assertNull(p1.parent)
+        assertEquals(listOf(p1), p1.segments.toList())
+        assertEquals("", p1.extension)
+        assertEquals(".", p1.nameWithoutExtension)
+        assertEquals("..", p1.name)
+        assertFalse(p1.isAbsolute)
+        val p2 = p1.toNioPath()
+        assertEquals("..", p2.pathString)
+        assertNull(p2.parent)
+        assertEquals(listOf(p2),
+            (0 until p2.nameCount).map { p2.getName(it) })
+        assertEquals("", p2.extension)
+        assertEquals(".", p2.nameWithoutExtension)
+        assertEquals("..", p2.name)
+        assertFalse(p2.isAbsolute)
+        assertEquals(p1, p2.toUPath())
+    }
 }
