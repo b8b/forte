@@ -23,87 +23,125 @@ class TestGlob {
         }
     }
 
-    @Test
-    fun testMatchingPower() {
-        Glob("*?*").let { glob ->
-            assertEquals(Glob.MatchingPower.ALL, glob.matchingPower)
-            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
-        }
+    private class AssertedGlob(
+        val glob: Glob,
+        val regex: Regex = glob.regex.getOrThrow()
+    )
 
-        Glob("***", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.ALL, glob.matchingPower)
-            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
-        }
+    private fun Glob.assertRegexPattern(
+        pattern: String,
+        requireAbsolutePath: Boolean = false,
+        requireRelativePath: Boolean = false,
+        requireDirectory: Boolean = false,
+        requireNormalized: Boolean = true
+    ): AssertedGlob {
+        assertEquals(pattern, regexPattern.getOrThrow())
+        assertEquals(requireAbsolutePath, matchingProperties.requireAbsolutePath)
+        assertEquals(requireRelativePath, matchingProperties.requireRelativePath)
+        assertEquals(requireDirectory, matchingProperties.requireDirectory)
+        assertEquals(requireNormalized, matchingProperties.requireNormalized)
+        return AssertedGlob(this)
+    }
 
-        Glob("*?*", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
-            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
-        }
-
-        Glob("foo").let { glob ->
-            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
-            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
-        }
-
-        Glob("foo*").let { glob ->
-            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
-            assertEquals(Glob.MatchingProperties(), glob.matchingProperties)
-        }
-
-        Glob("/foo", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
-            assertEquals(
-                Glob.MatchingProperties(
-                    requireAbsolutePath = true
-                ),
-                glob.matchingProperties
-            )
-        }
-
-        Glob("//foo", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
-            assertEquals(
-                Glob.MatchingProperties(
-                    requireAbsolutePath = true,
-                    requireNormalized = false
-                ),
-                glob.matchingProperties
-            )
-        }
-
-        Glob("a/foo", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
-            assertEquals(
-                Glob.MatchingProperties(
-                    requireRelativePath = true
-                ),
-                glob.matchingProperties
-            )
-        }
-
-        Glob("a/foo?/", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
-            assertEquals(
-                Glob.MatchingProperties(
-                    requireRelativePath = true,
-                    requireDirectory = true
-                ),
-                glob.matchingProperties
-            )
-        }
-
-        Glob("a/foo?//", Glob.Flavor.Git).let { glob ->
-            assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
-            assertEquals(
-                Glob.MatchingProperties(
-                    requireRelativePath = true,
-                    requireDirectory = true,
-                    requireNormalized = false
-                ),
-                glob.matchingProperties
-            )
+    private fun AssertedGlob.assertMatchesOne(
+        sample: String,
+        andNot: Iterable<String> = emptyList()
+    ) {
+        assertEquals(Glob.MatchingPower.ONE, glob.matchingPower)
+        assertTrue(regex.matches(sample))
+        assertFalse(regex.matches("${sample}x"))
+        assertFalse(regex.matches("x$sample"))
+        for (s in andNot) {
+            assertFalse(regex.matches(s))
         }
     }
+
+    private fun AssertedGlob.assertMatchesOne(
+        sample: String,
+        andNot: String
+    ) = assertMatchesOne(sample, listOf(andNot))
+
+    private fun AssertedGlob.assertMatchesAll() {
+        assertEquals(Glob.MatchingPower.ALL, glob.matchingPower)
+        assertTrue(regex.matches(""))
+        assertTrue(regex.matches(" "))
+        assertTrue(regex.matches("x"))
+        assertTrue(regex.matches("xyz"))
+    }
+
+    private fun AssertedGlob.assertMatchesSome(
+        vararg samples: String,
+        andNot: Iterable<String> = emptyList()
+    ) {
+        assertEquals(Glob.MatchingPower.SOME, glob.matchingPower)
+        for (s in samples) {
+            assertTrue(regex.matches(s))
+        }
+        for (s in andNot) {
+            assertFalse(regex.matches(s))
+        }
+    }
+
+    private fun AssertedGlob.assertMatchesSome(
+        vararg samples: String,
+        andNot: String
+    ) = assertMatchesSome(*samples, andNot = listOf(andNot))
+
+    @Test fun matchNonEmpty() = Glob("*?*")
+        .assertRegexPattern(".*..*")
+        .assertMatchesSome("a", "abc", "xy", andNot = "")
+
+    @Test fun matchAll() = Glob("***", Glob.Flavor.Git)
+        .assertRegexPattern(".*")
+        .assertMatchesAll()
+
+    @Test fun matchNonEmptyGit() = Glob("*?*", Glob.Flavor.Git)
+        .assertRegexPattern("[^/]*[^/][^/]*")
+        .assertMatchesSome("a", "abc", "xy", andNot = "")
+
+    @Test fun matchOneRelative() = Glob("foo")
+        .assertRegexPattern("foo")
+        .assertMatchesOne("foo")
+
+    @Test fun matchPrefix() = Glob("foo*")
+        .assertRegexPattern("foo.*")
+        .assertMatchesSome("foo", "foo1", "foo1a", andNot = "1foo")
+
+    @Test fun matchOneAbsolute() = Glob("/foo", Glob.Flavor.Git)
+        .assertRegexPattern("/foo", requireAbsolutePath = true)
+        .assertMatchesOne("/foo")
+
+    @Test fun matchOneNotNormalized() = Glob("//foo", Glob.Flavor.Git)
+        .assertRegexPattern(
+            "//foo",
+            requireAbsolutePath = true,
+            requireNormalized = false
+        )
+        .assertMatchesOne("//foo", andNot = "/foo")
+
+    @Test fun matchRelativeSubPath() = Glob("a/foo", Glob.Flavor.Git)
+        .assertRegexPattern("a/foo", requireRelativePath = true)
+        .assertMatchesOne("a/foo", andNot = "a//foo")
+
+    @Test fun matchRelativeDirWithSingleCharSuffix() =
+        Glob("a/foo?/", Glob.Flavor.Git)
+            .assertRegexPattern(
+                "a/foo[^/]/",
+                requireRelativePath = true,
+                requireDirectory = true
+            )
+            .assertMatchesSome("a/foo1/", "a/foo2/", andNot = "a/foo/")
+
+    @Test
+    fun matchNotNormalizedRelativeDirWithSingleCharSuffix() =
+        Glob("a/foo?//", Glob.Flavor.Git)
+            .assertRegexPattern(
+                "a/foo[^/]//",
+                requireRelativePath = true,
+                requireDirectory = true,
+                requireNormalized = false
+            )
+            .assertMatchesSome("a/foo1//", "a/foo2//")
 
     @Test
     fun testGitIgnore() {

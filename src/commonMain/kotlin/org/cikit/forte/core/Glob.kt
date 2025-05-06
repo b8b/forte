@@ -295,11 +295,7 @@ class Glob(
         }
 
         fun haveWildcard() {
-            if (flavor.matchPathName) {
-                matchingPower = MatchingPower.SOME
-            } else {
-                haveMatchAll()
-            }
+            matchingPower = MatchingPower.SOME
         }
 
         fun haveMatchAll() {
