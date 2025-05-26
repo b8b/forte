@@ -163,4 +163,11 @@ class TestParser {
             Forte.parseTemplate("xxx\n{% fu ")
         }
     }
+
+    @Test
+    fun testCommandWithTrailingGarbage() {
+        assertFails {
+            Forte.parseTemplate("{% macro f(x) for ever %}fail{% endmacro %}")
+        }
+    }
 }

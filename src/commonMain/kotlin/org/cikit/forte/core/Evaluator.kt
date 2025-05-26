@@ -1,5 +1,6 @@
 package org.cikit.forte.core
 
+import org.cikit.forte.eval.tryEvalExpression
 import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.Node
 import org.cikit.forte.parser.ParsedTemplate
@@ -10,6 +11,7 @@ class Branch(
     val body: ParsedTemplate
 )
 
+@Deprecated("migrate to suspending api")
 fun interface CommandFunction {
     operator fun invoke(ctx: Context.Builder<*>, args: Map<String, Expression>)
 }
@@ -121,243 +123,9 @@ private fun Context.Builder<*>.evalCommand(
     }
 }
 
-private class UndefinedResult(
-    val expression: Expression,
-    val value: Undefined
-)
-
+@Deprecated("migrate to suspending api")
 fun Context<*>.evalExpression(expression: Expression): Any? {
-    val result = evalExpressionInternal(expression)
-    if (result is UndefinedResult) {
-        throw EvalException(result.expression, result.value.message)
-    }
-    return result
-}
-
-private fun Context<*>.evalExpressionInternal(
-    expression: Expression
-): Any? = when (expression) {
-    is Expression.Malformed -> throw EvalException(
-        expression,
-        "malformed expression: $expression"
-    )
-    is Expression.SubExpression -> {
-        evalExpressionInternal(expression.content)
-    }
-    is Expression.Variable -> {
-        val result = try {
-            getVar(expression.name)
-        } catch (ex: EvalException) {
-            throw ex
-        } catch (ex: Exception) {
-            throw EvalException(expression, ex.toString(), ex)
-        }
-        if (result is Undefined) {
-            UndefinedResult(expression, result)
-        } else {
-            result
-        }
-    }
-    is Expression.NullLiteral -> null
-    is Expression.BooleanLiteral -> expression.value
-    is Expression.NumericLiteral -> expression.value
-    is Expression.StringLiteral -> expression.value
-    is Expression.StringInterpolation -> expression.children
-        .joinToString("") { evalExpression(it).toString() }
-    is Expression.ArrayLiteral -> expression.children.map {
-        evalExpression(it)
-    }
-    is Expression.ObjectLiteral -> expression.pairs.associate { (k, v) ->
-        val key = when (k) {
-            is Expression.Variable -> k.name
-            is Expression.StringLiteral -> k.value
-            else -> evalExpression(k)
-        }
-        key to evalExpression(v)
-    }
-    is Expression.CompAccess -> {
-        when (val subject = evalExpressionInternal(expression.left)) {
-            is UndefinedResult -> subject
-            else -> {
-                val result = try {
-                    val key = evalExpression(expression.right)
-                    getBinaryOpFunction("get")
-                        ?.invoke(this, subject, key)
-                        ?: Undefined("get operator function not defined")
-                } catch (ex: EvalException) {
-                    throw ex
-                } catch (ex: Exception) {
-                    throw EvalException(expression, ex.toString(), ex)
-                }
-                if (result is Undefined) {
-                    UndefinedResult(expression, result)
-                } else {
-                    result
-                }
-            }
-        }
-    }
-    is Expression.Access -> {
-        when (val subject = evalExpressionInternal(expression.left)) {
-            is UndefinedResult -> subject
-            else -> {
-                val result = try {
-                    getBinaryOpFunction("get")
-                        ?.invoke(this, subject, expression.name)
-                        ?: Undefined("get operator function not defined")
-                } catch (ex: EvalException) {
-                    throw ex
-                } catch (ex: Exception) {
-                    throw EvalException(expression, ex.toString(), ex)
-                }
-                if (result is Undefined) {
-                    UndefinedResult(expression, result)
-                } else {
-                    result
-                }
-            }
-        }
-    }
-    is Expression.FunctionCall -> {
-        val function = getFunction(expression.name) ?: throw EvalException(
-            expression,
-            "undefined function ${expression.name}"
-        )
-        val result = try {
-            function(this, evalArgs(expression.args))
-        } catch (ex: EvalException) {
-            throw ex
-        } catch (ex: Exception) {
-            throw EvalException(expression, ex.toString(), ex)
-        }
-        if (result is Undefined) {
-            UndefinedResult(expression, result)
-        } else {
-            result
-        }
-    }
-    is Expression.UnOp -> {
-        val function = getOpFunction(expression.decl.name)
-            ?: throw EvalException(
-                expression,
-                "undefined unary operator function ${expression.decl.name}"
-            )
-        val result = try {
-            function.invoke(this, evalExpression(expression.right))
-        } catch (ex: EvalException) {
-            throw ex
-        } catch (ex: Exception) {
-            throw EvalException(expression, ex.toString(), ex)
-        }
-        if (result is Undefined) {
-            UndefinedResult(expression, result)
-        } else {
-            result
-        }
-    }
-    is Expression.InvokeOp -> {
-        when (expression.left) {
-            is Expression.Access -> {
-                val subject = evalExpression(expression.left.left)
-                val methodName = expression.left.name
-                val function = getMethod(methodName)
-                    ?: throw EvalException(
-                        expression,
-                        "undefined method $methodName"
-                    )
-                val result = try {
-                    function.invoke(this, subject, evalArgs(expression.args))
-                } catch (ex: EvalException) {
-                    throw ex
-                } catch (ex: Exception) {
-                    throw EvalException(expression.left, ex.toString(), ex)
-                }
-                if (result is Undefined) {
-                    UndefinedResult(expression.left, result)
-                } else {
-                    result
-                }
-            }
-            else -> {
-                val subject = evalExpression(expression.left)
-                val function = getMethod("invoke")
-                    ?: throw EvalException(
-                        expression,
-                        "invoke method not defined"
-                    )
-                val result = try {
-                    function.invoke(this, subject, evalArgs(expression.args))
-                } catch (ex: EvalException) {
-                    throw ex
-                } catch (ex: Exception) {
-                    throw EvalException(expression.left, ex.toString(), ex)
-                }
-                if (result is Undefined) {
-                    UndefinedResult(expression.left, result)
-                } else {
-                    result
-                }
-            }
-        }
-    }
-    is Expression.TransformOp -> {
-        val operator = expression.decl.name
-        val method = expression.name
-        val subject = evalExpressionInternal(expression.left)
-        val (function, finalSubject) = if (subject is UndefinedResult) {
-            val f = getRescueMethod(method, operator) ?: throw EvalException(
-                subject.expression,
-                subject.value.message
-            )
-            f to subject.value
-        } else {
-            val f = getMethod(method, operator) ?: throw EvalException(
-                expression,
-                "undefined `$operator` operator method $method"
-            )
-            f to subject
-        }
-        val result = try {
-            function.invoke(this, finalSubject, evalArgs(expression.args))
-        } catch (ex: EvalException) {
-            throw ex
-        } catch (ex: Exception) {
-            throw EvalException(expression, ex.toString(), ex)
-        }
-        if (result is Undefined) {
-            UndefinedResult(expression, result)
-        } else {
-            result
-        }
-    }
-    is Expression.BinOp -> {
-        val subject = evalExpression(expression.left)
-        val function = getBinaryOpFunction(expression.decl.name)
-            ?: throw EvalException(
-                expression,
-                "undefined operator function ${expression.decl.name}"
-            )
-        val result = try {
-            if (function is ConditionalBinOpFunction) {
-                if (function.condition(this, subject)) {
-                    function.invoke(this, evalExpression(expression.right))
-                } else {
-                    subject
-                }
-            } else {
-                function.invoke(this, subject, evalExpression(expression.right))
-            }
-        } catch (ex: EvalException) {
-            throw ex
-        } catch (ex: Exception) {
-            throw EvalException(expression, ex.toString(), ex)
-        }
-        if (result is Undefined) {
-            UndefinedResult(expression, result)
-        } else {
-            result
-        }
-    }
+    return tryEvalExpression(expression).getOrThrow()
 }
 
 private fun Node.callCommand(
@@ -390,16 +158,4 @@ private fun Node.callControl(
     } catch (ex: Exception) {
         throw EvalException(this, ex.toString(), ex)
     }
-}
-
-private fun Context<*>.evalArgs(
-    namedArgs: Expression.NamedArgs
-): NamedArgs {
-    if (namedArgs.values.isEmpty()) {
-        return NamedArgs.Empty
-    }
-    val providedValues = namedArgs.values.map { expression ->
-        evalExpression(expression)
-    }
-    return NamedArgs(providedValues, namedArgs.names)
 }

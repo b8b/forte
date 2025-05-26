@@ -3,7 +3,9 @@ package org.cikit.forte.core
 sealed class Context<R> {
     abstract val result: R
     abstract fun getVar(name: String): Any?
+    @Deprecated("migrate to suspending api")
     abstract fun getCommand(name: String): CommandFunction?
+    @Deprecated("migrate to suspending api")
     abstract fun getControl(name: String): ControlFunction?
     abstract fun getCommandTag(name: String): CommandTag?
     abstract fun getControlTag(name: String): ControlTag?
@@ -15,10 +17,13 @@ sealed class Context<R> {
 
     abstract fun builder(): Builder<Unit>
 
-    open fun get(subject: Any?, key: Any?): Any? {
-        return getBinaryOpFunction("get")
-            ?.invoke(this, subject, key)
-            ?: Undefined("get operator function not defined")
+    fun get(subject: Any?, key: Any?): Any? {
+        val getMethod = getMethod("get", "pipe")
+        return if (getMethod == null) {
+            Undefined("get filter function not defined")
+        } else {
+            getMethod.invoke(this, subject, NamedArgs(listOf(key), listOf("key")))
+        }
     }
 
     interface ResultBuilder<R> {
@@ -61,8 +66,10 @@ sealed class Context<R> {
     companion object : Context<Unit>() {
         override val result: Unit get() = Unit
         override fun getVar(name: String): Any =
-            Undefined("undefined variable: $name")
+            Undefined("undefined variable: '$name'")
+        @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? = null
+        @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? = null
         override fun getCommandTag(name: String): CommandTag? = null
         override fun getControlTag(name: String): ControlTag? = null
@@ -119,28 +126,38 @@ sealed class Context<R> {
             return rootContext.getVar(name)
         }
 
+        @Deprecated("migrate to suspending api")
         fun defineCommand(
             name: String,
             implementation: CommandFunction
         ): Builder<R> {
             scope["cmd_$name"] = implementation
+            scope["%cmd_$name"] = CommandTag { ctx, args ->
+                implementation.invoke(ctx, args)
+            }
             return this
         }
 
+        @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? {
             return scope["cmd_$name"]
                 ?.let { it as CommandFunction }
                 ?: rootContext.getCommand(name)
         }
 
+        @Deprecated("migrate to suspending api")
         fun defineControl(
             name: String,
             implementation: ControlFunction
         ): Builder<R> {
             scope["control_$name"] = implementation
+            scope["%control_$name"] = ControlTag { ctx, args ->
+                implementation.invoke(ctx, args)
+            }
             return this
         }
 
+        @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? {
             return scope["control_$name"]
                 ?.let { it as ControlFunction }
@@ -204,20 +221,6 @@ sealed class Context<R> {
         ): Builder<R> {
             scope["binary_$name"] = object : ConditionalBinOpFunction {
                 override fun condition(ctx: Context<*>, arg: Any?) = arg == condition
-                override fun invoke(ctx: Context<*>, arg: Any?): Any? {
-                    return implementation.invoke(ctx, arg)
-                }
-            }
-            return this
-        }
-
-        fun defineBinaryOpFunction(
-            name: String,
-            condition: (ctx: Context<*>, arg: Any?) -> Boolean,
-            implementation: UnOpFunction
-        ): Builder<R> {
-            scope["binary_$name"] = object : ConditionalBinOpFunction {
-                override fun condition(ctx: Context<*>, arg: Any?) = condition(ctx, arg)
                 override fun invoke(ctx: Context<*>, arg: Any?): Any? {
                     return implementation.invoke(ctx, arg)
                 }
@@ -352,9 +355,11 @@ sealed class Context<R> {
         override val result: R
     ) : Context<R>() {
         override fun getVar(name: String): Any =
-            scope["var_$name"] ?: Undefined("undefined variable: $name")
+            scope["var_$name"] ?: Undefined("undefined variable: '$name'")
+        @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? =
             scope["cmd_$name"] as CommandFunction?
+        @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? =
             scope["control_$name"] as ControlFunction?
         override fun getCommandTag(name: String): CommandTag? =
@@ -389,12 +394,14 @@ sealed class Context<R> {
             return rootContext.getVar(name)
         }
 
+        @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? {
             return scope["cmd_$name"]
                 ?.let { it as CommandFunction }
                 ?: rootContext.getCommand(name)
         }
 
+        @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? {
             return scope["control_$name"]
                 ?.let { it as ControlFunction }

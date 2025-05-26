@@ -3,8 +3,13 @@ package org.cikit.forte.core
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.encode
+import org.cikit.forte.core.CoreDeprecated.defineDeprecatedFunctions
 import org.cikit.forte.emitter.JsonEmitter
 import org.cikit.forte.emitter.YamlEmitter
+import org.cikit.forte.eval.EvaluationResult
+import org.cikit.forte.eval.evalExpression
+import org.cikit.forte.eval.evalTemplate
+import org.cikit.forte.eval.tryEvalExpression
 import org.cikit.forte.parser.Expression
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -13,15 +18,16 @@ import kotlin.math.roundToInt
 object Core {
     private fun eq(subject: Any?, other: Any?) = subject == other
 
-    private fun `in`(subject: Any?, listValue: Any?): Boolean = when (listValue) {
-        is String -> listValue.indexOf(subject as String) >= 0
-        is List<*> -> subject in listValue
-        else -> error("invalid type for in: $listValue")
+    private fun `in`(subject: Any?, list: Any?): Boolean = when (list) {
+        is String -> list.indexOf(subject as String) >= 0
+        is Iterable<*> -> subject in list
+        else -> error("invalid type for in: ${typeName(list)}")
     }
 
     private fun range(subject: Any?, other: Any?): Any = when (subject) {
         is Int -> (subject..(other as Int)).toList()
-        else -> Undefined("invalid type for range: $subject")
+        is Long -> (subject .. (other as Long)).toList()
+        else -> error("invalid type for range: ${typeName(subject)}")
     }
 
     private fun plus(subject: Any?, other: Any?): Any = when (subject) {
@@ -29,28 +35,28 @@ object Core {
         is Float -> subject + (other as Float)
         is Double -> subject + (other as Double)
         is String -> subject + (other as String)
-        else -> Undefined("invalid type for plus: $subject")
+        else -> error("invalid type for plus: ${typeName(subject)}")
     }
 
     private fun minus(subject: Any?, other: Any?): Any = when (subject) {
         is Int -> subject - (other as Int)
         is Float -> subject - (other as Float)
         is Double -> subject - (other as Double)
-        else -> Undefined("invalid type for minus: $subject")
+        else -> error("invalid type for minus: ${typeName(subject)}")
     }
 
     private fun mul(subject: Any?, other: Any?): Any = when (subject) {
         is Int -> subject * (other as Int)
         is Float -> subject * (other as Float)
         is Double -> subject * (other as Double)
-        else -> Undefined("invalid type for multiply: $subject")
+        else -> error("invalid type for multiply: ${typeName(subject)}")
     }
 
     private fun div(subject: Any?, other: Any?): Any = when (subject) {
         is Int -> subject / (other as Int)
         is Float -> subject / (other as Float)
         is Double -> subject / (other as Double)
-        else -> Undefined("invalid type for division: $subject")
+        else -> error("invalid type for division: ${typeName(subject)}")
     }
 
     private fun toInt(subject: Any?): Int = when (subject) {
@@ -60,7 +66,7 @@ object Core {
         is Float -> subject.roundToInt()
         is Double -> subject.roundToInt()
         is String -> subject.toInt()
-        else -> error("cannot convert to int: $subject")
+        else -> error("cannot convert ${typeName(subject)} to int")
     }
 
     private fun toString(subject: Any?): String = when (subject) {
@@ -70,7 +76,7 @@ object Core {
         is Float -> subject.toString()
         is Double -> subject.toString()
         is String -> subject
-        else -> error("cannot convert to string: $subject")
+        else -> error("cannot convert ${typeName(subject)} to string")
     }
 
     private fun toJsonFilter(
@@ -91,6 +97,45 @@ object Core {
     ): String {
         args.requireEmpty()
         return YamlEmitter.encodeToString { emit(subject) }
+    }
+
+    private fun listFilter(
+        ctx: Context<*>,
+        filter: Method,
+        filterArgs: NamedArgs,
+        source: Iterable<*>,
+    ): Any? {
+        val target = mutableListOf<Any?>()
+        val sourceIt = source.iterator()
+        while (sourceIt.hasNext()) {
+            val item = sourceIt.next()
+            val include = filter.invoke(ctx, item, filterArgs)
+            if (include == true) {
+                target.add(item)
+            }
+            if (include is Suspended) {
+                return Suspended {
+                    if (include.eval() == true) {
+                        target.add(item)
+                    }
+                    while (sourceIt.hasNext()) {
+                        val item = sourceIt.next()
+                        val include = filter.invoke(ctx, item, filterArgs)
+                        if (include == true) {
+                            target.add(item)
+                        }
+                        if (include is Suspended) {
+                            val finalInclude = include.eval()
+                            if (finalInclude == true) {
+                                target.add(item)
+                            }
+                        }
+                    }
+                    target.toList()
+                }
+            }
+        }
+        return target.toList()
     }
 
     private fun eqTest(
@@ -165,7 +210,9 @@ object Core {
     }
 
     val context = Context.builder()
-        .defineCommand("set") { ctx, args ->
+        .defineDeprecatedFunctions()
+
+        .defineCommandTag("set") { ctx, args ->
             val varName = args.getValue("varName")
             val value = args.getValue("value")
             ctx.setVar(
@@ -174,7 +221,7 @@ object Core {
             )
         }
 
-        .defineControl("if") { ctx, branches ->
+        .defineControlTag("if") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {
                     "else" -> {
@@ -193,7 +240,7 @@ object Core {
             }
         }
 
-        .defineControl("for") { ctx, branches ->
+        .defineControlTag("for") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {
                     "else" -> {
@@ -209,7 +256,8 @@ object Core {
                                 "destructuring in for loop is not implemented"
                             )
                         var done = false
-                        for (item in ctx.evalExpression(listValue) as List<*>) {
+                        val list = ctx.evalExpression(listValue)
+                        for (item in list as Iterable<*>) {
                             done = true
                             ctx.scope()
                                 .setVar(varName as String, item)
@@ -223,7 +271,7 @@ object Core {
             }
         }
 
-        .defineControl("macro") { ctx, branches ->
+        .defineControlTag("macro") { ctx, branches ->
             val cmd = branches.single()
             val functionNameExpr = cmd.args.getValue("name")
             val argNamesExpr = cmd.args.getValue("argNames")
@@ -251,19 +299,30 @@ object Core {
                             optionalNullable(
                                 name,
                                 { it },
-                                { macroCtx.evalExpression(defaultValue) }
+                                { macroCtx.tryEvalExpression(defaultValue) }
                             )
                         }
                         macroCtx.setVar(name, value)
                     }
                 }
-                macroCtx.captureToString()
-                    .evalTemplate(cmd.body)
-                    .result
+                Suspended {
+                    for (name in finalArgNames) {
+                        when (val value = macroCtx.getVar(name)) {
+                            is EvaluationResult -> {
+                                macroCtx.setVar(name, value.get())
+                            }
+                        }
+                    }
+                    macroCtx.captureToString()
+                        .evalTemplate(cmd.body)
+                        .result
+                }
             }
         }
 
-        .defineBinaryOpFunction("get") { _, subject, key ->
+        .defineFilter("get") { _, subject, args ->
+            val key: Any?
+            args.use { key = requireAny("key") }
             when (subject) {
                 null -> Undefined("cannot access property $key of null")
                 is Map<*, *> -> {
@@ -310,7 +369,7 @@ object Core {
                 is Float -> left > (right as Float)
                 is Double -> left > (right as Double)
                 is Int -> left > (right as Int)
-                else -> Undefined("invalid type for gt: $left")
+                else -> error("invalid type for gt: ${typeName(left)}")
             }
         }
 
@@ -320,7 +379,7 @@ object Core {
                 is Float -> left >= (right as Float)
                 is Double -> left >= (right as Double)
                 is Int -> left >= (right as Int)
-                else -> Undefined("invalid type for ge: $left")
+                else -> error("invalid type for ge: ${typeName(left)}")
             }
         }
 
@@ -330,7 +389,7 @@ object Core {
                 is Float -> left < (right as Float)
                 is Double -> left < (right as Double)
                 is Int -> left < (right as Int)
-                else -> Undefined("invalid type for lt: $left")
+                else -> error("invalid type for lt: ${typeName(left)}")
             }
         }
 
@@ -340,7 +399,7 @@ object Core {
                 is Float -> left <= (right as Float)
                 is Double -> left <= (right as Double)
                 is Int -> left <= (right as Int)
-                else -> Undefined("invalid type for le: $left")
+                else -> error("invalid type for le: ${typeName(left)}")
             }
         }
 
@@ -385,7 +444,7 @@ object Core {
                 is Float -> subject.toDouble()
                 is Double -> subject
                 is String -> subject.toDouble()
-                else -> Undefined("cannot convert to float: $subject")
+                else -> error("cannot convert ${typeName(subject)} to float")
             }
         }
 
@@ -420,13 +479,13 @@ object Core {
                             result.toList()
                         }
 
-                        else -> Undefined(
+                        else -> error(
                             "invalid option for strings: $strings"
                         )
                     }
                 }
 
-                else -> Undefined("cannot convert to list: $subject")
+                else -> error("cannot convert ${typeName(subject)} to list")
             }
         }
 
@@ -442,8 +501,8 @@ object Core {
         .defineFilter("first") { _, subject, args ->
             args.requireEmpty()
             when (subject) {
-                is List<*> -> subject.firstOrNull()
-                else -> Undefined("invalid type for first: $subject")
+                is Iterable<*> -> subject.firstOrNull()
+                else -> error("invalid type for first: ${typeName(subject)}")
             }
         }
 
@@ -451,7 +510,7 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is List<*> -> subject.lastOrNull()
-                else -> Undefined("invalid type for last: $subject")
+                else -> error("invalid type for last: ${typeName(subject)}")
             }
         }
 
@@ -459,7 +518,7 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is Map<*, *> -> subject.keys.toList()
-                is List<*> -> listOf("size") + (0 until subject.size).toList()
+                is List<*> -> listOf("size") + subject.indices.toList()
                 else -> emptyList()
             }
         }
@@ -467,58 +526,56 @@ object Core {
         .defineFilter("length") { _, subject, args ->
             args.requireEmpty()
             when (subject) {
-                is List<*> -> subject.size
                 is Map<*, *> -> subject.size
+                is Collection<*> -> subject.size
                 is String -> subject.length
-                else -> Undefined("invalid type for length: $subject")
+                else -> error("invalid type for length: ${typeName(subject)}")
             }
         }
 
         .defineFilter("select") { ctx, subject, args ->
+            val test: String
+            val filterArgs: NamedArgs
             args.use {
-                val test: String = require("test")
-                val filterArgs = optional(
+                test = require("test")
+                filterArgs = optional(
                     "arg",
                     { NamedArgs(listOf(it), emptyList()) },
                     { NamedArgs(emptyList(), emptyList()) }
                 )
-                val filter = ctx.getMethod(test, "is")
-                    ?: error("undefined test: $test")
-                when (subject) {
-                    is List<*> -> subject.filter { item ->
-                        filter(ctx, item, filterArgs) as Boolean
-                    }
-
-                    else -> Undefined("invalid type for reject: $subject")
-                }
             }
+            val filter = ctx.getMethod(test, "is")
+                ?: error("undefined test: $test")
+            if (subject !is Iterable<*>) {
+                error("invalid type for select: ${typeName(subject)}")
+            }
+            listFilter(ctx, filter, filterArgs, subject)
         }
 
         .defineFilter("reject") { ctx, subject, args ->
+            val test: String
+            val filterArgs: NamedArgs
             args.use {
-                val test: String = require("test")
-                val filterArgs = optional(
+                test = require("test")
+                filterArgs = optional(
                     "arg",
                     { NamedArgs(listOf(it), emptyList()) },
                     { NamedArgs(emptyList(), emptyList()) }
                 )
-                val filter = ctx.getMethod(test, "is")
-                    ?: error("undefined test: $test")
-                when (subject) {
-                    is List<*> -> subject.filterNot { item ->
-                        filter(ctx, item, filterArgs) as Boolean
-                    }
-
-                    else -> Undefined("invalid type for reject: $subject")
-                }
             }
+            val filter = ctx.getMethod(test, "is_not")
+                ?: error("undefined test: $test")
+            if (subject !is Iterable<*>) {
+                error("invalid type for reject: ${typeName(subject)}")
+            }
+            listFilter(ctx, filter, filterArgs, subject)
         }
 
         .defineFilter("unique") { _, subject, args ->
             args.requireEmpty()
             when (subject) {
-                is List<*> -> subject.toSet().toList()
-                else -> Undefined("invalid type for unique: $subject")
+                is Iterable<*> -> subject.toSet().toList()
+                else -> error("invalid type for unique: ${typeName(subject)}")
             }
         }
 
@@ -526,11 +583,11 @@ object Core {
             args.use {
                 val separator: String = optional("separator") { ", " }
                 when (subject) {
-                    is List<*> -> subject.joinToString(separator) { v ->
+                    is Iterable<*> -> subject.joinToString(separator) { v ->
                         toString(v)
                     }
 
-                    else -> Undefined("invalid type for join: $subject")
+                    else -> error("invalid type for join: ${typeName(subject)}")
                 }
             }
         }
@@ -549,8 +606,8 @@ object Core {
                     }
                 }
                 when (subject) {
-                    is List<*> -> subject.sortedWith(comparator)
-                    else -> Undefined("invalid type for sort: $subject")
+                    is Iterable<*> -> subject.sortedWith(comparator)
+                    else -> error("invalid type for sort: ${typeName(subject)}")
                 }
             }
         }
@@ -560,7 +617,9 @@ object Core {
                 val prefix: String = require("prefix")
                 when (subject) {
                     is String -> subject.startsWith(prefix)
-                    else -> Undefined("invalid type for startswith: $subject")
+                    else -> error(
+                        "invalid type for startswith: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -570,7 +629,9 @@ object Core {
                 val suffix: String = require("suffix")
                 when (subject) {
                     is String -> subject.endsWith(suffix)
-                    else -> Undefined("invalid type for endswith: $subject")
+                    else -> error(
+                        "invalid type for endswith: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -582,7 +643,9 @@ object Core {
                 val re = Glob(pattern, ignoreCase = ignoreCase).toRegex()
                 when (subject) {
                     is String -> re.matches(subject)
-                    else -> Undefined("invalid type for matchesGlob: $subject")
+                    else -> error(
+                        "invalid type for matchesGlob: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -598,7 +661,9 @@ object Core {
                 }
                 when (subject) {
                     is String -> re.matches(subject)
-                    else -> Undefined("invalid type for matchesRegex: $subject")
+                    else -> error(
+                        "invalid type for matchesRegex: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -615,8 +680,8 @@ object Core {
                 }
                 when (subject) {
                     is String -> subject.replace(re, replacement)
-                    else -> Undefined(
-                        "invalid type for regex_replace: $subject"
+                    else -> error(
+                        "invalid type for regex_replace: ${typeName(subject)}"
                     )
                 }
             }
@@ -634,7 +699,9 @@ object Core {
                         ignoreCase = ignoreCase
                     )
 
-                    else -> Undefined("invalid type for replace: $subject")
+                    else -> error(
+                        "invalid type for replace: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -657,7 +724,9 @@ object Core {
                         subject.trim(*chars.toCharArray())
                     }
 
-                    else -> Undefined("invalid type for trim: $subject")
+                    else -> error(
+                        "invalid type for trim: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -666,7 +735,7 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is String -> subject.lowercase()
-                else -> Undefined("invalid type for lower: $subject")
+                else -> error("invalid type for lower: ${typeName(subject)}")
             }
         }
 
@@ -674,7 +743,7 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is String -> subject.uppercase()
-                else -> Undefined("invalid type for upper: $subject")
+                else -> error("invalid type for upper: ${typeName(subject)}")
             }
         }
 
@@ -684,7 +753,9 @@ object Core {
             when (subject) {
                 is String -> Base64.decodeToByteString(subject)
 
-                else -> Undefined("invalid type for base64decode: $subject")
+                else -> error(
+                    "invalid type for base64decode: ${typeName(subject)}"
+                )
             }
         }
 
@@ -702,7 +773,9 @@ object Core {
                         Base64.UrlSafe.encode(result)
                     }
 
-                    else -> Undefined("invalid type for base64encode: $subject")
+                    else -> error(
+                        "invalid type for base64encode: ${typeName(subject)}"
+                    )
                 }
             }
         }
@@ -747,7 +820,7 @@ object Core {
             when (subject) {
                 is Map<*, *> -> subject.keys.toList()
                 is List<*> -> (0 until subject.size).toList()
-                else -> Undefined("$subject.keys() is not a function")
+                else -> error("$subject.keys() is not a function")
             }
         }
 

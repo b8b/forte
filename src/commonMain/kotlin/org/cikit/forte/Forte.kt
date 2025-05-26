@@ -24,7 +24,11 @@ sealed class Forte(
     fun parseExpression(input: String): Expression =
         parser(input).parseExpression()
 
-    fun evalExpression(expression: Expression, vars: Map<String, Any?>): Any? {
+    @Deprecated("migrate to suspending api")
+    fun evalExpression(
+        expression: Expression,
+        vars: Map<String, Any?>
+    ): Any? {
         return if (vars.isEmpty()) {
             context.evalExpression(expression)
         } else {
@@ -34,6 +38,7 @@ sealed class Forte(
         }
     }
 
+    @Deprecated("migrate to suspending api")
     fun evalExpression(
         expression: Expression,
         vararg vars: Pair<String, Any?>
@@ -47,14 +52,23 @@ sealed class Forte(
         }
     }
 
-    fun evalExpression(input: String, vars: Map<String, Any?>): Any? {
+    @Deprecated("migrate to suspending api")
+    fun evalExpression(
+        input: String,
+        vars: Map<String, Any?>
+    ): Any? {
         return evalExpression(parseExpression(input), vars)
     }
 
-    fun evalExpression(input: String, vararg vars: Pair<String, Any?>): Any? {
+    @Deprecated("migrate to suspending api")
+    fun evalExpression(
+        input: String,
+        vararg vars: Pair<String, Any?>
+    ): Any? {
         return evalExpression(parseExpression(input), *vars)
     }
 
+    @Deprecated("migrate to suspending api")
     fun evalTemplate(
         input: String,
         path: UPath? = null,
@@ -64,6 +78,7 @@ sealed class Forte(
         return scope().setVars(vars).evalTemplate(parsedTemplate)
     }
 
+    @Deprecated("migrate to suspending api")
     fun evalTemplate(
         input: String,
         vararg vars: Pair<String, Any?>,
@@ -73,6 +88,7 @@ sealed class Forte(
         return scope().setVars(*vars).evalTemplate(parsedTemplate)
     }
 
+    @Deprecated("migrate to suspending api")
     fun evalTemplateToString(
         input: String,
         path: UPath? = null,
@@ -85,6 +101,7 @@ sealed class Forte(
             .result
     }
 
+    @Deprecated("migrate to suspending api")
     fun evalTemplateToString(
         input: String,
         vararg vars: Pair<String, Any?>,
