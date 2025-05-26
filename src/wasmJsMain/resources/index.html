@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Forte Playground</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        body {
+            background: #f6f8fa;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+            color: #222;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.4rem;
+            margin: 2rem 0 1.5rem 0;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #2c3e50;
+        }
+
+        .row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            max-width: 700px;
+            min-width: 300px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            font-size: 1.1rem;
+            font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.06);
+            transition: border 0.2s;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            border: 1.5px solid #4f8cff;
+            outline: none;
+        }
+
+        button#eval {
+            background: linear-gradient(90deg, #4f8cff 0%, #38b2ac 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 0.7rem 1.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 1rem;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.06);
+            transition: background 0.2s;
+        }
+
+        button#eval:hover {
+            background: linear-gradient(90deg, #38b2ac 0%, #4f8cff 100%);
+        }
+
+        input[type="checkbox"] {
+            accent-color: #4f8cff;
+            width: 1.1em;
+            height: 1.1em;
+            margin-right: 0.5em;
+        }
+
+        label[for="autorender"] {
+            font-size: 1.05rem;
+            color: #444;
+            user-select: none;
+        }
+
+        hr {
+            border: none;
+            border-top: 1.5px solid #e1e4e8;
+            margin: 2rem 0;
+            width: 80%;
+        }
+
+        #root {
+            min-height: 80px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.07);
+            padding: 1.5rem;
+            width: 80%;
+            margin: 0 auto 2rem auto;
+            font-size: 1.15rem;
+            color: #2c3e50;
+            word-break: break-word;
+            background-image: url('https://robohash.org/cikit.org?set=set1');
+            background-position: bottom right;
+            background-repeat: no-repeat;
+            min-width: 300px;
+            min-height: 300px;
+    </style>
+</head>
+<body>
+<h1>Forte Playground</h1>
+<div class="row">
+    <textarea id="template" rows="12" style="width: 100%">{% load_json %}
+{
+  "a": 1,
+  "b": 2
+}
+{% endload -%}
+
+a + b = &lt;b&gt;{{ a + b }}&lt;/b&gt;</textarea>
+</div>
+<div class="row">
+    <button id="eval">Render</button>
+    <input id="autorender" type="checkbox" checked>
+    <label for="autorender">autorender</label>
+</div>
+<hr>
+<table style="width: 100%; height: 100%">
+    <tr>
+        <td style="width: 100%; vertical-align: top">
+            <div id="root"></div>
+        </td>
+    </tr>
+</table>
+<script type="module" src="forte.js"></script>
+</body>
+</html>
