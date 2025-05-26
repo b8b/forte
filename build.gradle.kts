@@ -1,10 +1,14 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     kotlin("multiplatform")
     `maven-publish`
 }
 
 group = "org.cikit"
-version = "0.4.5-dev"
+version = "0.5.0-dev"
 
 repositories {
     mavenCentral()
@@ -22,23 +26,39 @@ kotlin {
             binaries.executable()
         }
     }
+    wasmJs {
+        nodejs {
+            binaries.executable()
+        }
+        browser {
+            binaries.executable()
+        }
+    }
     sourceSets {
         commonMain {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                api("org.jetbrains.kotlinx:kotlinx-io-bytestring:0.6.0")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+                api("org.jetbrains.kotlinx:kotlinx-io-bytestring:0.7.0")
+                api("org.jetbrains.kotlinx:kotlinx-io-core:0.7.0")
             }
         }
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         jvmMain {}
         jvmTest {}
         jsMain {}
         jsTest {}
+        wasmJsMain {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-browser-wasm-js:0.3")
+            }
+        }
+        wasmJsTest {}
     }
 }
 

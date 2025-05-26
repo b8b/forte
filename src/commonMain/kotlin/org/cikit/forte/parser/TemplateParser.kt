@@ -650,7 +650,7 @@ private class ExpressionParserImpl(
                 is Token.Number -> {
                     tokenizer.consume(t)
                     val s = input.substring(t.first .. t.last)
-                    val v = when {
+                    val v: Number = when {
                         '.' in s -> s.toDouble()
                         else -> s.toInt()
                     }

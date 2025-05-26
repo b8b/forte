@@ -1,6 +1,6 @@
 pluginManagement {
     plugins {
-        val kotlinVersion = "2.0.21"
+        val kotlinVersion = "2.1.21"
         kotlin("multiplatform") version kotlinVersion
         kotlin("plugin.serialization") version kotlinVersion
     }
