@@ -1,5 +1,7 @@
 package org.cikit.forte.parser
 
+import org.cikit.forte.eval.compile
+
 class TemplateParser private constructor(
     val tokenizer: TemplateTokenizer,
     val commandDeclarations: Map<String, Declarations.Command>,
@@ -32,7 +34,12 @@ class TemplateParser private constructor(
 
     fun parseTemplate(): ParsedTemplate {
         val nodes = parse()
-        return ParsedTemplate(tokenizer.input, tokenizer.path, nodes)
+        val parsedTemplate = ParsedTemplate(
+            tokenizer.input,
+            tokenizer.path,
+            nodes
+        )
+        return parsedTemplate.compile()
     }
 
     fun parseExpression(): Expression {
@@ -41,7 +48,7 @@ class TemplateParser private constructor(
             unaryOpDeclarations,
             binaryOpDeclarations
         )
-        return exprParser.parseExpression()
+        return exprParser.parseExpression().compile()
     }
 
     fun parseExpressionOrNull(): Expression? {
@@ -50,7 +57,7 @@ class TemplateParser private constructor(
             unaryOpDeclarations,
             binaryOpDeclarations
         )
-        return exprParser.parseExpressionOrNull()
+        return exprParser.parseExpressionOrNull()?.compile()
     }
 
     fun copy(

@@ -14,8 +14,17 @@ fun interface CommandFunction {
     operator fun invoke(ctx: Context.Builder<*>, args: Map<String, Expression>)
 }
 
+fun interface CommandTag {
+    suspend operator fun invoke(ctx: Context.Builder<*>, args: Map<String, Expression>)
+}
+
+@Deprecated("migrate to suspending api")
 fun interface ControlFunction {
     operator fun invoke(ctx: Context.Builder<*>, branches: List<Branch>)
+}
+
+fun interface ControlTag {
+    suspend operator fun invoke(ctx: Context.Builder<*>, branches: List<Branch>)
 }
 
 fun interface UnOpFunction {
@@ -46,8 +55,17 @@ fun interface Method {
     operator fun invoke(ctx: Context<*>, subject: Any?, args: NamedArgs): Any?
 }
 
-open class Undefined(open val message: String)
+class Suspended(val eval: suspend () -> Any?) : Undefined(
+    "evaluation has been suspended"
+)
 
+open class Undefined(open val message: String) {
+    override fun toString(): String {
+        return "Undefined(message='$message')"
+    }
+}
+
+@Deprecated("migrate to suspending api")
 fun <R> Context.Builder<R>.evalTemplate(
     template: ParsedTemplate
 ): Context.Builder<R> {

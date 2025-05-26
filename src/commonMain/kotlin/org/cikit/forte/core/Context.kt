@@ -5,6 +5,8 @@ sealed class Context<R> {
     abstract fun getVar(name: String): Any?
     abstract fun getCommand(name: String): CommandFunction?
     abstract fun getControl(name: String): ControlFunction?
+    abstract fun getCommandTag(name: String): CommandTag?
+    abstract fun getControlTag(name: String): ControlTag?
     abstract fun getOpFunction(name: String): UnOpFunction?
     abstract fun getBinaryOpFunction(name: String): BinOpFunction?
     abstract fun getFunction(name: String): Function?
@@ -62,6 +64,8 @@ sealed class Context<R> {
             Undefined("undefined variable: $name")
         override fun getCommand(name: String): CommandFunction? = null
         override fun getControl(name: String): ControlFunction? = null
+        override fun getCommandTag(name: String): CommandTag? = null
+        override fun getControlTag(name: String): ControlTag? = null
         override fun getOpFunction(name: String): UnOpFunction? = null
         override fun getBinaryOpFunction(name: String): BinOpFunction? = null
         override fun getFunction(name: String): Function? = null
@@ -141,6 +145,34 @@ sealed class Context<R> {
             return scope["control_$name"]
                 ?.let { it as ControlFunction }
                 ?: rootContext.getControl(name)
+        }
+
+        fun defineCommandTag(
+            name: String,
+            implementation: CommandTag
+        ): Builder<R> {
+            scope["%cmd_$name"] = implementation
+            return this
+        }
+
+        override fun getCommandTag(name: String): CommandTag? {
+            return scope["%cmd_$name"]
+                ?.let { it as CommandTag }
+                ?: rootContext.getCommandTag(name)
+        }
+
+        fun defineControlTag(
+            name: String,
+            implementation: ControlTag
+        ): Builder<R> {
+            scope["%control_$name"] = implementation
+            return this
+        }
+
+        override fun getControlTag(name: String): ControlTag? {
+            return scope["%control_$name"]
+                ?.let { it as ControlTag }
+                ?: rootContext.getControlTag(name)
         }
 
         fun defineOpFunction(
@@ -325,6 +357,10 @@ sealed class Context<R> {
             scope["cmd_$name"] as CommandFunction?
         override fun getControl(name: String): ControlFunction? =
             scope["control_$name"] as ControlFunction?
+        override fun getCommandTag(name: String): CommandTag? =
+            scope["%cmd_$name"] as? CommandTag?
+        override fun getControlTag(name: String): ControlTag? =
+            scope["%control_$name"] as? ControlTag?
         override fun getOpFunction(name: String): UnOpFunction? =
             scope["unary_$name"]?.let { it as UnOpFunction }
         override fun getBinaryOpFunction(name: String): BinOpFunction? =
@@ -363,6 +399,18 @@ sealed class Context<R> {
             return scope["control_$name"]
                 ?.let { it as ControlFunction }
                 ?: rootContext.getControl(name)
+        }
+
+        override fun getCommandTag(name: String): CommandTag? {
+            return scope["%cmd_$name"]
+                ?.let { it as CommandTag }
+                ?: rootContext.getCommandTag(name)
+        }
+
+        override fun getControlTag(name: String): ControlTag? {
+            return scope["%control_$name"]
+                ?.let { it as ControlTag }
+                ?: rootContext.getControlTag(name)
         }
 
         override fun getOpFunction(name: String): UnOpFunction? {
