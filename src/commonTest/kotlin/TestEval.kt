@@ -15,7 +15,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class TestEval {
     private fun JsonElement.toAny(): Any? = when (this) {
@@ -48,7 +47,7 @@ class TestEval {
         val result = Forte.scope()
             .setVar("x", 2)
             .evalExpression(Forte.parseExpression("x + 1 == 3"))
-        assertTrue(result == true)
+        assertEquals(result, true)
     }
 
     @Test
@@ -70,7 +69,7 @@ class TestEval {
 
     @Test
     fun testContext() = runTest {
-        with (Forte.scope { println("--> $it") }) {
+        with (Forte.capture { println("--> $it") }) {
             setVar("x", 2)
             evalTemplate(Forte.parseTemplate("{% if true %}{% set y = x + 1 %}{% endif %}{{ y }}"))
             assertEquals(3, getVar("y"))

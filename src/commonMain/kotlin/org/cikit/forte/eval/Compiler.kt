@@ -101,7 +101,7 @@ private fun Node.Text.compile(template: ParsedTemplate): Node.Text {
         trimLeft,
         trimRight,
         if (trimmed.isNotEmpty()) {
-            { ctx -> ctx.emit(trimmed) }
+            { ctx -> ctx.flowCollector.emit(trimmed) }
         } else {
             null
         }
@@ -112,7 +112,7 @@ private fun Node.Emit.compile(): Node.Emit {
     val content = content.compile()
     return Node.Emit(first, content, last) { ctx ->
         val result = ctx.evalExpression(content)
-        ctx.emit(result)
+        ctx.flowCollector.emit(result)
     }
 }
 

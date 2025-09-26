@@ -67,6 +67,7 @@ open class Undefined(open val message: String) {
     }
 }
 
+@Suppress("DEPRECATION")
 @Deprecated("migrate to suspending api")
 fun <R> Context.Builder<R>.evalTemplate(
     template: ParsedTemplate
@@ -77,6 +78,8 @@ fun <R> Context.Builder<R>.evalTemplate(
     return this
 }
 
+@Suppress("DEPRECATION")
+@Deprecated("migrate to suspending api")
 private fun Context.Builder<*>.evalCommand(
     template: ParsedTemplate,
     cmd: Node
@@ -128,6 +131,8 @@ fun Context<*>.evalExpression(expression: Expression): Any? {
     return tryEvalExpression(expression).getOrThrow()
 }
 
+@Suppress("DEPRECATION")
+@Deprecated("migrate to suspending api")
 private fun Node.callCommand(
     ctx: Context.Builder<*>,
     name: String,
@@ -144,6 +149,8 @@ private fun Node.callCommand(
     }
 }
 
+@Suppress("DEPRECATION")
+@Deprecated("migrate to suspending api")
 private fun Node.callControl(
     ctx: Context.Builder<*>,
     name: String,

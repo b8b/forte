@@ -1,10 +1,14 @@
 package org.cikit.forte.core
 
+import kotlinx.coroutines.flow.FlowCollector
+
 sealed class Context<R> {
     abstract val result: R
     abstract fun getVar(name: String): Any?
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     abstract fun getCommand(name: String): CommandFunction?
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     abstract fun getControl(name: String): ControlFunction?
     abstract fun getCommandTag(name: String): CommandTag?
@@ -26,11 +30,14 @@ sealed class Context<R> {
         }
     }
 
+    @Deprecated("migrate to flow api")
     interface ResultBuilder<R> {
         fun append(value: Any?)
         fun build(): R
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("migrate to flow api")
     object UnitResultBuilder : ResultBuilder<Unit> {
         override fun append(value: Any?) {
         }
@@ -39,6 +46,8 @@ sealed class Context<R> {
         }
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("migrate to flow api")
     class StringResultBuilder(
         private val target: Appendable = StringBuilder()
     ) : ResultBuilder<String> {
@@ -51,6 +60,8 @@ sealed class Context<R> {
         }
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("migrate to flow api")
     class ListResultBuilder(
         private val target: MutableList<Any?> = mutableListOf()
     ) : ResultBuilder<List<Any?>> {
@@ -67,8 +78,10 @@ sealed class Context<R> {
         override val result: Unit get() = Unit
         override fun getVar(name: String): Any =
             Undefined("undefined variable: '$name'")
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? = null
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? = null
         override fun getCommandTag(name: String): CommandTag? = null
@@ -78,27 +91,105 @@ sealed class Context<R> {
         override fun getFunction(name: String): Function? = null
         override fun getMethod(name: String, operator: String): Method? = null
         override fun getRescueMethod(name: String, operator: String): Method? = null
-        override fun builder(): Builder<Unit> = Builder(
-            rootContext = this,
-            resultBuilder = UnitResultBuilder
-        )
+        override fun builder(): Builder<Unit> = Builder.create(rootContext = this)
+    }
+
+    private interface CaptureFunction<R> : FlowCollector<Any?> {
+        fun result(): R
+    }
+
+    private interface SyncCaptureFunction<R> : CaptureFunction<R> {
+        fun emitSync(value: Any?)
+    }
+
+    private object NoOpCaptureFunction : SyncCaptureFunction<Unit> {
+        override suspend fun emit(value: Any?) = Unit
+        override fun emitSync(value: Any?) = Unit
+        override fun result() = Unit
+    }
+
+    @Suppress("DEPRECATION")
+    private class RbCaptureFunction<R>(
+        val rb: ResultBuilder<R>
+    ) : SyncCaptureFunction<R> {
+        override suspend fun emit(value: Any?) = rb.append(value)
+        override fun emitSync(value: Any?) = rb.append(value)
+        override fun result(): R = rb.build()
+    }
+
+    private class CbCaptureFunction(
+        val f: (Any?) -> Unit
+    ) : SyncCaptureFunction<Unit> {
+        override suspend fun emit(value: Any?) = f(value)
+        override fun emitSync(value: Any?) = f(value)
+        override fun result() = Unit
+    }
+
+    private class StringCaptureFunction : SyncCaptureFunction<String> {
+        private val builder = StringBuilder()
+
+        override suspend fun emit(value: Any?) {
+            builder.append(value)
+        }
+
+        override fun emitSync(value: Any?) {
+            builder.append(value)
+        }
+
+        override fun result() = builder.toString()
+    }
+
+    private class ListCaptureFunction : SyncCaptureFunction<List<Any?>> {
+        private val builder = mutableListOf<Any?>()
+
+        override suspend fun emit(value: Any?) {
+            builder.add(value)
+        }
+
+        override fun emitSync(value: Any?) {
+            builder.add(value)
+        }
+
+        override fun result(): List<Any?> = builder.toList()
+    }
+
+    private fun interface FlowCaptureFunction : CaptureFunction<Unit> {
+        override fun result() = Unit
     }
 
     class Builder<R> private constructor(
         private val rootContext: Context<*>,
         private val scope: MutableMap<String, Any?> = mutableMapOf(),
-        private val resultBuilder: ResultBuilder<R>,
-        private val captureFunction: (Any?) -> Unit = resultBuilder::append
+        private val captureFunction: CaptureFunction<R>
     ) : Context<R>() {
 
+        @Suppress("DEPRECATION")
+        @Deprecated(
+            "ResultBuilder is deprecated",
+            ReplaceWith("Context.builder()")
+        )
         constructor(
             rootContext: Context<*>,
             scope: MutableMap<String, Any?> = mutableMapOf(),
             resultBuilder: ResultBuilder<R>
-        ) : this(rootContext, scope, resultBuilder, resultBuilder::append)
+        ) : this(
+            rootContext = rootContext,
+            scope = scope,
+            captureFunction = RbCaptureFunction(resultBuilder)
+        )
+
+        companion object {
+            internal fun create(
+                rootContext: Context<*>,
+                scope: MutableMap<String, Any?> = mutableMapOf()
+            ) = Builder(rootContext, scope, NoOpCaptureFunction)
+        }
 
         override val result: R
-            get() = resultBuilder.build()
+            get() = captureFunction.result()
+
+        internal val flowCollector: FlowCollector<Any?>
+            get() = captureFunction
 
         fun setVar(name: String, value: Any?): Builder<R> {
             scope["var_$name"] = value
@@ -126,6 +217,7 @@ sealed class Context<R> {
             return rootContext.getVar(name)
         }
 
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         fun defineCommand(
             name: String,
@@ -138,6 +230,7 @@ sealed class Context<R> {
             return this
         }
 
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? {
             return scope["cmd_$name"]
@@ -145,6 +238,7 @@ sealed class Context<R> {
                 ?: rootContext.getCommand(name)
         }
 
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         fun defineControl(
             name: String,
@@ -157,6 +251,7 @@ sealed class Context<R> {
             return this
         }
 
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? {
             return scope["control_$name"]
@@ -297,52 +392,61 @@ sealed class Context<R> {
         override fun builder(): Builder<Unit> = Builder(
             rootContext,
             scope.toMutableMap(),
-            UnitResultBuilder,
+            NoOpCaptureFunction
         )
 
         fun scope(): Builder<R> = Builder(
             rootContext,
             scope.toMutableMap(),
-            resultBuilder,
-            captureFunction
+            captureFunction,
         )
 
+        @Deprecated("replace with chained call to capture")
         fun scope(captureFunction: (Any?) -> Unit) = Builder(
             rootContext,
             scope.toMutableMap(),
-            UnitResultBuilder,
-            captureFunction
+            CbCaptureFunction(captureFunction)
         )
 
+        @Suppress("DEPRECATION")
+        @Deprecated("ResultBuilder is deprecated")
         fun <R> scope(resultBuilder: ResultBuilder<R>) = Builder(
             rootContext,
             scope.toMutableMap(),
-            resultBuilder
+            RbCaptureFunction(resultBuilder)
         )
 
         fun capture(captureFunction: (Any?) -> Unit) = Builder(
             rootContext,
             scope,
-            UnitResultBuilder,
-            captureFunction
+            CbCaptureFunction(captureFunction)
         )
 
         fun captureToString() = Builder(
             rootContext,
             scope,
-            StringResultBuilder()
+            StringCaptureFunction()
         )
 
         fun captureToList() = Builder(
             rootContext,
             scope,
-            ListResultBuilder()
+            ListCaptureFunction()
         )
 
-        fun emit(value: Any?) = captureFunction(value)
+        fun captureToFlow(flowCollector: FlowCollector<Any?>) = Builder(
+            rootContext,
+            scope,
+            FlowCaptureFunction(flowCollector::emit)
+        )
+
+        @Deprecated("evaluator is using flowCollector now")
+        fun emit(value: Any?) {
+            (captureFunction as SyncCaptureFunction).emitSync(value)
+        }
 
         fun build(): Context<R> {
-            return if (rootContext === Companion) {
+            return if (rootContext === Context.Companion) {
                 MapContext(scope.toMap(), result)
             } else {
                 NewContext(rootContext, scope.toMap(), result)
@@ -356,9 +460,11 @@ sealed class Context<R> {
     ) : Context<R>() {
         override fun getVar(name: String): Any =
             scope["var_$name"] ?: Undefined("undefined variable: '$name'")
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? =
             scope["cmd_$name"] as CommandFunction?
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? =
             scope["control_$name"] as ControlFunction?
@@ -376,10 +482,7 @@ sealed class Context<R> {
             scope["apply_${operator}_$name"]?.let { it as Method }
         override fun getRescueMethod(name: String, operator: String): Method? =
             scope["rescue_${operator}_$name"]?.let { it as Method }
-        override fun builder(): Builder<Unit> = Builder(
-            rootContext = this,
-            resultBuilder = UnitResultBuilder
-        )
+        override fun builder(): Builder<Unit> = Builder.create(rootContext = this)
     }
 
     private class NewContext<R>(
@@ -394,6 +497,7 @@ sealed class Context<R> {
             return rootContext.getVar(name)
         }
 
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? {
             return scope["cmd_$name"]
@@ -401,6 +505,7 @@ sealed class Context<R> {
                 ?: rootContext.getCommand(name)
         }
 
+        @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getControl(name: String): ControlFunction? {
             return scope["control_$name"]
@@ -450,9 +555,6 @@ sealed class Context<R> {
                 ?: rootContext.getRescueMethod(name, operator)
         }
 
-        override fun builder(): Builder<Unit> = Builder(
-            rootContext = this,
-            resultBuilder = UnitResultBuilder
-        )
+        override fun builder(): Builder<Unit> = Builder.create(rootContext = this)
     }
 }

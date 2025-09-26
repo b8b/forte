@@ -244,7 +244,6 @@ sealed class Declarations {
                     is UnOp -> item.aliases
                     is BinOp -> item.aliases
                     is Command -> setOf(item.name)
-                    else -> error("invalid declaration")
                 }
                 for (alias in aliases) {
                     result[alias] = item

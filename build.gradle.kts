@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "org.cikit"
-version = "0.5.0"
+version = "0.6.0"
 
 repositories {
     mavenCentral()
@@ -32,15 +32,30 @@ kotlin {
         }
         browser {
             binaries.executable()
+            testTask {
+                enabled = false
+            }
         }
     }
+    /* wip
+    wasmWasi {
+        nodejs {
+            binaries.executable()
+            runTask {
+                executable = file("work/node-v24.8.0-linux-x64/bin/node").path
+                nodeArgs.add("--experimental-wasm-exnref")
+                nodeArgs.add("--no-warnings")
+            }
+        }
+    }
+    */
     sourceSets {
         commonMain {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
-                api("org.jetbrains.kotlinx:kotlinx-io-bytestring:0.7.0")
-                api("org.jetbrains.kotlinx:kotlinx-io-core:0.7.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                api("org.jetbrains.kotlinx:kotlinx-io-bytestring:0.8.0")
+                api("org.jetbrains.kotlinx:kotlinx-io-core:0.8.0")
             }
         }
         commonTest {
@@ -55,12 +70,38 @@ kotlin {
         jsTest {}
         wasmJsMain {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-browser-wasm-js:0.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-browser-wasm-js:0.5.0")
             }
         }
         wasmJsTest {}
+        /* wip
+        wasmWasiMain {}
+        wasmWasiTest {}
+        */
     }
 }
+
+/* wip
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile> {
+    compilerOptions {
+        freeCompilerArgs.add("-Xwasm-use-new-exception-proposal")
+    }
+}
+
+tasks.register<Exec>("runWasmtime") {
+    dependsOn("compileProductionExecutableKotlinWasmWasiOptimize")
+    executable = "wasmtime"
+    args = listOf(
+        "run",
+        "-W", "gc=y",
+        "-W", "gc-support=y",
+        "-W", "exceptions=y",
+        "-W", "function-references=y",
+        file("build/compileSync/wasmWasi/main/productionExecutable/optimized/forte.wasm").path,
+        "{{ 1 + 1 }}"
+    )
+}
+*/
 
 publishing {
     publications {

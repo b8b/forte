@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 
 expect fun readTests(fileName: String): String
 
+@Suppress("DEPRECATION")
 private fun Forte.runTest(testName: String, testSource: String) {
     println("--- $testName ---")
     val expect = testSource.substringBefore("\n~\n")

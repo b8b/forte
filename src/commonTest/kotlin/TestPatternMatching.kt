@@ -1,4 +1,6 @@
+import kotlinx.coroutines.test.runTest
 import org.cikit.forte.Forte
+import org.cikit.forte.eval.evalExpression
 import org.cikit.forte.parser.Declarations
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +15,7 @@ class TestPatternMatching {
     }
 
     @Test
-    fun testWithSubject() {
+    fun testWithSubject() = runTest {
         val forte = Forte {
             declarations += Declarations.TransformOp(5, "->", name = "then")
             declarations += Declarations.BinOp(6, "with", left = true)
@@ -86,11 +88,15 @@ class TestPatternMatching {
         }
 
         println(forte.parseExpression(""" match(x) with 1 -> return("a") with 2 -> return("b") else "c" """))
-        val expr = """ match(x) with 1 -> return("a") with 2 -> return("b") else "c" """
-        assertEquals("a", forte.evalExpression(expr, "x" to 1))
-        assertEquals("b", forte.evalExpression(expr, "x" to 2))
-        assertEquals("c", forte.evalExpression(expr, "x" to 22))
-        val expr2 = """ match() with a is defined -> return("BAD") else "GOOD" """
-        assertEquals("GOOD", forte.evalExpression(expr2))
+        val expr = forte.parseExpression(
+            """ match(x) with 1 -> return("a") with 2 -> return("b") else "c" """
+        )
+        assertEquals("a", forte.scope().setVars("x" to 1).evalExpression(expr))
+        assertEquals("b", forte.scope().setVars("x" to 2).evalExpression(expr))
+        assertEquals("c", forte.scope().setVars("x" to 22).evalExpression(expr))
+        val expr2 = forte.parseExpression(
+            """ match() with a is defined -> return("BAD") else "GOOD" """
+        )
+        assertEquals("GOOD", forte.scope().evalExpression(expr2))
     }
 }

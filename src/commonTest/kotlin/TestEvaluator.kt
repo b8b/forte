@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 import kotlinx.serialization.json.*
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
@@ -35,7 +37,7 @@ class TestEvaluator {
     @Test
     fun testVar() {
         val result = Forte.evalExpression("x + 1 == 3", "x" to 2)
-        assertTrue(result == true)
+        assertEquals(result, true)
     }
 
     @Test

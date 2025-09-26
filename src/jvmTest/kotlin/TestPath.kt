@@ -5,7 +5,9 @@ import org.cikit.forte.core.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.net.URI
 import kotlin.io.path.*
+import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNull
 
@@ -30,8 +32,9 @@ class TestPath {
         assertEquals(UPath("1\ta.txt"), UPath("1\\ta.txt", DecodeEscapes))
         assertEquals("1\\ta.txt", UPath("1\ta.txt").toVisualPath())
 
-        assertFalse(UPath("test%201.txt", DecodeUrlPath).isUtf8Only)
-        assertFalse(UPath("test\\t1.txt", DecodeEscapes).isUtf8Only)
+        assertTrue(UPath("test%201.txt", DecodeUrlPath).isUtf8Only)
+        assertTrue(UPath("test\\t1.txt", DecodeEscapes).isUtf8Only)
+        assertFalse(UPath("abc%FFdef", DecodeUrlPath).isUtf8Only)
 
         val absolutePath = UPath("/some/where/over/there")
         val nioPath = absolutePath.toNioPath()
@@ -44,7 +47,7 @@ class TestPath {
         assertEquals(
             nioPath.subpath(1, 2).pathString,
             absolutePath.segments.toList().let {
-                it[1].append(*it.subList(2, 2).toTypedArray()).pathString
+                it[1].appendSegments(*it.subList(2, 2).toTypedArray()).pathString
             }
         )
         assertEquals(
@@ -68,10 +71,17 @@ class TestPath {
         assertEquals("/", UPath("/").toNioPath().pathString)
         assertEquals(Path("foo"), UPath("foo").toNioPath())
         assertEquals(UPath("foo"), Path("foo").toUPath())
-        assertEquals("foo/bar", Path("foo").append(Path("bar")).pathString)
-        assertEquals("foo/bar", Path("foo").append(Path("/bar")).pathString)
-        assertEquals("foo/bar", Path("foo").append(UPath("bar")).pathString)
-        assertEquals("foo/bar", Path("foo").append(UPath("/bar")).pathString)
+        assertEquals("foo/bar", Path("foo").appendSegments(Path("bar")).pathString)
+        assertEquals("foo/bar", Path("foo").appendSegments(Path("/bar")).pathString)
+        assertEquals("foo/bar", Path("foo").appendSegments(UPath("bar")).pathString)
+        assertEquals("foo/bar", Path("foo").appendSegments(UPath("/bar")).pathString)
+    }
+
+    @Test
+    fun testRfc() {
+        val absoluteUrlPath = "file:///abc-def~test_1.txt"
+        val nioPath = URI.create(absoluteUrlPath).toPath()
+        assertEquals(Path("/abc-def~test_1.txt"), nioPath)
     }
 
     @Test
@@ -153,7 +163,7 @@ class TestPath {
         )
         assertEquals(
             "foo/some/where/else",
-            UPath(UPath("foo"), "/some/where/else").pathString
+            UPath("foo").appendSegments("/some/where/else").pathString
         )
 
         // same with File
@@ -199,7 +209,7 @@ class TestPath {
         val x = UPath("foo/bar")
         val y = UPath("/some/where/else")
         assertEquals("foo/bar/some/where/else", UPath("$x/$y").normalize().pathString)
-        assertEquals("foo/bar/some/where/else", UPath(x, y.pathString).pathString)
+        assertEquals("foo/bar/some/where/else", x.appendSegments(y.pathString).pathString)
 
         // the binary safe variant with Path could be
         assertEquals(
@@ -219,11 +229,11 @@ class TestPath {
         // append() simply appends all path segments
         assertEquals(
             UPath("foo/bar/some/where/else"),
-            UPath("foo/bar").append(UPath("/some/where/else"))
+            UPath("foo/bar").appendSegments(UPath("/some/where/else"))
         )
         assertEquals(
             UPath("foo/bar/some/where/else"),
-            UPath("foo/bar").append(
+            UPath("foo/bar").appendSegments(
                 UPath("/some"),
                 UPath("/where"),
                 UPath("/else")
@@ -231,11 +241,11 @@ class TestPath {
         )
         assertEquals(
             UPath("foo/bar/some/where/else"),
-            UPath("foo/bar").append("/some/where/else")
+            UPath("foo/bar").appendSegments("/some/where/else")
         )
         assertEquals(
             UPath("foo/bar/some/where/else"),
-            UPath("foo/bar").append("/some/", "where", "/else")
+            UPath("foo/bar").appendSegments("/some/", "where", "/else")
         )
     }
 

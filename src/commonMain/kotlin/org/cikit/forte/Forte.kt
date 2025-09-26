@@ -1,5 +1,6 @@
 package org.cikit.forte
 
+import kotlinx.coroutines.flow.FlowCollector
 import org.cikit.forte.core.*
 import org.cikit.forte.parser.*
 
@@ -24,6 +25,7 @@ sealed class Forte(
     fun parseExpression(input: String): Expression =
         parser(input).parseExpression()
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalExpression(
         expression: Expression,
@@ -38,6 +40,7 @@ sealed class Forte(
         }
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalExpression(
         expression: Expression,
@@ -52,6 +55,7 @@ sealed class Forte(
         }
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalExpression(
         input: String,
@@ -60,6 +64,7 @@ sealed class Forte(
         return evalExpression(parseExpression(input), vars)
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalExpression(
         input: String,
@@ -68,6 +73,7 @@ sealed class Forte(
         return evalExpression(parseExpression(input), *vars)
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalTemplate(
         input: String,
@@ -78,6 +84,7 @@ sealed class Forte(
         return scope().setVars(vars).evalTemplate(parsedTemplate)
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalTemplate(
         input: String,
@@ -88,6 +95,7 @@ sealed class Forte(
         return scope().setVars(*vars).evalTemplate(parsedTemplate)
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalTemplateToString(
         input: String,
@@ -101,6 +109,7 @@ sealed class Forte(
             .result
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("migrate to suspending api")
     fun evalTemplateToString(
         input: String,
@@ -116,6 +125,7 @@ sealed class Forte(
 
     fun scope(): Context.Builder<Unit> = context.builder()
 
+    @Deprecated("replace with capture")
     fun scope(captureFunction: (Any?) -> Unit) =
         context.builder().capture(captureFunction)
 
@@ -125,6 +135,9 @@ sealed class Forte(
     fun captureToString() = context.builder().captureToString()
 
     fun captureToList() = context.builder().captureToList()
+
+    fun captureToFlow(flowCollector: FlowCollector<Any?>) =
+        context.builder().captureToFlow(flowCollector)
 }
 
 class ForteBuilder {

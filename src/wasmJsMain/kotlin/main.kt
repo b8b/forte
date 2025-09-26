@@ -13,7 +13,6 @@ import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import org.cikit.forte.Forte
-import org.cikit.forte.core.Context
 import org.cikit.forte.eval.evalTemplate
 import org.cikit.forte.parser.Declarations
 import org.w3c.dom.HTMLButtonElement
@@ -27,7 +26,8 @@ val forte = Forte {
     declarations += Declarations.Command("load_json", setOf("endload"))
     context.defineControlTag("load_json") { ctx, branches ->
         val tag = branches.single()
-        val jsonText = ctx.scope(Context.StringResultBuilder())
+        val jsonText = ctx.scope()
+            .captureToString()
             .evalTemplate(tag.body)
             .result
         val data = Json.decodeFromString<JsonObject>(jsonText)

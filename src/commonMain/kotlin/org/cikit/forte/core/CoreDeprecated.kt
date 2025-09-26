@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package org.cikit.forte.core
 
 import org.cikit.forte.eval.EvaluationResult

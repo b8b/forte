@@ -27,9 +27,16 @@ fun Path.toUPath(): UPath {
     }
 }
 
-fun Path.append(other: UPath): Path = append(other.toNioPath())
+@Deprecated("renamed to appendSegments", ReplaceWith("appendSegments"))
+fun Path.append(other: UPath): Path = appendSegments(other.toNioPath())
 
-fun Path.append(other: Path): Path = if (other.isAbsolute) {
+fun Path.appendSegments(other: UPath): Path = appendSegments(other.toNioPath())
+
+
+@Deprecated("renamed to appendSegments", ReplaceWith("appendSegments"))
+fun Path.append(other: Path): Path = appendSegments(other)
+
+fun Path.appendSegments(other: Path): Path = if (other.isAbsolute) {
     resolve(other.relativeTo(other.root))
 } else {
     resolve(other)

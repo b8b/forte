@@ -13,19 +13,25 @@ private val rootUPath = UPath("/")
 
 class UPath private constructor (
     val encoded: ByteString,
-    utf8: Boolean
-) {
-    var isUtf8Only: Boolean = utf8
-        private set
+    val isUtf8Only: Boolean
+) : Comparable<UPath> {
+
+    private constructor(source: UPath) : this(
+        source.encoded,
+        source.isUtf8Only
+    )
 
     constructor() : this(
         encoded = emptyByteString,
-        utf8 = true
+        isUtf8Only = true
     )
 
     constructor(encoded: ByteString) : this(
         encoded = encoded,
-        utf8 = encoded.isEmpty()
+        isUtf8Only = when {
+            encoded.isEmpty() -> true
+            else -> checkByteStringIsUtf8(encoded)
+        }
     )
 
     constructor(utfPath: String) : this(
@@ -34,30 +40,28 @@ class UPath private constructor (
         } else {
             utfPath.encodeToByteString()
         },
-        utf8 = true
+        isUtf8Only = checkStringIsUtf8(utfPath)
     )
 
     constructor(base: String, vararg parts: String) : this(
-        encoded = UPath(base).append(*parts).encoded,
-        utf8 = true
+        source = UPath(base).appendSegments(*parts)
     )
 
+    @Deprecated("replace with appendSegments(parts)")
     constructor(base: UPath, vararg parts: String) : this(
-        encoded = base.append(*parts).encoded,
-        utf8 = base.isUtf8Only
+        source = base.appendSegments(*parts)
     )
 
     constructor(base: String, decodeEscapes: Boolean) : this(
-        base,
-        when (decodeEscapes) {
+        base = base,
+        decoder = when (decodeEscapes) {
             true -> DecodeEscapes
             else -> UPathDecoder { s -> s.encodeToByteString() }
         }
     )
 
     constructor(base: String, decoder: UPathDecoder) : this(
-        encoded = decoder.decode(base),
-        utf8 = false
+        source = UPath(decoder.decode(base))
     )
 
     init {
@@ -80,6 +84,9 @@ class UPath private constructor (
             val b = encoded[i].toInt()
             if (b == '/'.code ||
                 b == '.'.code ||
+                b == '-'.code ||
+                b == '~'.code ||
+                b == '_'.code ||
                 b in '0'.code .. '9'.code ||
                 b in 'a'.code .. 'z'.code ||
                 b in 'A'.code .. 'Z'.code) {
@@ -146,7 +153,7 @@ class UPath private constructor (
                             yield(
                                 UPath(
                                     encoded = encoded.substring(startIndex, i),
-                                    utf8 = isUtf8Only
+                                    isUtf8Only = isUtf8Only
                                 )
                             )
                             return@sequence
@@ -156,7 +163,7 @@ class UPath private constructor (
                         yield(
                             UPath(
                                 encoded = encoded.substring(startIndex, i),
-                                utf8 = isUtf8Only
+                                isUtf8Only = isUtf8Only
                             )
                         )
                     }
@@ -193,7 +200,7 @@ class UPath private constructor (
             if (i == 0) {
                 return UPath(
                     encoded = encoded.substring(0, i + 1),
-                    utf8 = isUtf8Only
+                    isUtf8Only = isUtf8Only
                 )
             }
             // i = index of the last byte of the last segment
@@ -204,13 +211,13 @@ class UPath private constructor (
                 if (i < 0) {
                     return UPath(
                         encoded = encoded.substring(0, endIndex),
-                        utf8 = isUtf8Only
+                        isUtf8Only = isUtf8Only
                     )
                 }
             }
             return UPath(
                 encoded = encoded.substring(i + 1, endIndex),
-                utf8 = isUtf8Only
+                isUtf8Only = isUtf8Only
             )
         }
 
@@ -247,7 +254,7 @@ class UPath private constructor (
             }
             return UPath(
                 encoded = encoded.substring(0, i + 1),
-                utf8 = isUtf8Only
+                isUtf8Only = isUtf8Only
             )
         }
 
@@ -293,7 +300,7 @@ class UPath private constructor (
         }
         return UPath(
             encoded = encoded.substring(0, i),
-            utf8 = isUtf8Only
+            isUtf8Only = isUtf8Only
         )
     }
 
@@ -314,9 +321,9 @@ class UPath private constructor (
             }
         }
         return if (isAbsolute) {
-            rootUPath.append(*normalized.toTypedArray())
+            rootUPath.appendSegments(*normalized.toTypedArray())
         } else {
-            emptyUPath.append(*normalized.toTypedArray())
+            emptyUPath.appendSegments(*normalized.toTypedArray())
         }
     }
 
@@ -345,7 +352,7 @@ class UPath private constructor (
                 builder.append(other.encoded)
                 return UPath(
                     encoded = builder.toByteString(),
-                    utf8 = other.isUtf8Only
+                    isUtf8Only = other.isUtf8Only
                 )
             }
         }
@@ -362,11 +369,17 @@ class UPath private constructor (
         builder.append(other.encoded)
         return UPath(
             encoded = builder.toByteString(),
-            utf8 = isUtf8Only && other.isUtf8Only
+            isUtf8Only = isUtf8Only && other.isUtf8Only
         )
     }
 
-    fun append(other: UPath): UPath {
+    @Deprecated(
+        "renamed to appendSegments",
+        ReplaceWith("appendSegments")
+    )
+    fun append(other: UPath): UPath = appendSegments(other)
+
+    fun appendSegments(other: UPath): UPath {
         val right = other.encoded.trimStart()
         if (right.isEmpty()) {
             return this
@@ -375,11 +388,20 @@ class UPath private constructor (
         builder.append(right)
         return UPath(
             encoded = builder.toByteString(),
-            utf8 = isUtf8Only && other.isUtf8Only
+            isUtf8Only = isUtf8Only && other.isUtf8Only
         )
     }
 
-    fun append(vararg other: UPath): UPath {
+    @Deprecated(
+        "renamed to appendSegments",
+        ReplaceWith("appendSegments")
+    )
+    fun append(vararg other: UPath): UPath = appendSegments(*other)
+
+    fun appendSegments(vararg other: UPath): UPath =
+        appendSegments(other.asSequence())
+
+    fun appendSegments(other: Sequence<UPath>): UPath {
         var utf8 = isUtf8Only
         val iterator = other.iterator()
         while (iterator.hasNext()) {
@@ -412,16 +434,28 @@ class UPath private constructor (
                 }
                 return UPath(
                     encoded = builder.toByteString(),
-                    utf8 = utf8
+                    isUtf8Only = utf8
                 )
             }
         }
         return this
     }
 
-    fun append(other: String): UPath = append(UPath(other))
+    @Deprecated(
+        "renamed to appendSegments",
+        ReplaceWith("appendSegments")
+    )
+    fun append(other: String): UPath = appendSegments(UPath(other))
 
-    fun append(vararg other: String): UPath {
+    fun appendSegments(other: String): UPath = appendSegments(UPath(other))
+
+    @Deprecated(
+        "renamed to appendSegments",
+        ReplaceWith("appendSegments")
+    )
+    fun append(vararg other: String): UPath = appendSegments(*other)
+
+    fun appendSegments(vararg other: String): UPath {
         val iterator = other.iterator()
         while (iterator.hasNext()) {
             val first = iterator.next()
@@ -444,7 +478,7 @@ class UPath private constructor (
                         builder.append(nextTrimmed)
                     }
                 }
-                return append(UPath(builder.toString()))
+                return appendSegments(UPath(builder.toString()))
             }
         }
         return this
@@ -469,7 +503,7 @@ class UPath private constructor (
                 //       ^
                 val dots = "../".repeat(osIt.asSequence().count() + 1)
                 return UPath(dots)
-                    .append(s, *sIt.asSequence().toList().toTypedArray())
+                    .appendSegments(s, *sIt.asSequence().toList().toTypedArray())
             }
         }
         if (sIt.hasNext()) {
@@ -477,14 +511,14 @@ class UPath private constructor (
             // a / c / c / 1 / 2 / 3
             // a / b / c
             //             ^
-            return sIt.next().append(*sIt.asSequence().toList().toTypedArray())
+            return sIt.next().appendSegments(*sIt.asSequence().toList().toTypedArray())
         }
         if (osIt.hasNext()) {
             require(!sIt.hasNext()) { "internal error" }
             // a / b / c
             // a / c / c / 1 / 2 / 3
             //             ^
-            return UPath(osIt.asSequence().joinToString("/") { ".." })
+            return UPath(osIt.asSequence().joinToString("/") { ".." }) //?
         }
         return emptyUPath
     }
@@ -571,6 +605,10 @@ class UPath private constructor (
         return builder
     }
 
+    override fun compareTo(other: UPath): Int {
+        return encoded.compareTo(other.encoded)
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
@@ -583,6 +621,10 @@ class UPath private constructor (
     override fun hashCode(): Int {
         return encoded.hashCode()
     }
+}
+
+fun interface UPathMatcher {
+    fun matches(path: UPath): Boolean
 }
 
 fun interface UPathDecoder {
@@ -602,7 +644,7 @@ object DecodeUrlPath : UPathDecoder {
             require(part.length >= 2) {
                 "invalid url escape"
             }
-            val code = part.substring(0, 2).toInt(16)
+            val code = part.take(2).toInt(16)
             builder.append(code.toByte())
             if (part.length > 2) {
                 builder.append(part.substring(2).encodeToByteString())
@@ -640,7 +682,7 @@ object DecodeEscapes : UPathDecoder {
                     require(part.length >= 3) {
                         "invalid octal escape"
                     }
-                    val code = part.substring(0, 3).toInt(8)
+                    val code = part.take(3).toInt(8)
                     builder.append(code.toByte())
                     escapeLength = 3
                 }
@@ -655,4 +697,71 @@ object DecodeEscapes : UPathDecoder {
         }
         return builder.toByteString()
     }
+}
+
+private fun checkStringIsUtf8(input: String): Boolean {
+    var index = 0
+    while (index < input.length) {
+        val ch = input[index++]
+        if (ch.isLowSurrogate()) {
+            return false
+        }
+        if (ch.isHighSurrogate()) {
+            if (index >= input.length) {
+                return false
+            }
+            if (!input[index++].isLowSurrogate()) {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+private fun checkByteStringIsUtf8(input: ByteString): Boolean {
+    var remainingBytes = 0
+    var codePoint = 0
+    var minCodePoint = 0
+
+    var index = 0
+    while (index < input.size) {
+        val b = input[index++].toInt() and 0xFF
+
+        if (remainingBytes == 0) {
+            when {
+                b shr 7 == 0b0 -> { // 1-byte char (ASCII)
+                    codePoint = b
+                    minCodePoint = 0
+                }
+                b shr 5 == 0b110 -> { // 2-byte char
+                    remainingBytes = 1
+                    codePoint = b and 0x1F
+                    minCodePoint = 0x80
+                }
+                b shr 4 == 0b1110 -> { // 3-byte char
+                    remainingBytes = 2
+                    codePoint = b and 0x0F
+                    minCodePoint = 0x800
+                }
+                b shr 3 == 0b11110 -> { // 4-byte char
+                    remainingBytes = 3
+                    codePoint = b and 0x07
+                    minCodePoint = 0x10000
+                }
+                else -> return false // Invalid leading byte
+            }
+        } else {
+            // continuation bytes must start with '10'
+            if (b shr 6 != 0b10) return false
+            codePoint = (codePoint shl 6) or (b and 0x3F)
+            remainingBytes--
+            if (remainingBytes == 0) {
+                // check for overlong encoding
+                if (codePoint !in minCodePoint..0x10FFFF) return false
+                // UTF-16 surrogate halves are invalid here
+                if (codePoint in 0xD800..0xDFFF) return false
+            }
+        }
+    }
+    return remainingBytes == 0
 }

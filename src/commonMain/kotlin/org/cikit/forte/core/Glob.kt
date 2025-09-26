@@ -14,12 +14,11 @@ package org.cikit.forte.core
  * a class, surrogate pairs are treated as 2 individual characters and may 
  * lead to unexpected results.
  *
- * `?` matches any single 16 bit character. Surrogate pairs within the input are
- * treated as 2 individual characters.
+ * When the input contains high or low surrogates, the matching is defined
+ * by the underlying regex engine and should be considered undefined.
  * 
  * In general. it is recommended to initialize input and pattern with 
- * ASCII characters only to avoid any confusion. We might add a feature to 
- * enforce ASCII only at least within character classes in the future.
+ * ASCII characters only to avoid any confusion.
  *
  * # Compatibility
  * 
@@ -32,7 +31,7 @@ package org.cikit.forte.core
  *
  */
 class Glob(
-    val pattern: String,
+    val pattern: CharSequence,
     val flavor: Flavor = Flavor.Default,
     val ignoreCase: Boolean = false
 ) {
@@ -43,7 +42,7 @@ class Glob(
 
     init {
         val source = Scanner(pattern)
-        regexPattern = kotlin.runCatching { convertPattern(source) }
+        regexPattern = runCatching { convertPattern(source) }
         regex = runCatching {
             if (ignoreCase) {
                 regexPattern.getOrThrow().toRegex(RegexOption.IGNORE_CASE)
@@ -259,7 +258,7 @@ class Glob(
         }
     }
 
-    private inner class Scanner(val input: CharSequence) {
+    private class Scanner(val input: CharSequence) {
         var index = 0
         var allowDoubleStar = true
         var pathSeparatorCount = 0

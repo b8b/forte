@@ -1,4 +1,7 @@
+import org.cikit.forte.core.DecodeUrlPath
 import org.cikit.forte.core.Glob
+import org.cikit.forte.core.UPath
+import org.cikit.forte.core.asGLobMatcher
 import kotlin.test.*
 
 
@@ -218,6 +221,14 @@ class TestGlob {
     fun testUnclosedClass3() {
         // git expects no match
         assertGitFails(input = "\\", pattern = "[\\]")
+    }
+
+    @Test
+    fun matchBinary() {
+        val pattern = "abc%c0%af%c1.*"
+        val sample = "abc%c0%af%c1.txt"
+        val glob = UPath(pattern, DecodeUrlPath).asGLobMatcher()
+        assertTrue(glob.matches(UPath(sample, DecodeUrlPath)))
     }
 
     private fun assertGitTranspiles(regex: String, glob: String) {

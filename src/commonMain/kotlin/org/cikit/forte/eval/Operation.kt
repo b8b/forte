@@ -120,7 +120,7 @@ sealed class Operation {
             if (key is UndefinedResult) {
                 throw EvalException(key.expression, key.value.message)
             }
-            (state.last() as MutableMap<Any?, Any?>).put(key, value)
+            (state.last() as MutableMap<Any?, Any?>)[key] = value
         }
     }
 
