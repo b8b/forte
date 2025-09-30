@@ -1,5 +1,6 @@
 package org.cikit.forte
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import org.cikit.forte.core.*
 import org.cikit.forte.parser.*
@@ -138,6 +139,11 @@ sealed class Forte(
 
     fun captureToFlow(flowCollector: FlowCollector<Any?>) =
         context.builder().captureToFlow(flowCollector)
+
+    fun flow(block: suspend Context.Builder<Unit>.() -> Unit): Flow<Any?> =
+        kotlinx.coroutines.flow.flow {
+            captureToFlow(this).block()
+        }
 }
 
 class ForteBuilder {

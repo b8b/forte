@@ -94,7 +94,7 @@ sealed class Context<R> {
         override fun builder(): Builder<Unit> = Builder.create(rootContext = this)
     }
 
-    private interface CaptureFunction<R> : FlowCollector<Any?> {
+    private sealed interface CaptureFunction<R> : FlowCollector<Any?> {
         fun result(): R
     }
 
@@ -102,7 +102,11 @@ sealed class Context<R> {
         fun emitSync(value: Any?)
     }
 
-    private object NoOpCaptureFunction : SyncCaptureFunction<Unit> {
+    private interface UnitCaptureFunction : CaptureFunction<Unit>
+
+    private object NoOpCaptureFunction :
+        SyncCaptureFunction<Unit>, UnitCaptureFunction
+    {
         override suspend fun emit(value: Any?) = Unit
         override fun emitSync(value: Any?) = Unit
         override fun result() = Unit
@@ -119,7 +123,7 @@ sealed class Context<R> {
 
     private class CbCaptureFunction(
         val f: (Any?) -> Unit
-    ) : SyncCaptureFunction<Unit> {
+    ) : SyncCaptureFunction<Unit>, UnitCaptureFunction {
         override suspend fun emit(value: Any?) = f(value)
         override fun emitSync(value: Any?) = f(value)
         override fun result() = Unit
@@ -153,7 +157,7 @@ sealed class Context<R> {
         override fun result(): List<Any?> = builder.toList()
     }
 
-    private fun interface FlowCaptureFunction : CaptureFunction<Unit> {
+    private fun interface FlowCaptureFunction : UnitCaptureFunction {
         override fun result() = Unit
     }
 
@@ -188,7 +192,7 @@ sealed class Context<R> {
         override val result: R
             get() = captureFunction.result()
 
-        internal val flowCollector: FlowCollector<Any?>
+        val resultBuilder: FlowCollector<Any?>
             get() = captureFunction
 
         fun setVar(name: String, value: Any?): Builder<R> {
@@ -434,15 +438,34 @@ sealed class Context<R> {
             ListCaptureFunction()
         )
 
-        fun captureToFlow(flowCollector: FlowCollector<Any?>) = Builder(
-            rootContext,
-            scope,
-            FlowCaptureFunction(flowCollector::emit)
-        )
+        fun captureToFlow(flowCollector: FlowCollector<Any?>): Builder<Unit> {
+            return Builder(
+                rootContext,
+                scope,
+                flowCollector as? UnitCaptureFunction
+                    ?: FlowCaptureFunction(flowCollector::emit)
+            )
+        }
 
-        @Deprecated("evaluator is using flowCollector now")
+        @Deprecated(
+            "fails when capturing to flow",
+            ReplaceWith("resultBuilder.emit()"),
+            DeprecationLevel.ERROR
+        )
         fun emit(value: Any?) {
-            (captureFunction as SyncCaptureFunction).emitSync(value)
+            (captureFunction as? SyncCaptureFunction)
+                ?.emitSync(value)
+                ?: error(
+                    "attempted to emit() value while capturing to flow"
+                )
+        }
+
+        internal fun tryEmit(value: Any?): Boolean {
+            if (captureFunction is SyncCaptureFunction) {
+                captureFunction.emitSync(value)
+                return true
+            }
+            return false
         }
 
         fun build(): Context<R> {

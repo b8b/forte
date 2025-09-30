@@ -116,12 +116,22 @@ private fun Context.Builder<*>.evalCommand(
                 else -> text
             }
             if (trimmed.isNotEmpty()) {
-                emit(trimmed)
+                if (!tryEmit(trimmed)) {
+                    throw EvalException(
+                        cmd,
+                        "attempted to emit() value while capturing to flow"
+                    )
+                }
             }
         }
 
         is Node.Emit -> {
-            emit(evalExpression(cmd.content))
+            if (!tryEmit(evalExpression(cmd.content))) {
+                throw EvalException(
+                    cmd,
+                    "attempted to emit() value while capturing to flow"
+                )
+            }
         }
     }
 }
