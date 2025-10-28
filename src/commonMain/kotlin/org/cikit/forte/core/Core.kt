@@ -571,6 +571,72 @@ object Core {
             listFilter(ctx, filter, filterArgs, subject)
         }
 
+        .defineFilter("selectattr") { ctx, subject, args ->
+            val attr: Any
+            val test: String
+            val filterArgs: NamedArgs
+            args.use {
+                attr = require("attr")
+                test = optional("test") { "defined" }
+                filterArgs = optional(
+                    "arg",
+                    { NamedArgs(listOf(it), emptyList()) },
+                    { NamedArgs(emptyList(), emptyList()) }
+                )
+            }
+            val get = ctx.getMethod("get", CoreOperators.Filter.value)
+                ?: error(
+                    "filter `selectattr` failed with undefined filter `get`"
+                )
+            val getArgs = NamedArgs(listOf(attr), emptyList())
+            val filter = ctx.getMethod(test, CoreOperators.Test.value)
+                ?: error(
+                    "filter `selectattr` failed with undefined test '$test'"
+                )
+            if (subject !is Iterable<*>) {
+                error(
+                    "filter `selectattr` is undefined " +
+                            "for '${typeName(subject)}'"
+                )
+            }
+            val sourceIt = subject.iterator()
+            val target = mutableListOf<Any?>()
+            while (sourceIt.hasNext()) {
+                val item = sourceIt.next()
+                val candidate = get.invoke(ctx, item, getArgs)
+                val include = filter.invoke(ctx, candidate, filterArgs)
+                if (include == true) {
+                    target.add(item)
+                } else if (include is Suspended) {
+                    return@defineFilter Suspended {
+                        if (include.eval() == true) {
+                            target.add(item)
+                        }
+                        while (sourceIt.hasNext()) {
+                            val item = sourceIt.next()
+                            val candidate = get.invoke(ctx, item, getArgs)
+                            val include = filter.invoke(
+                                ctx,
+                                candidate,
+                                filterArgs
+                            )
+                            if (include == true) {
+                                target.add(item)
+                            }
+                            if (include is Suspended) {
+                                val finalInclude = include.eval()
+                                if (finalInclude == true) {
+                                    target.add(item)
+                                }
+                            }
+                        }
+                        target.toList()
+                    }
+                }
+            }
+            target.toList()
+        }
+
         .defineFilter("unique") { _, subject, args ->
             args.requireEmpty()
             when (subject) {
