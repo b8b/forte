@@ -151,6 +151,7 @@ fun Expression.sourceTokenRange(): Pair<Token, Token> = when (val node = this) {
     is Expression.ObjectLiteral -> node.first to node.last
     is Expression.ArrayLiteral -> node.first to node.last
     is Expression.StringLiteral -> node.first to node.last
+    is Expression.ByteStringLiteral -> node.first to node.last
     is Expression.StringInterpolation -> {
         node.children.first().sourceTokenRange().first to
                 node.children.last().sourceTokenRange().second

@@ -1,5 +1,7 @@
 package org.cikit.forte.parser
 
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.indices
 import org.cikit.forte.eval.Operation
 import org.cikit.forte.eval.UNCOMPILED_EXPRESSION
 
@@ -107,6 +109,48 @@ sealed class Expression(
 
         override fun toString(): String {
             return "Literal('$value')"
+        }
+    }
+
+    class ByteStringLiteral(
+        val first: Token,
+        val last: Token,
+        val value: ByteString,
+        operations: List<Operation> = UNCOMPILED_EXPRESSION
+    ) : Expression(operations) {
+        override val children: Iterable<Expression>
+            get() = emptyList()
+
+        override fun toString(): String {
+            return buildString {
+                append("ByteStringLiteral('")
+                for (i in value.indices) {
+                    val b = value[i].toInt()
+                    when (val ch = b.toChar()) {
+                        '\\' -> append("\\\\")
+
+                        in '\u0021' .. '\u007e' -> append(ch)
+
+                        '\u0007' -> append("\\a")
+                        '\u0008' -> append("\\b")
+                        '\u0009' -> append("\\t")
+                        '\u000A' -> append("\\n")
+                        '\u000B' -> append("\\v")
+                        '\u000C' -> append("\\f")
+                        '\u000D' -> append("\\r")
+
+                        else -> {
+                            append("\\")
+                            val oct = (b and 0xFF).toString(8)
+                            if (oct.length < 3) {
+                                append("0".repeat(oct.length - 3))
+                            }
+                            append(oct)
+                        }
+                    }
+                }
+                append("')")
+            }
         }
     }
 
