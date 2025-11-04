@@ -1,5 +1,7 @@
 package org.cikit.forte.parser
 
+import org.cikit.forte.core.CoreOperators as OP
+
 val defaultDeclaredCommands = listOf(
     Declarations.Command("set") {
         val variable = expect<Token.Identifier>()
@@ -79,8 +81,16 @@ val defaultDeclaredCommands = listOf(
                 name,
                 input.substring(name.first..name.last)
             )
-            val lPar = tokenizer.peek(skipSpace = true)
-                    as? Token.LPar ?: return@Command
+            val lPar = tokenizer.peek(skipSpace = true) as? Token.LPar
+            if (lPar == null) {
+                args["argNames"] = Expression.ArrayLiteral(
+                    name, name, emptyList()
+                )
+                args["argDefaults"] = Expression.ObjectLiteral(
+                    name, name, emptyList()
+                )
+                return@Command
+            }
             tokenizer.consume(lPar)
             val argNames = mutableListOf<Expression.StringLiteral>()
             val argDefaults = mutableListOf<Pair<Expression, Expression>>()
@@ -124,7 +134,7 @@ val defaultDeclaredUnaryOperations = listOf(
 )
 
 val defaultDeclaredOperations = listOf(
-    Declarations.TransformOp(90, "|", name = "pipe", left = true),
+    Declarations.TransformOp(90, "|", name = OP.Filter.value, left = true),
 
     Declarations.BinOp(80, "**", name = "pow", right = true),
 
@@ -145,8 +155,8 @@ val defaultDeclaredOperations = listOf(
     Declarations.BinOp(40, "in"),
     Declarations.BinOp(40, "not in", name = "not_in"),
 
-    Declarations.TransformOp(40, "is", name = "is"),
-    Declarations.TransformOp(40, "is not", name = "is_not"),
+    Declarations.TransformOp(40, "is", name = OP.Test.value),
+    Declarations.TransformOp(40, "is not", name = OP.TestNot.value),
 
     Declarations.BinOp(40, "<", name = "lt"),
     Declarations.BinOp(40, "<=", name = "le"),

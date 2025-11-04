@@ -16,17 +16,29 @@ sealed class Context<R> {
     abstract fun getOpFunction(name: String): UnOpFunction?
     abstract fun getBinaryOpFunction(name: String): BinOpFunction?
     abstract fun getFunction(name: String): Function?
-    abstract fun getMethod(name: String, operator: String = "invoke"): Method?
-    abstract fun getRescueMethod(name: String, operator: String = "invoke"): Method?
+
+    abstract fun getMethod(
+        name: String,
+        operator: String = CoreOperators.Invoke.value
+    ): Method?
+
+    abstract fun getRescueMethod(
+        name: String,
+        operator: String = CoreOperators.Invoke.value
+    ): Method?
 
     abstract fun builder(): Builder<Unit>
 
     fun get(subject: Any?, key: Any?): Any? {
-        val getMethod = getMethod("get", "pipe")
+        val getMethod = getMethod("get", CoreOperators.Filter.value)
         return if (getMethod == null) {
-            Undefined("get filter function not defined")
+            Undefined("filter 'get' not defined")
         } else {
-            getMethod.invoke(this, subject, NamedArgs(listOf(key), listOf("key")))
+            getMethod.invoke(
+                this,
+                subject,
+                NamedArgs(listOf(key), listOf("key"))
+            )
         }
     }
 
@@ -351,7 +363,7 @@ sealed class Context<R> {
             name: String,
             implementation: Method
         ): Builder<R> {
-            scope["apply_invoke_$name"] = implementation
+            scope["apply_${CoreOperators.Invoke.value}_$name"] = implementation
             return this
         }
 
@@ -374,7 +386,7 @@ sealed class Context<R> {
             name: String,
             implementation: Method
         ): Builder<R> {
-            scope["rescue_invoke_$name"] = implementation
+            scope["rescue_${CoreOperators.Invoke.value}_$name"] = implementation
             return this
         }
 

@@ -32,10 +32,13 @@ class UndefinedResult(
     }
 
     override suspend fun get(): Any? {
-        if (value is Suspended) {
-            return value.eval()
+        val undefinedValue: Undefined = if (value is Suspended) {
+            val result = value.eval()
+            result as? Undefined ?: return result
+        } else {
+            value
         }
-        throw EvalException(expression, value.message)
+        throw EvalException(expression, undefinedValue.message)
     }
 
     override fun getOrThrow(): Any? {
@@ -48,16 +51,21 @@ class UndefinedResult(
 suspend fun <R> Context.Builder<R>.evalTemplate(
     template: ParsedTemplate
 ): Context.Builder<R> {
-    for (cmd in template.nodes) {
-        cmd.execute?.let { proc ->
-            if (proc === UNCOMPILED_NODE) {
-                cmd.compile(template).execute?.invoke(this)
-            } else {
-                proc.invoke(this)
+    try {
+        for (cmd in template.nodes) {
+            cmd.execute?.let { proc ->
+                if (proc === UNCOMPILED_NODE) {
+                    cmd.compile(template).execute?.invoke(this)
+                } else {
+                    proc.invoke(this)
+                }
             }
         }
+        return this
+    } catch (ex: EvalException) {
+        ex.setTemplate(template)
+        throw ex
     }
-    return this
 }
 
 suspend fun Context<*>.evalExpression(expression: Expression): Any? {

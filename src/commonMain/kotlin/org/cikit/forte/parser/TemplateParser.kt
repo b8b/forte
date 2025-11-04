@@ -404,15 +404,23 @@ private class ExpressionParserImpl(
             if (op1 is Declarations.TransformOp) {
                 mutLhs = when (rhs) {
                     is Expression.Variable -> Expression.TransformOp(
-                        tokens1, op1, mutLhs, rhs.name, Expression.NamedArgs()
+                        tokens1 + rhs.first,
+                        op1,
+                        mutLhs,
+                        rhs.name,
+                        Expression.NamedArgs()
                     )
                     is Expression.FunctionCall -> Expression.TransformOp(
-                        tokens1, op1, mutLhs, rhs.name, rhs.args
+                        tokens1 + rhs.first,
+                        op1,
+                        mutLhs,
+                        rhs.name,
+                        rhs.args
                     )
                     else -> throw ParseException(
                         tokenizer,
-                        tokens1.first(),
-                        "expected extension function call"
+                        rhs,
+                        "expected function call"
                     )
                 }
                 continue

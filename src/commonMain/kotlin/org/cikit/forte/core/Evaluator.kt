@@ -72,10 +72,15 @@ open class Undefined(open val message: String) {
 fun <R> Context.Builder<R>.evalTemplate(
     template: ParsedTemplate
 ): Context.Builder<R> {
-    for (node in template.nodes) {
-        evalCommand(template, node)
+    try {
+        for (node in template.nodes) {
+            evalCommand(template, node)
+        }
+        return this
+    } catch (ex: EvalException) {
+        ex.setTemplate(template)
+        throw ex
     }
-    return this
 }
 
 @Suppress("DEPRECATION")

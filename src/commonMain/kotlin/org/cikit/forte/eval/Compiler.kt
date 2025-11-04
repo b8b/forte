@@ -2,6 +2,7 @@ package org.cikit.forte.eval
 
 import org.cikit.forte.core.Branch
 import org.cikit.forte.core.Context
+import org.cikit.forte.core.CoreOperators
 import org.cikit.forte.core.EvalException
 import org.cikit.forte.core.Undefined
 import org.cikit.forte.parser.Expression
@@ -41,7 +42,7 @@ private fun Node.Command.compile(): Node.Command {
     val content = content.compile()
     return Node.Command(first, name, content, last) { ctx ->
         val function = ctx.getCommandTag(name)
-            ?: throw EvalException(this, "undefined command $name")
+            ?: throw EvalException(this, "command '$name' not defined")
         try {
             function.invoke(ctx, content)
         } catch (ex: EvalException) {
@@ -62,7 +63,7 @@ private fun Node.Control.compile(template: ParsedTemplate): Node.Control {
     }
     return Node.Control(first, branches) { ctx ->
         val function = ctx.getControlTag(name)
-            ?: throw EvalException(this, "undefined command $name")
+            ?: throw EvalException(this, "command '$name' not defined")
         try {
             function.invoke(ctx, compiledBranches)
         } catch (ex: EvalException) {
@@ -178,6 +179,15 @@ private fun compileExpressionInternal(
                 operations.opSubList(firstOperation, operations.size)
             )
         }
+        is Expression.ByteStringLiteral -> {
+            operations.add(Operation.Const(expression, expression.value))
+            Expression.ByteStringLiteral(
+                expression.first,
+                expression.last,
+                expression.value,
+                operations.opSubList(firstOperation, operations.size)
+            )
+        }
         is Expression.StringInterpolation -> {
             val children = if (expression.children.isEmpty()) {
                 operations.add(Operation.Const(expression, ""))
@@ -248,7 +258,14 @@ private fun compileExpressionInternal(
             operations.add(Operation.InitArray(expression, 1))
             val right = compileExpressionInternal(operations, expression.right)
             operations.add(Operation.AddArrayElement(expression.right, 0))
-            operations.add(Operation.TransformOp(expression, "get", "pipe", listOf("key")))
+            operations.add(
+                Operation.TransformOp(
+                    expression,
+                    "get",
+                    CoreOperators.Filter.value,
+                    listOf("key")
+                )
+            )
             Expression.CompAccess(
                 expression.first,
                 left,
@@ -261,7 +278,14 @@ private fun compileExpressionInternal(
             operations.add(Operation.InitArray(expression, 1))
             operations.add(Operation.Const(expression, expression.name))
             operations.add(Operation.AddArrayElement(expression, 0))
-            operations.add(Operation.TransformOp(expression, "get", "pipe", listOf("key")))
+            operations.add(
+                Operation.TransformOp(
+                    expression,
+                    "get",
+                    CoreOperators.Filter.value,
+                    listOf("key")
+                )
+            )
             Expression.Access(
                 expression.first,
                 expression.last,
@@ -307,7 +331,13 @@ private fun compileExpressionInternal(
                         args += compileExpressionInternal(operations, arg)
                         operations.add(Operation.AddArrayElement(arg, index++))
                     }
-                    operations.add(Operation.CallMethod(expression, expression.left.name, expression.args.names))
+                    operations.add(
+                        Operation.CallMethod(
+                            expression.left,
+                            expression.left.name,
+                            expression.args.names
+                        )
+                    )
                     Expression.InvokeOp(
                         expression.first,
                         expression.last,
@@ -331,7 +361,13 @@ private fun compileExpressionInternal(
                         args += compileExpressionInternal(operations, arg)
                         operations.add(Operation.AddArrayElement(arg, index++))
                     }
-                    operations.add(Operation.CallMethod(expression, "invoke", expression.args.names))
+                    operations.add(
+                        Operation.CallMethod(
+                            expression,
+                            CoreOperators.Invoke.value,
+                            expression.args.names
+                        )
+                    )
                     Expression.InvokeOp(
                         expression.first,
                         expression.last,
@@ -353,7 +389,14 @@ private fun compileExpressionInternal(
                 args += compileExpressionInternal(operations, arg)
                 operations.add(Operation.AddArrayElement(arg, index++))
             }
-            operations.add(Operation.TransformOp(expression, method, operator, expression.args.names))
+            operations.add(
+                Operation.TransformOp(
+                    expression,
+                    method,
+                    operator,
+                    expression.args.names
+                )
+            )
             Expression.TransformOp(
                 expression.tokens,
                 expression.decl,

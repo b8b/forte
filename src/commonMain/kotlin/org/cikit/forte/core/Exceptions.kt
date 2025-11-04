@@ -17,7 +17,14 @@ class EvalException private constructor(
         expression: Expression?,
         message: String?,
         cause: Throwable?
-    ) : this(tokens.first, tokens.second, node, expression, message, cause)
+    ) : this(
+        startToken = tokens.first,
+        endToken = tokens.second,
+        node = node,
+        expression = expression,
+        message = message,
+        cause = cause
+    )
 
     constructor(
         node: Node,
@@ -31,6 +38,34 @@ class EvalException private constructor(
         cause: Throwable? = null
     ) : this(expression.sourceTokenRange(), null, expression, message, cause)
 
+    var template: ParsedTemplate? = null
+        private set
+
+    var location: Location? = null
+        private set
+
     val detailedMessage: String
-        get() = "$startToken .. $endToken: $message"
+        get() = buildString {
+            append(template?.path ?: "<anonymous>")
+            location?.let {
+                append("[")
+                append(it.lineNumber)
+                append(":")
+                append(it.columnNumber)
+                append("]")
+            }
+            append(": ")
+            append(message)
+        }
+
+    internal fun setTemplate(template: ParsedTemplate) {
+        if (this.template == null) {
+            this.template = template
+            this.location = LocationInfo(
+                template.path,
+                template.input,
+                startToken
+            ).tokenStart
+        }
+    }
 }

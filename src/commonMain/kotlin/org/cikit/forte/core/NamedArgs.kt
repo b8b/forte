@@ -21,16 +21,12 @@ class NamedArgs(
         }
         val args = NamedArgsIterator(values, names)
         val result = block(args)
-        if (args.hasRemaining()) {
-            error("too many args")
-        }
+        require(!args.hasRemaining()) { "too many args" }
         return result
     }
 
     fun requireEmpty() {
-        if (values.isNotEmpty()) {
-            error("too many args")
-        }
+        require(values.isEmpty()) { "too many args" }
     }
 }
 
@@ -48,25 +44,19 @@ class NamedArgsIterator(
 
     fun requireAny(name: String): Any? {
         val nextIndex = next(name)
-        if (nextIndex < 0) {
-            error("missing required arg '$name'")
-        }
+        require(nextIndex >= 0) { "missing required arg '$name'" }
         return values[nextIndex]
     }
 
     fun <T : Any> requireNullable(name: String, type: KClass<T>): T? {
         val nextIndex = next(name)
-        if (nextIndex < 0) {
-            error("missing required arg '$name'")
-        }
+        require(nextIndex >= 0) { "missing required arg '$name'" }
         return castNullable(name, type, values[nextIndex])
     }
 
     fun <T : Any> require(name: String, type: KClass<T>): T {
         val nextIndex = next(name)
-        if (nextIndex < 0) {
-            error("missing required arg '$name'")
-        }
+        require(nextIndex >= 0) { "missing required arg '$name'" }
         return cast(name, type, values[nextIndex])
     }
 
@@ -129,12 +119,13 @@ class NamedArgsIterator(
         type: KClass<T>,
         value: Any?
     ): T {
-        if (value == null) {
-            error("invalid null value for arg '$name'")
+        require(value != null) { "invalid null value for arg '$name'" }
+        val result = type.safeCast(value)
+        require(result != null) {
+            "invalid type '${typeName(value)}' " +
+                    "for arg '$name': expected '$type'"
         }
-        return type.safeCast(value) ?: error(
-            "invalid type '${value::class}' for arg '$name': expected '$type'"
-        )
+        return result
     }
 
     private fun <T: Any> castNullable(
@@ -145,34 +136,35 @@ class NamedArgsIterator(
         if (value == null) {
             return null
         }
-        return type.safeCast(value) ?: error(
-            "invalid type '${value::class}' for arg '$name': expected '$type'"
-        )
+        val result = type.safeCast(value)
+        require(result != null) {
+            "invalid type '${typeName(value)}' " +
+                    "for arg '$name': expected '$type'"
+        }
+        return result
     }
 
     private fun next(name: String): Int {
         val nameIndex = names.indexOf(name)
         if (index < positionalCount) {
             //positional
-            if (nameIndex >= 0) {
-                error("arg '${name}' already passed")
-            }
+            require(nameIndex < 0) { "arg '${name}' already passed" }
             val result = index
             index++
             return result
         } else if (nameIndex < 0) {
             return -1
         } else {
-            if (consumed[nameIndex]) {
-                error("arg '${name} already passed")
-            }
+            require(!consumed[nameIndex]) { "arg '${name} already passed" }
             consumed[nameIndex] = true
             return nameIndex + positionalCount
         }
     }
 }
 
-inline fun <reified T: Any> NamedArgsIterator.requireNullable(name: String): T? {
+inline fun <reified T: Any> NamedArgsIterator.requireNullable(
+    name: String
+): T? {
     return requireNullable(name, T::class)
 }
 

@@ -166,7 +166,8 @@ sealed class Operation {
             val function = ctx.getOpFunction(expression.decl.name)
                 ?: throw EvalException(
                     expression,
-                    "undefined unary operator function ${expression.decl.name}"
+                    "unary operator function '${expression.decl.name}' " +
+                            "not defined"
                 )
             var value = state.last()
             if (value is UndefinedResult) {
@@ -196,7 +197,7 @@ sealed class Operation {
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
             val function = ctx.getFunction(expression.name) ?: throw EvalException(
                 expression,
-                "undefined function ${expression.name}"
+                "function '${expression.name}' not defined"
             )
             val args = NamedArgs((state.last() as Array<*>).toList(), argNames)
             val result = try {
@@ -224,7 +225,7 @@ sealed class Operation {
             val function = ctx.getMethod(name)
                 ?: throw EvalException(
                     expression,
-                    "undefined method $name"
+                    "method '$name' not defined"
                 )
             val args = NamedArgs((state.removeLast() as Array<*>).toList(), argNames)
             var value = state.last()
@@ -255,7 +256,7 @@ sealed class Operation {
             val function = ctx.getBinaryOpFunction(name)
                 ?: throw EvalException(
                     expression,
-                    "undefined operator function $name"
+                    "operator function '$name' not defined"
                 )
             val value = state.last()
             if (value is UndefinedResult) {
@@ -328,7 +329,7 @@ sealed class Operation {
             } else {
                 function = ctx.getMethod(method, operator) ?: throw EvalException(
                     expression,
-                    "undefined `${operator}` operator method $method"
+                    "method '`$operator`$method' not defined"
                 )
                 subject
             }
