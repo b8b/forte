@@ -6,3 +6,6 @@ fun typeName(value: Any?): String {
     }
     return value::class.simpleName ?: value::class.toString()
 }
+
+fun CharSequence.concatToString() = this as? String
+    ?: CharArray(length) { i -> get(i) }.concatToString()

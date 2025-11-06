@@ -37,9 +37,9 @@ object Core {
 
     private fun `in`(subject: Any?, list: Any?): Boolean = when (list) {
         is CharSequence -> when (subject) {
-            is String -> list.indexOf(subject) >= 0
-            is CharSequence -> list.indexOf(subject.toString()) >= 0
-            is Char -> subject in list
+            is String -> list.contains(subject)
+            is CharSequence -> list.contains(subject)
+            is Char -> list.contains(subject)
             else -> binOpTypeError("in", subject, list)
         }
         is Iterable<*> -> subject in list
@@ -68,18 +68,19 @@ object Core {
                 else -> binOpTypeError("range", subject, other)
             }
 
-        is Long -> when (other) {
-            is Number -> (subject..other.toLong()).toList()
+            is Long -> when (other) {
+                is Number -> (subject..other.toLong()).toList()
+                else -> binOpTypeError("range", subject, other)
+            }
+
+            is Number -> when (other) {
+                is Long -> (subject.toLong()..other).toList()
+                is Number -> (subject.toInt()..other.toInt()).toList()
+                else -> binOpTypeError("range", subject, other)
+            }
+
             else -> binOpTypeError("range", subject, other)
         }
-
-        is Number -> when (other) {
-            is Long -> (subject.toLong()..other).toList()
-            is Number -> (subject.toInt()..other.toInt()).toList()
-            else -> binOpTypeError("range", subject, other)
-        }
-
-        else -> binOpTypeError("range", subject, other)
     }
 
     private fun compareNumbers(a: Number, b: Number): Int {
@@ -128,15 +129,15 @@ object Core {
 
             is String -> when (b) {
                 is String -> a.compareTo(b, ignoreCase)
-                is CharSequence -> a.compareTo(b.toString(), ignoreCase)
+                is CharSequence -> a.compareTo(b.concatToString(), ignoreCase)
 
                 else -> null
             }
 
             is CharSequence -> when (b) {
-                is String -> a.toString().compareTo(b, ignoreCase)
-                is CharSequence -> a.toString().compareTo(
-                    b.toString(),
+                is String -> a.concatToString().compareTo(b, ignoreCase)
+                is CharSequence -> a.concatToString().compareTo(
+                    b.concatToString(),
                     ignoreCase
                 )
 
@@ -472,6 +473,44 @@ object Core {
         return this
     }
 
+    private object GetFilter : Method {
+        override fun invoke(
+            ctx: Context<*>,
+            subject: Any?,
+            args: NamedArgs
+        ): Any? {
+            val key: Any?
+            args.use { key = requireAny("key") }
+            return when (subject) {
+                is Map<*, *> -> {
+                    if (!subject.containsKey(key)) {
+                        Undefined("key '$key' of type '${typeName(key)}' " +
+                                "is missing in the Map operand " +
+                                "of type '${typeName(subject)}'")
+                    } else {
+                        subject[key]
+                    }
+                }
+                is List<*> -> when (key) {
+                    is Int -> subject.getOrElse(key) {
+                        Undefined("index $key out of bounds for List operand " +
+                                "of type '${typeName(subject)}' " +
+                                "with size ${subject.size}")
+                    }
+                    else -> Undefined(
+                        "invalid key '$key' of type '${typeName(key)}' for " +
+                                " List operand of type '${typeName(subject)}'"
+                    )
+                }
+                else -> Undefined(
+                    "invalid operand " +
+                            "of type '${typeName(subject)}' with " +
+                            "key '$key' of type '${typeName(key)}'"
+                )
+            }
+        }
+    }
+
     val context = Context.builder()
         .defineDeprecatedFunctions()
 
@@ -554,7 +593,7 @@ object Core {
             argDefaultsExpr as Expression.ObjectLiteral
 
             val finalArgDefaults = argDefaultsExpr.pairs.associate { (k, v) ->
-                ctx.evalExpression(k).toString() to v
+                (ctx.evalExpression(k) as String) to v
             }
             val finalArgNames = argNames.map { name -> name as String }
 
@@ -593,36 +632,18 @@ object Core {
             }
         }
 
-        .defineFilter("get") { _, subject, args ->
-            val key: Any?
-            args.use { key = requireAny("key") }
-            when (subject) {
-                is Map<*, *> -> {
-                    if (!subject.containsKey(key)) {
-                        Undefined("key '$key' of type '${typeName(key)}' " +
-                                "is missing in the Map operand " +
-                                "of type '${typeName(subject)}'")
-                    } else {
-                        subject[key]
-                    }
+        .defineFilter("get", GetFilter)
+
+        .defineFilter("attr") { ctx, subject, args ->
+            if (args.values.firstOrNull() !is CharSequence) {
+                val key: String
+                args.use {
+                    key = require("name")
                 }
-                is List<*> -> when (key) {
-                    is Int -> subject.getOrElse(key) {
-                        Undefined("index $key out of bounds for List operand " +
-                                "of type '${typeName(subject)}' " +
-                                "with size ${subject.size}")
-                    }
-                    else -> Undefined(
-                        "invalid key '$key' of type '${typeName(key)}' for " +
-                                " List operand of type '${typeName(subject)}'"
-                    )
-                }
-                else -> Undefined(
-                    "invalid operand " +
-                            "of type '${typeName(subject)}' with key '$key' " +
-                            "of type '${typeName(key)}'"
-                )
             }
+            val get = ctx.getMethod("get", CoreOperators.Filter.value)
+                ?: error("filter 'get' not defined")
+            get(ctx, subject, args)
         }
 
         .defineOpFunction("not") { _, arg ->
@@ -710,7 +731,7 @@ object Core {
                 is Number -> subject.toInt()
                 is Boolean -> if (subject) 1 else 0
                 is String -> subject.toLong()
-                is CharSequence -> subject.toString().toLong()
+                is CharSequence -> subject.concatToString().toLong()
                 else -> throw IllegalArgumentException(
                     "invalid operand of type '${typeName(subject)}'"
                 )
@@ -723,7 +744,7 @@ object Core {
                 is Boolean -> if (subject) 1.0 else 0.0
                 is Number -> subject.toDouble()
                 is String -> subject.toDouble()
-                is CharSequence -> subject.toString().toDouble()
+                is CharSequence -> subject.concatToString().toDouble()
                 else -> throw IllegalArgumentException(
                     "invalid operand of type '${typeName(subject)}'"
                 )
@@ -734,8 +755,8 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is String -> subject
-                is CharSequence -> subject.toString()
-                is Number -> subject.toString()
+                is CharSequence -> subject.concatToString()
+                is Number -> /* FIXME avoid toString() */ subject.toString()
                 is Boolean -> if (subject) "true" else "false"
                 null -> "null"
                 else -> throw IllegalArgumentException(
@@ -751,19 +772,21 @@ object Core {
             }
             when (subject) {
                 is CharSequence -> {
-                    when (strings.toString()) {
+                    when (strings.concatToString()) {
                         "empty" -> emptyList<String>()
-                        "chars" -> subject.map { it.toString() }
+                        "chars" -> subject.indices
+                            .map { i -> subject.subSequence(i, i + 1) }
                         "codePoints" -> {
-                            val result = mutableListOf<String>()
-                            val charIt = subject.iterator()
-                            while (charIt.hasNext()) {
-                                val ch1 = charIt.next()
+                            val result = mutableListOf<CharSequence>()
+                            var i = 0
+                            while (i < subject.length) {
+                                val ch1 = subject[i++]
                                 result += if (ch1.isHighSurrogate()) {
-                                    val ch2 = charIt.next()
-                                    charArrayOf(ch1, ch2).concatToString()
+                                    //TBD verify ch2
+                                    i++
+                                    subject.subSequence(i - 2, i)
                                 } else {
-                                    ch1.toString()
+                                    subject.subSequence(i - 1, i)
                                 }
                             }
                             result.toList()
@@ -849,7 +872,7 @@ object Core {
                 )
             }
             val filter = ctx.getMethod(
-                test.toString(),
+                test.concatToString(),
                 CoreOperators.Test.value
             ) ?: throw IllegalArgumentException(
                 "invalid value for arg 'test': test '$test' not defined"
@@ -872,7 +895,7 @@ object Core {
                 )
             }
             val filter = ctx.getMethod(
-                test.toString(),
+                test.concatToString(),
                 CoreOperators.TestNot.value
             ) ?: throw IllegalArgumentException(
                 "invalid value for arg 'test': test '$test' not defined"
@@ -900,7 +923,7 @@ object Core {
                 ?: error("filter 'get' not defined")
             val getArgs = NamedArgs(listOf(attr), emptyList())
             val filter = ctx.getMethod(
-                test.toString(),
+                test.concatToString(),
                 CoreOperators.Test.value
             ) ?: throw IllegalArgumentException(
                 "invalid value for arg 'test': test '$test' not defined"
@@ -961,14 +984,19 @@ object Core {
             args.use {
                 separator = optional("separator") { ", " }
             }
-            val toString = ctx.getMethod(
-                "string",
-                CoreOperators.Filter.value
-            ) ?: error("filter 'string' not defined")
+            val convertToString by lazy {
+                ctx.getMethod(
+                    "string",
+                    CoreOperators.Filter.value
+                ) ?: error("filter 'string' not defined")
+            }
             when (subject) {
                 is Iterable<*> -> subject.joinToString(separator) { v ->
+                    if (v is CharSequence) {
+                        return@joinToString v
+                    }
                     val result = try {
-                        toString.invoke(ctx, v, NamedArgs.Empty)
+                        convertToString(ctx, v, NamedArgs.Empty)
                     } catch (ex: Exception) {
                         throw RuntimeException(
                             "failed to convert list element " +
@@ -977,7 +1005,7 @@ object Core {
                             ex
                         )
                     }
-                    if (result !is String) {
+                    if (result !is CharSequence) {
                         throw IllegalArgumentException(
                             "failed to convert list element " +
                                     "of type '${typeName(v)}' to string"
@@ -1035,7 +1063,7 @@ object Core {
                 is CharSequence -> Comparator<Any?> { a, b ->
                     val aStr = when (a) {
                         is String -> a
-                        is CharSequence -> a.toString()
+                        is CharSequence -> a.concatToString()
 
                         else -> throw IllegalArgumentException(
                             "non-comparable list elements " +
@@ -1045,7 +1073,7 @@ object Core {
                     }
                     val bStr = when (b) {
                         is String -> b
-                        is CharSequence -> b.toString()
+                        is CharSequence -> b.concatToString()
 
                         else -> throw IllegalArgumentException(
                             "non-comparable list elements " +
@@ -1121,9 +1149,9 @@ object Core {
                 ignoreCase = optional("ignore_case") { true }
             }
             val re = if (ignoreCase) {
-                Regex(pattern.toString(), RegexOption.IGNORE_CASE)
+                Regex(pattern.concatToString(), RegexOption.IGNORE_CASE)
             } else {
-                Regex(pattern.toString())
+                Regex(pattern.concatToString())
             }
             when (subject) {
                 is CharSequence -> re.matches(subject)
@@ -1144,12 +1172,15 @@ object Core {
                 ignoreCase = optional("ignore_case") { true }
             }
             val re = if (ignoreCase) {
-                Regex(pattern.toString(), RegexOption.IGNORE_CASE)
+                Regex(pattern.concatToString(), RegexOption.IGNORE_CASE)
             } else {
-                Regex(pattern.toString())
+                Regex(pattern.concatToString())
             }
             when (subject) {
-                is CharSequence -> subject.replace(re, replacement.toString())
+                is CharSequence -> subject.replace(
+                    re,
+                    replacement.concatToString()
+                )
 
                 else -> throw IllegalArgumentException(
                     "invalid operand of type '${typeName(subject)}'"
@@ -1168,14 +1199,14 @@ object Core {
             }
             when (subject) {
                 is String -> subject.replace(
-                    search.toString(),
-                    replacement.toString(),
+                    search.concatToString(),
+                    replacement.concatToString(),
                     ignoreCase = ignoreCase
                 )
 
-                is CharSequence -> subject.toString().replace(
-                    search.toString(),
-                    replacement.toString(),
+                is CharSequence -> subject.concatToString().replace(
+                    search.concatToString(),
+                    replacement.concatToString(),
                     ignoreCase = ignoreCase
                 )
 
@@ -1215,7 +1246,7 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is String -> subject.lowercase()
-                is CharSequence -> subject.toString().lowercase()
+                is CharSequence -> subject.concatToString().lowercase()
 
                 else -> throw IllegalArgumentException(
                     "invalid operand of type '${typeName(subject)}'"
@@ -1227,7 +1258,7 @@ object Core {
             args.requireEmpty()
             when (subject) {
                 is String -> subject.uppercase()
-                is CharSequence -> subject.toString().uppercase()
+                is CharSequence -> subject.concatToString().uppercase()
 
                 else -> throw IllegalArgumentException(
                     "invalid operand of type '${typeName(subject)}'"

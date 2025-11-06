@@ -1,12 +1,6 @@
 package org.cikit.forte.eval
 
-import org.cikit.forte.core.BinOpFunction
-import org.cikit.forte.core.ConditionalBinOpFunction
-import org.cikit.forte.core.Context
-import org.cikit.forte.core.EvalException
-import org.cikit.forte.core.Method
-import org.cikit.forte.core.NamedArgs
-import org.cikit.forte.core.Undefined
+import org.cikit.forte.core.*
 import org.cikit.forte.parser.Expression
 
 sealed class Operation {
@@ -44,7 +38,28 @@ sealed class Operation {
             if (value is UndefinedResult) {
                 throw EvalException(value.expression, value.value.message)
             }
-            (state.last() as StringBuilder).append(value)
+            val convertedValue = when (value) {
+                is CharSequence -> value
+                else -> {
+                    val toString = ctx.getMethod(
+                        "string",
+                        CoreOperators.Filter.value
+                    ) ?: throw EvalException(
+                        expression,
+                        "filter 'string' not defined"
+                    )
+                    val result = toString.invoke(ctx, value, NamedArgs.Empty)
+                    if (result !is CharSequence) {
+                        throw EvalException(
+                            expression,
+                            "filter to convert value " +
+                                    "of type '${typeName(value)}' to string"
+                        )
+                    }
+                    result
+                }
+            }
+            (state.last() as StringBuilder).append(convertedValue)
         }
     }
 
