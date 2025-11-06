@@ -46,12 +46,27 @@ object Core {
         else -> binOpTypeError("in", subject, list)
     }
 
-    private fun range(subject: Any?, other: Any?): Any = when (subject) {
-        is Int -> when (other) {
-            is Long -> (subject .. other).toList()
-            is Number -> (subject..other.toInt()).toList()
-            else -> binOpTypeError("range", subject, other)
+    private object RangeFunction : Function, BinOpFunction {
+        override fun invoke(ctx: Context<*>, args: NamedArgs): Any {
+            val start: Number
+            val end: Number
+            args.use {
+                start = require("start")
+                end  = require("end_inclusive")
+            }
+            return range(start, end)
         }
+
+        override fun invoke(ctx: Context<*>, left: Any?, right: Any?): Any {
+            return range(left, right)
+        }
+
+        private fun range(subject: Any?, other: Any?): Any = when (subject) {
+            is Int -> when (other) {
+                is Long -> (subject .. other).toList()
+                is Number -> (subject..other.toInt()).toList()
+                else -> binOpTypeError("range", subject, other)
+            }
 
         is Long -> when (other) {
             is Number -> (subject..other.toLong()).toList()
@@ -618,15 +633,7 @@ object Core {
             !arg
         }
 
-        .defineFunction("range") { _, args ->
-            val start: Number
-            val end: Number
-            args.use {
-                start = require("start")
-                end  = require("end_inclusive")
-            }
-            range(start, end)
-        }
+        .defineFunction("range", RangeFunction)
 
         .defineBinaryOpFunction("eq") { _, left, right ->
             eq(left, right)
@@ -677,9 +684,7 @@ object Core {
             right
         }
 
-        .defineBinaryOpFunction("range") { _, left, right ->
-            range(left, right)
-        }
+        .defineBinaryOpFunction("range", RangeFunction)
 
         .defineBinaryOpFunction("plus") { _, left, right ->
             plus(left, right)
