@@ -5,22 +5,32 @@ import org.cikit.forte.core.LocationInfo
 class ParseException private constructor(
     locationInfo: LocationInfo,
     val tokenizer: ExpressionTokenizer,
+    @Deprecated("parser should come up with more specific error location")
     val node: Node?,
     val expression: Expression?,
-    val errorMessage: String,
-) : RuntimeException(
-    locationInfo.buildMessage(node, expression, errorMessage)
-) {
-    val token: Token = locationInfo.token
-    val tokenStart = locationInfo.tokenStart
-    val tokenEnd = locationInfo.tokenEnd
+    errorMessage: String,
+) : RuntimeException(errorMessage) {
+    val location: Location = locationInfo.startLocation
+    val startToken: Token = locationInfo.startToken
+    val endToken: Token = locationInfo.endToken
+
+    @Deprecated("replace with startToken")
+    val token: Token
+        get() = startToken
+
+    @Deprecated("replace with location")
+    val tokenStart: Location
+        get() = location
+
+    @Deprecated("use location + endToken.last - startToken.first")
+    val tokenEnd = locationInfo.endLocation
 
     constructor(
         tokenizer: ExpressionTokenizer,
         token: Token,
         errorMessage: String,
     ) : this(
-        locationInfo = LocationInfo(tokenizer, token),
+        locationInfo = LocationInfo(tokenizer, token, token),
         tokenizer = tokenizer,
         node = null,
         expression = null,
@@ -29,14 +39,30 @@ class ParseException private constructor(
 
     constructor(
         tokenizer: ExpressionTokenizer,
+        startToken: Token,
+        endToken: Token,
+        errorMessage: String,
+    ) : this(
+        locationInfo = LocationInfo(tokenizer, startToken, endToken),
+        tokenizer = tokenizer,
+        node = null,
+        expression = null,
+        errorMessage = errorMessage
+    )
+
+    @Deprecated("parser should come up with more specific error location")
+    constructor(
+        tokenizer: ExpressionTokenizer,
         node: Node,
         errorMessage: String,
     ) : this(
-        LocationInfo(tokenizer, node.sourceTokenRange().first),
-        tokenizer,
-        node,
-        null,
-        errorMessage
+        locationInfo = node.sourceTokenRange().let { (t1, t2) ->
+            LocationInfo(tokenizer, t1, t2)
+        },
+        tokenizer = tokenizer,
+        node = node,
+        expression = null,
+        errorMessage = errorMessage
     )
 
     constructor(
@@ -44,12 +70,26 @@ class ParseException private constructor(
         expression: Expression,
         errorMessage: String,
     ) : this(
-        LocationInfo(tokenizer, expression.sourceTokenRange().first),
-        tokenizer,
-        null,
-        expression,
-        errorMessage
+        locationInfo = expression.sourceTokenRange().let { (t1, t2) ->
+            LocationInfo(tokenizer, t1, t2)
+        },
+        tokenizer = tokenizer,
+        node = null,
+        expression = expression,
+        errorMessage = errorMessage
     )
+
+    override val message: String?
+        get() = buildString {
+            append(tokenizer.path ?: "<anonymous>")
+            append("[")
+            append(location.lineNumber)
+            append(":")
+            append(location.columnNumber)
+            append("]")
+            append(": ")
+            append(super.message)
+        }
 }
 
 class Location(

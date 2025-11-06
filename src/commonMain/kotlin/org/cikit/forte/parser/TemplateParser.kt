@@ -139,7 +139,7 @@ class TemplateParser private constructor(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t"
+                    "unexpected token ${t::class}"
                 )
             }
         }
@@ -152,7 +152,7 @@ class TemplateParser private constructor(
             throw ParseException(
                 tokenizer,
                 t,
-                "expected 'end comment' token"
+                "expected ${Token.EndComment::class}"
             )
         }
         return Node.Comment(startToken, txt, t)
@@ -235,7 +235,7 @@ class TemplateParser private constructor(
                 throw ParseException(
                     tokenizer,
                     endToken,
-                    "expected 'end command' token"
+                    "expected ${Token.EndCommand::class}"
                 )
             }
             return Node.Command(
@@ -264,7 +264,7 @@ class TemplateParser private constructor(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t"
+                    "unexpected token ${t::class}"
                 )
             }
         }
@@ -278,11 +278,12 @@ class TemplateParser private constructor(
         var branchStart = cmd
         while (true) {
             val content = copy(context = decl).parse()
-            val last = content.last() as? Node.Command ?: throw ParseException(
-                tokenizer,
-                content.last(),
-                "expected end command ${decl.endAliases}"
-            )
+            val last = content.lastOrNull() as? Node.Command
+                ?: throw ParseException(
+                    tokenizer,
+                    tokenizer.peek(),
+                    "expected end command ${decl.endAliases}"
+                )
             val firstNode = if (input[branchStart.last.first] == '-') {
                 (content.first() as? Node.Text)?.let { txt ->
                     Node.Text(txt.content, trimLeft = true, txt.trimRight)
@@ -318,7 +319,7 @@ class TemplateParser private constructor(
             throw ParseException(
                 tokenizer,
                 t,
-                "expected 'end emit' token"
+                "expected ${Token.EndEmit::class}"
             )
         }
         return Node.Emit(startToken, content, t)
@@ -436,6 +437,7 @@ private class ExpressionParserImpl(
                             throw ParseException(
                                 tokenizer,
                                 tokens2.first(),
+                                tokens2.last(),
                                 "unexpected operator"
                             )
                         }
@@ -491,7 +493,7 @@ private class ExpressionParserImpl(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t in string"
+                    "unexpected token ${t::class} in string"
                 )
             }
         }
@@ -556,7 +558,7 @@ private class ExpressionParserImpl(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t in string"
+                    "unexpected token ${t::class} in string"
                 )
             }
         }
@@ -728,8 +730,8 @@ private class ExpressionParserImpl(
                     val arg = when (args) {
                         null -> throw ParseException(
                             tokenizer,
-                            t2,
-                            "unexpected token $t2"
+                            t, t2,
+                            "no key passed"
                         )
                         else -> args
                     }
@@ -822,7 +824,7 @@ private class ExpressionParserImpl(
                     throw ParseException(
                         tokenizer,
                         expression,
-                        "expected arg name"
+                        "expected arg name, actual ${expression::class}"
                     )
                 }
                 tokenizer.consume(t)
