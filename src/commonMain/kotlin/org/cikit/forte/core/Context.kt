@@ -175,7 +175,7 @@ sealed class Context<R> {
 
     class Builder<R> private constructor(
         private val rootContext: Context<*>,
-        private val scope: MutableMap<String, Any?> = mutableMapOf(),
+        private val scope: MutableMap<String, Any?> = HashMap(),
         private val captureFunction: CaptureFunction<R>
     ) : Context<R>() {
 
@@ -186,7 +186,7 @@ sealed class Context<R> {
         )
         constructor(
             rootContext: Context<*>,
-            scope: MutableMap<String, Any?> = mutableMapOf(),
+            scope: MutableMap<String, Any?> = HashMap(),
             resultBuilder: ResultBuilder<R>
         ) : this(
             rootContext = rootContext,
@@ -197,7 +197,7 @@ sealed class Context<R> {
         companion object {
             internal fun create(
                 rootContext: Context<*>,
-                scope: MutableMap<String, Any?> = mutableMapOf()
+                scope: MutableMap<String, Any?> = HashMap()
             ) = Builder(rootContext, scope, NoOpCaptureFunction)
         }
 
@@ -407,20 +407,20 @@ sealed class Context<R> {
 
         override fun builder(): Builder<Unit> = Builder(
             rootContext,
-            scope.toMutableMap(),
+            HashMap(scope),
             NoOpCaptureFunction
         )
 
         fun scope(): Builder<R> = Builder(
             rootContext,
-            scope.toMutableMap(),
+            HashMap(scope),
             captureFunction,
         )
 
         @Deprecated("replace with chained call to capture")
         fun scope(captureFunction: (Any?) -> Unit) = Builder(
             rootContext,
-            scope.toMutableMap(),
+            HashMap(scope),
             CbCaptureFunction(captureFunction)
         )
 
@@ -428,7 +428,7 @@ sealed class Context<R> {
         @Deprecated("ResultBuilder is deprecated")
         fun <R> scope(resultBuilder: ResultBuilder<R>) = Builder(
             rootContext,
-            scope.toMutableMap(),
+            HashMap(scope),
             RbCaptureFunction(resultBuilder)
         )
 
@@ -481,10 +481,20 @@ sealed class Context<R> {
         }
 
         fun build(): Context<R> {
+            val newScope = when (val size = scope.size) {
+                0 -> emptyMap()
+                1 -> {
+                    val entry = scope.entries.iterator().next()
+                    mapOf(entry.key to entry.value)
+                }
+                else -> {
+                    HashMap(scope)
+                }
+            }
             return if (rootContext === Context.Companion) {
-                MapContext(scope.toMap(), result)
+                MapContext(newScope, result)
             } else {
-                NewContext(rootContext, scope.toMap(), result)
+                NewContext(rootContext, newScope, result)
             }
         }
     }
@@ -493,8 +503,12 @@ sealed class Context<R> {
         val scope: Map<String, Any?>,
         override val result: R
     ) : Context<R>() {
-        override fun getVar(name: String): Any =
-            scope["var_$name"] ?: Undefined("undefined variable: '$name'")
+        override fun getVar(name: String): Any? {
+            if (scope.containsKey("var_$name")) {
+                return scope["var_$name"]
+            }
+            return Undefined("undefined variable: '$name'")
+        }
         @Suppress("DEPRECATION")
         @Deprecated("migrate to suspending api")
         override fun getCommand(name: String): CommandFunction? =
