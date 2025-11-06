@@ -165,9 +165,9 @@ class TestEval {
                     .setVars(vars)
                     .evalExpression(Forte.parseExpression("yes.a.b.c"))
             } catch (ex: EvalException) {
-                println(ex.detailedMessage)
+                println(ex)
                 assertEquals(0, ex.startToken.first)
-                assertContains(ex.message!!, "undefined variable: 'yes'")
+                assertContains(ex.errorMessage, "undefined variable: 'yes'")
                 throw ex
             }
         }
@@ -177,9 +177,9 @@ class TestEval {
                     .setVars(vars)
                     .evalExpression(Forte.parseExpression("x.z.b.c"))
             } catch (ex: EvalException) {
-                println(ex.detailedMessage)
+                println(ex)
                 assertEquals(1, ex.startToken.first)
-                assertContains(ex.message!!, "'z'")
+                assertContains(ex.errorMessage, "'z'")
                 throw ex
             }
         }
@@ -191,9 +191,9 @@ class TestEval {
             } catch (ex: EvalException) {
                 // the expression "a.cat" is rescued
                 // so expect the expression flash to fail
-                println(ex.detailedMessage)
+                println(ex)
                 assertEquals(14, ex.startToken.first)
-                assertContains(ex.message!!, "undefined variable: 'flash'")
+                assertContains(ex.errorMessage, "undefined variable: 'flash'")
                 throw ex
             }
         }
