@@ -21,11 +21,11 @@ kotlin {
             useJUnitPlatform()
         }
     }
-    js {
+    /* safeCast broken js {
         nodejs {
             binaries.executable()
         }
-    }
+    } */
     wasmJs {
         nodejs {
             binaries.executable()
@@ -66,8 +66,8 @@ kotlin {
         }
         jvmMain {}
         jvmTest {}
-        jsMain {}
-        jsTest {}
+        //jsMain {}
+        //jsTest {}
         wasmJsMain {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-browser-wasm-js:0.5.0")
