@@ -26,7 +26,7 @@ class NamedArgs(
     }
 
     fun requireEmpty() {
-        require(values.isEmpty()) { "too many args" }
+        require(this === Empty || values.isEmpty()) { "too many args" }
     }
 }
 

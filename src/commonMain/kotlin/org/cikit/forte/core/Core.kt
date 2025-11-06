@@ -840,7 +840,7 @@ object Core {
                 filterArgs = optional(
                     "arg",
                     { NamedArgs(listOf(it), emptyList()) },
-                    { NamedArgs(emptyList(), emptyList()) }
+                    { NamedArgs.Empty }
                 )
             }
             val filter = ctx.getMethod(
@@ -863,7 +863,7 @@ object Core {
                 filterArgs = optional(
                     "arg",
                     { NamedArgs(listOf(it), emptyList()) },
-                    { NamedArgs(emptyList(), emptyList()) }
+                    { NamedArgs.Empty }
                 )
             }
             val filter = ctx.getMethod(
@@ -888,7 +888,7 @@ object Core {
                 filterArgs = optional(
                     "arg",
                     { NamedArgs(listOf(it), emptyList()) },
-                    { NamedArgs(emptyList(), emptyList()) }
+                    { NamedArgs.Empty }
                 )
             }
             val get = ctx.getMethod("get", CoreOperators.Filter.value)
