@@ -48,18 +48,24 @@ class NamedArgsIterator(
         return values[nextIndex]
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> requireNullable(name: String, type: KClass<T>): T? {
         val nextIndex = next(name)
         require(nextIndex >= 0) { "missing required arg '$name'" }
         return castNullable(name, type, values[nextIndex])
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> require(name: String, type: KClass<T>): T {
         val nextIndex = next(name)
         require(nextIndex >= 0) { "missing required arg '$name'" }
         return cast(name, type, values[nextIndex])
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> optionalNullable(
         name: String,
         type: KClass<T>,
@@ -87,6 +93,8 @@ class NamedArgsIterator(
         }
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> optional(
         name: String,
         type: KClass<T>,
@@ -114,6 +122,7 @@ class NamedArgsIterator(
         }
     }
 
+    @Deprecated("does not work correctly on js target")
     private fun <T: Any> cast(
         name: String,
         type: KClass<T>,
@@ -128,6 +137,7 @@ class NamedArgsIterator(
         return result
     }
 
+    @Deprecated("does not work correctly on js target")
     private fun <T: Any> castNullable(
         name: String,
         type: KClass<T>,
@@ -165,16 +175,42 @@ class NamedArgsIterator(
 inline fun <reified T: Any> NamedArgsIterator.requireNullable(
     name: String
 ): T? {
-    return requireNullable(name, T::class)
+    val value = requireAny(name) ?: return null
+    require(value is T) {
+        "invalid type '${typeName(value)}' " +
+                "for arg '$name': expected '${T::class}'"
+    }
+    return value
 }
 
 inline fun <reified T: Any> NamedArgsIterator.require(name: String): T {
-    return require(name, T::class)
+    val value = requireAny(name)
+    require(value != null) {
+        "invalid null value for arg '$name'"
+    }
+    require(value is T) {
+        "invalid type '${typeName(value)}' " +
+                "for arg '$name': expected '${T::class}'"
+    }
+    return value
 }
 
 inline fun <reified T: Any> NamedArgsIterator.optional(
     name: String,
     noinline defaultValue: () -> T
 ) : T {
-    return optional(name, T::class, defaultValue)
+    return optional(
+        name = name,
+        convertValue = { value ->
+            require(value != null) {
+                "invalid null value for arg '$name'"
+            }
+            require(value is T) {
+                "invalid type '${typeName(value)}' " +
+                        "for arg '$name': expected '${T::class}'"
+            }
+            value
+        },
+        defaultValue = defaultValue
+    )
 }
