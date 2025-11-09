@@ -634,6 +634,15 @@ object Core {
 
         .defineFilter("get", GetFilter)
 
+        .defineRescueMethod(
+            "get",
+            CoreOperators.Filter.value
+        ) { _, subject, args ->
+            val key: Any?
+            args.use { key = requireAny("key") }
+            subject
+        }
+
         .defineFilter("attr") { ctx, subject, args ->
             if (args.values.firstOrNull() !is CharSequence) {
                 val key: String
@@ -1358,6 +1367,19 @@ object Core {
                 )
             }
         }
+
+        .defineMethod("invoke") { _, subject, _ ->
+            throw IllegalArgumentException(
+                "operand of type '${typeName(subject)}' is not callable"
+            )
+        }
+
+        .defineTest(
+            "callable",
+            // nothing is callable
+            { _, _, args -> args.requireEmpty(); false },
+            { _, _, args -> args.requireEmpty(); true },
+        )
 
         .build()
 

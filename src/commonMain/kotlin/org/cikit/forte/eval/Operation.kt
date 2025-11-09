@@ -8,7 +8,10 @@ sealed class Operation {
     abstract val expression: Expression
     abstract operator fun invoke(ctx: Context<*>, state: EvaluatorState)
 
-    class Const(override val expression: Expression, val value: Any?) : Operation() {
+    class Const(
+        override val expression: Expression,
+        val value: Any?
+    ) : Operation() {
         override fun toString(): String {
             return expression.toString()
         }
@@ -74,7 +77,10 @@ sealed class Operation {
         }
     }
 
-    class InitArray(override val expression: Expression, val size: Int) : Operation() {
+    class InitArray(
+        override val expression: Expression,
+        val size: Int
+    ) : Operation() {
         override fun toString(): String {
             return "InitArray"
         }
@@ -84,7 +90,10 @@ sealed class Operation {
         }
     }
 
-    class AddArrayElement(override val expression: Expression, val index: Int) : Operation() {
+    class AddArrayElement(
+        override val expression: Expression,
+        val index: Int
+    ) : Operation() {
         override fun toString(): String {
             return "AddArrayElement"
         }
@@ -110,7 +119,10 @@ sealed class Operation {
         }
     }
 
-    class InitObject(override val expression: Expression, val size: Int) : Operation() {
+    class InitObject(
+        override val expression: Expression,
+        val size: Int
+    ) : Operation() {
         override fun toString(): String {
             return "InitObject"
         }
@@ -204,16 +216,20 @@ sealed class Operation {
         }
     }
 
-    class CallFunction(override val expression: Expression.FunctionCall, val argNames: List<String>) : Operation() {
+    class CallFunction(
+        override val expression: Expression.FunctionCall,
+        val argNames: List<String>
+    ) : Operation() {
         override fun toString(): String {
             return "Call(${expression.name})"
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            val function = ctx.getFunction(expression.name) ?: throw EvalException(
-                expression,
-                "function '${expression.name}' not defined"
-            )
+            val function = ctx.getFunction(expression.name)
+                ?: throw EvalException(
+                    expression,
+                    "function '${expression.name}' not defined"
+                )
             val args = NamedArgs((state.last() as Array<*>).toList(), argNames)
             val result = try {
                 function(ctx, args)
@@ -231,28 +247,42 @@ sealed class Operation {
         }
     }
 
-    class CallMethod(override val expression: Expression, val name: String, val argNames: List<String>) : Operation() {
+    class CallMethod(
+        override val expression: Expression,
+        val name: String,
+        val argNames: List<String>
+    ) : Operation() {
         override fun toString(): String {
             return "CallMethod($name)"
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            val function = ctx.getMethod(name)
-                ?: throw EvalException(
+            val args = NamedArgs(
+                (state.removeLast() as Array<*>).toList(),
+                argNames
+            )
+            val subject = state.last()
+            val function: Method
+            val finalSubject = if (subject is UndefinedResult) {
+                function = ctx.getRescueMethod(name)
+                    ?: throw EvalException(expression, subject.value.message)
+                subject.value
+            } else {
+                function = ctx.getMethod(name) ?: throw EvalException(
                     expression,
-                    "method '$name' not defined"
+                    "method '`$name' not defined"
                 )
-            val args = NamedArgs((state.removeLast() as Array<*>).toList(), argNames)
-            var value = state.last()
-            if (value !is UndefinedResult) {
-                val result = try {
-                    function.invoke(ctx, value, args)
-                } catch (ex: EvalException) {
-                    throw ex
-                } catch (ex: Exception) {
-                    throw EvalException(expression, ex.toString(), ex)
-                }
-                value = if (result is Undefined) {
+                subject
+            }
+            val result = try {
+                function.invoke(ctx, finalSubject, args)
+            } catch (ex: EvalException) {
+                throw ex
+            } catch (ex: Exception) {
+                throw EvalException(expression, ex.toString(), ex)
+            }
+            if (result !== finalSubject) {
+                val value = if (result is Undefined) {
                     UndefinedResult(expression, result)
                 } else {
                     result
@@ -262,7 +292,11 @@ sealed class Operation {
         }
     }
 
-    class CondBinOp(override val expression: Expression, val name: String, val condOperationsCount: Int) : Operation() {
+    class CondBinOp(
+        override val expression: Expression,
+        val name: String,
+        val condOperationsCount: Int
+    ) : Operation() {
         override fun toString(): String {
             return "CondBinOp($name)"
         }
@@ -296,7 +330,10 @@ sealed class Operation {
         }
     }
 
-    class InvokeBinOp(override val expression: Expression, val name: String) : Operation() {
+    class InvokeBinOp(
+        override val expression: Expression,
+        val name: String
+    ) : Operation() {
         override fun toString(): String {
             return "InvokeBinOp($name)"
         }
@@ -335,17 +372,22 @@ sealed class Operation {
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            val args = NamedArgs((state.removeLast() as Array<*>).toList(), argNames)
+            val args = NamedArgs(
+                (state.removeLast() as Array<*>).toList(),
+                argNames
+            )
             val subject = state.last()
             val function: Method
             val finalSubject = if (subject is UndefinedResult) {
-                function = ctx.getRescueMethod(method, operator) ?: return
+                function = ctx.getRescueMethod(method, operator)
+                    ?: throw EvalException(expression, subject.value.message)
                 subject.value
             } else {
-                function = ctx.getMethod(method, operator) ?: throw EvalException(
-                    expression,
-                    "method '`$operator`$method' not defined"
-                )
+                function = ctx.getMethod(method, operator)
+                    ?: throw EvalException(
+                        expression,
+                        "method '`$operator`$method' not defined"
+                    )
                 subject
             }
             val result = try {
@@ -355,12 +397,14 @@ sealed class Operation {
             } catch (ex: Exception) {
                 throw EvalException(expression, ex.toString(), ex)
             }
-            val value = if (result is Undefined) {
-                UndefinedResult(expression, result)
-            } else {
-                result
+            if (result !== finalSubject) {
+                val value = if (result is Undefined) {
+                    UndefinedResult(expression, result)
+                } else {
+                    result
+                }
+                state.setLast(value)
             }
-            state.setLast(value)
         }
     }
 }
