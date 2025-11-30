@@ -184,7 +184,10 @@ sealed class Operation {
         }
     }
 
-    class UnOp(override val expression: Expression.UnOp) : Operation() {
+    class UnOp(
+        override val expression: Expression.UnOp,
+        val allowHidden: Boolean = false
+    ) : Operation() {
         override fun toString(): String {
             return "UnOp(${expression.decl.name})"
         }
@@ -196,6 +199,13 @@ sealed class Operation {
                     "unary operator function '${expression.decl.name}' " +
                             "not defined"
                 )
+            if (!allowHidden && function.isHidden) {
+                throw EvalException(
+                    expression,
+                    "unary operator function '${expression.decl.name}' " +
+                            "is hidden"
+                )
+            }
             var value = state.last()
             if (value is UndefinedResult) {
                 throw EvalException(value.expression, value.value.message)
@@ -218,7 +228,8 @@ sealed class Operation {
 
     class CallFunction(
         override val expression: Expression.FunctionCall,
-        val argNames: List<String>
+        val argNames: List<String>,
+        val allowHidden: Boolean = false
     ) : Operation() {
         override fun toString(): String {
             return "Call(${expression.name})"
@@ -230,6 +241,12 @@ sealed class Operation {
                     expression,
                     "function '${expression.name}' not defined"
                 )
+            if (!allowHidden && function.isHidden) {
+                throw EvalException(
+                    expression,
+                    "function '${expression.name}' is hidden"
+                )
+            }
             val args = NamedArgs((state.last() as Array<*>).toList(), argNames)
             val result = try {
                 function(ctx, args)
@@ -250,7 +267,8 @@ sealed class Operation {
     class CallMethod(
         override val expression: Expression,
         val name: String,
-        val argNames: List<String>
+        val argNames: List<String>,
+        val allowHidden: Boolean = false
     ) : Operation() {
         override fun toString(): String {
             return "CallMethod($name)"
@@ -274,6 +292,12 @@ sealed class Operation {
                 )
                 subject
             }
+            if (!allowHidden && function.isHidden) {
+                throw EvalException(
+                    expression,
+                    "method '`$name' is hidden"
+                )
+            }
             val result = try {
                 function.invoke(ctx, finalSubject, args)
             } catch (ex: EvalException) {
@@ -295,7 +319,8 @@ sealed class Operation {
     class CondBinOp(
         override val expression: Expression,
         val name: String,
-        val condOperationsCount: Int
+        val condOperationsCount: Int,
+        val allowHidden: Boolean = false
     ) : Operation() {
         override fun toString(): String {
             return "CondBinOp($name)"
@@ -307,6 +332,12 @@ sealed class Operation {
                     expression,
                     "operator function '$name' not defined"
                 )
+            if (!allowHidden && function.isHidden) {
+                throw EvalException(
+                    expression,
+                    "operator function '$name' is hidden"
+                )
+            }
             val value = state.last()
             if (value is UndefinedResult) {
                 throw EvalException(value.expression, value.value.message)
@@ -365,7 +396,8 @@ sealed class Operation {
         override val expression: Expression,
         val method: String,
         val operator: String,
-        val argNames: List<String>
+        val argNames: List<String>,
+        val allowHidden: Boolean = false
     ) : Operation() {
         override fun toString(): String {
             return "TransformOp(${operator}_$method)"
@@ -389,6 +421,12 @@ sealed class Operation {
                         "method '`$operator`$method' not defined"
                     )
                 subject
+            }
+            if (!allowHidden && function.isHidden) {
+                throw EvalException(
+                    expression,
+                    "method '`$operator`$method' is hidden"
+                )
             }
             val result = try {
                 function.invoke(ctx, finalSubject, args)

@@ -2,6 +2,7 @@ package org.cikit.forte.eval
 
 import org.cikit.forte.core.Branch
 import org.cikit.forte.core.Context
+import org.cikit.forte.core.Core
 import org.cikit.forte.core.CoreOperators
 import org.cikit.forte.core.EvalException
 import org.cikit.forte.core.Undefined
@@ -43,6 +44,9 @@ private fun Node.Command.compile(): Node.Command {
     return Node.Command(first, name, content, last) { ctx ->
         val function = ctx.getCommandTag(name)
             ?: throw EvalException(this, "command '$name' not defined")
+        if (!allowHidden && function.isHidden) {
+            throw EvalException(this, "command '$name' is hidden")
+        }
         try {
             function.invoke(ctx, content)
         } catch (ex: EvalException) {
@@ -64,6 +68,9 @@ private fun Node.Control.compile(template: ParsedTemplate): Node.Control {
     return Node.Control(first, branches) { ctx ->
         val function = ctx.getControlTag(name)
             ?: throw EvalException(this, "command '$name' not defined")
+        if (!allowHidden && function.isHidden) {
+            throw EvalException(this, "command '$name' is hidden")
+        }
         try {
             function.invoke(ctx, compiledBranches)
         } catch (ex: EvalException) {
@@ -263,7 +270,8 @@ private fun compileExpressionInternal(
                     expression,
                     "get",
                     CoreOperators.Filter.value,
-                    listOf("key")
+                    Core.GetFilter.singleArg,
+                    allowHidden = true
                 )
             )
             Expression.CompAccess(
@@ -283,7 +291,8 @@ private fun compileExpressionInternal(
                     expression,
                     "get",
                     CoreOperators.Filter.value,
-                    listOf("key")
+                    Core.GetFilter.singleArg,
+                    allowHidden = true
                 )
             )
             Expression.Access(

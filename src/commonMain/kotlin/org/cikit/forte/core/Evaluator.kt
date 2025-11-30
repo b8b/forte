@@ -17,6 +17,8 @@ fun interface CommandFunction {
 }
 
 fun interface CommandTag {
+    val isHidden: Boolean
+        get() = false
     suspend operator fun invoke(ctx: Context.Builder<*>, args: Map<String, Expression>)
 }
 
@@ -26,18 +28,26 @@ fun interface ControlFunction {
 }
 
 fun interface ControlTag {
+    val isHidden: Boolean
+        get() = false
     suspend operator fun invoke(ctx: Context.Builder<*>, branches: List<Branch>)
 }
 
 fun interface UnOpFunction {
+    val isHidden: Boolean
+        get() = false
     operator fun invoke(ctx: Context<*>, arg: Any?): Any?
 }
 
 fun interface BinOpFunction {
+    val isHidden: Boolean
+        get() = false
     operator fun invoke(ctx: Context<*>, left: Any?, right: Any?): Any?
 }
 
 interface ConditionalBinOpFunction : BinOpFunction, UnOpFunction {
+    override val isHidden: Boolean
+        get() = false
     fun condition(ctx: Context<*>, arg: Any?): Boolean
 
     override fun invoke(ctx: Context<*>, left: Any?, right: Any?): Any? {
@@ -50,10 +60,14 @@ interface ConditionalBinOpFunction : BinOpFunction, UnOpFunction {
 }
 
 fun interface Function {
+    val isHidden: Boolean
+        get() = false
     operator fun invoke(ctx: Context<*>, args: NamedArgs): Any?
 }
 
 fun interface Method {
+    val isHidden: Boolean
+        get() = false
     operator fun invoke(ctx: Context<*>, subject: Any?, args: NamedArgs): Any?
 }
 

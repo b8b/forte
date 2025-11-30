@@ -47,6 +47,9 @@ object Core {
     }
 
     private object RangeFunction : Function, BinOpFunction {
+        override val isHidden: Boolean
+            get() = false
+
         override fun invoke(ctx: Context<*>, args: NamedArgs): Any {
             val start: Number
             val end: Number
@@ -473,14 +476,24 @@ object Core {
         return this
     }
 
-    private object GetFilter : Method {
+    internal object GetFilter : Method {
+
+        val singleArg = listOf("key")
+
+        override val isHidden: Boolean
+            get() = true
+
         override fun invoke(
             ctx: Context<*>,
             subject: Any?,
             args: NamedArgs
         ): Any? {
             val key: Any?
-            args.use { key = requireAny("key") }
+            if (args.names === singleArg && args.values.size == 1) {
+                key = args.values[0]
+            } else {
+                args.use { key = requireAny("key") }
+            }
             return when (subject) {
                 is Map<*, *> -> {
                     if (!subject.containsKey(key)) {
@@ -930,7 +943,7 @@ object Core {
             }
             val get = ctx.getMethod("get", CoreOperators.Filter.value)
                 ?: error("filter 'get' not defined")
-            val getArgs = NamedArgs(listOf(attr), emptyList())
+            val getArgs = NamedArgs(listOf(attr), GetFilter.singleArg)
             val filter = ctx.getMethod(
                 test.concatToString(),
                 CoreOperators.Test.value

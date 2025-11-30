@@ -25,6 +25,7 @@ sealed class Node(
         val name: String,
         val content: Map<String, Expression>,
         val last: Token,
+        val allowHidden: Boolean = false,
         execute: Execute? = UNCOMPILED_NODE
     ) : Node(execute) {
         override fun toString(): String {
@@ -51,6 +52,7 @@ sealed class Node(
     class Control(
         val first: Branch,
         val branches: List<Branch> = emptyList(),
+        val allowHidden: Boolean = false,
         execute: Execute? = UNCOMPILED_NODE
     ) : Node(execute) {
         override fun toString(): String = buildString {
