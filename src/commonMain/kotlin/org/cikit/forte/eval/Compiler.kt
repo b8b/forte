@@ -41,7 +41,14 @@ internal fun Node.compile(template: ParsedTemplate) = when (val cmd = this) {
 
 private fun Node.Command.compile(): Node.Command {
     val content = content.compile()
-    return Node.Command(first, name, content, last) { ctx ->
+    return Node.Command(
+        first,
+        name,
+        content,
+        branchAliases,
+        endAliases,
+        last
+    ) { ctx ->
         val function = ctx.getCommandTag(name)
             ?: throw EvalException(this, "command '$name' not defined")
         if (!allowHidden && function.isHidden) {

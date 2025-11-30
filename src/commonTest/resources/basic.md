@@ -122,3 +122,22 @@ true,xxc,abc
 {{- [1, 2, 3]|reject("==", 2)|json -}},
 {{- [1, 2, 3]|select("==", 2)|json -}}
 ```
+
+## ArrayAccess
+```Twig
+2,empty
+~
+{{- ([1, 2, 3])[1] -}},
+{{- ([])[0]|default("empty") -}}
+```
+
+## Set Control
+```Twig
+hello there
+~
+{%- set name = "there" -%}
+{%- set x -%}
+hello {{ name }}
+{%- endset -%}
+{{- x -}}
+```

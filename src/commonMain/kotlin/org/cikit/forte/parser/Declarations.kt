@@ -4,14 +4,21 @@ import org.cikit.forte.core.CoreOperators as OP
 
 val defaultDeclaredCommands = listOf(
     Declarations.Command("set") {
-        val variable = expect<Token.Identifier>()
-        args["varName"] = Expression.StringLiteral(
-            variable,
-            variable,
-            input.substring(variable.first..variable.last)
-        )
-        expect<Token.Assign>()
-        args["value"] = parseExpression()
+        if (name == "set") {
+            val variable = expect<Token.Identifier>()
+            args["varName"] = Expression.StringLiteral(
+                variable,
+                variable,
+                input.substring(variable.first..variable.last)
+            )
+            val t = tokenizer.peek(skipSpace = true)
+            if (t is Token.Assign) {
+                tokenizer.consume(t)
+                args["value"] = parseExpression()
+            } else {
+                endAliases += "endset"
+            }
+        }
     },
     Declarations.Command(
         name = "if",

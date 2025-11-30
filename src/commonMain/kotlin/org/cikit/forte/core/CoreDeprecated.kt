@@ -12,22 +12,35 @@ object CoreDeprecated {
             val varName = args.getValue("varName")
             val value = args.getValue("value")
             ctx.setVar(
-                ctx.evalExpression(varName) as String,
-                ctx.evalExpression(value)
+                ctx.evalExpressionDeprecated(varName) as String,
+                ctx.evalExpressionDeprecated(value)
+            )
+        }
+        defineControl("set") { ctx, branches ->
+            val cmd = branches.single()
+            val varName = cmd.args.getValue("varName")
+            val value = ctx.scope()
+                .captureToString()
+                .evalTemplateDeprecated(cmd.body)
+                .result
+            ctx.setVar(
+                ctx.evalExpressionDeprecated(varName) as String,
+                value
             )
         }
         defineControl("if") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {
                     "else" -> {
-                        ctx.evalTemplate(cmd.body)
+                        ctx.evalTemplateDeprecated(cmd.body)
                         break
                     }
 
                     else -> {
                         val condition = cmd.args.getValue("condition")
-                        if (ctx.evalExpression(condition) as Boolean) {
-                            ctx.evalTemplate(cmd.body)
+                        if (ctx.evalExpressionDeprecated(condition) as Boolean)
+                        {
+                            ctx.evalTemplateDeprecated(cmd.body)
                             break
                         }
                     }
@@ -38,24 +51,25 @@ object CoreDeprecated {
             for (cmd in branches) {
                 when (cmd.name) {
                     "else" -> {
-                        ctx.evalTemplate(cmd.body)
+                        ctx.evalTemplateDeprecated(cmd.body)
                         break
                     }
 
                     else -> {
                         val varNames = cmd.args.getValue("varNames")
                         val listValue = cmd.args.getValue("listValue")
-                        val varName = (ctx.evalExpression(varNames) as List<*>)
-                            .singleOrNull() ?: error(
-                            "destructuring in for loop is not implemented"
-                        )
+                        val varName =
+                            (ctx.evalExpressionDeprecated(varNames) as List<*>)
+                                .singleOrNull() ?: error(
+                                "destructuring in for loop is not implemented"
+                                )
                         var done = false
-                        val list = ctx.evalExpression(listValue)
+                        val list = ctx.evalExpressionDeprecated(listValue)
                         for (item in list as Iterable<*>) {
                             done = true
                             ctx.scope()
                                 .setVar(varName as String, item)
-                                .evalTemplate(cmd.body)
+                                .evalTemplateDeprecated(cmd.body)
                         }
                         if (done) {
                             break
@@ -69,12 +83,13 @@ object CoreDeprecated {
             val functionNameExpr = cmd.args.getValue("name")
             val argNamesExpr = cmd.args.getValue("argNames")
             val argDefaultsExpr = cmd.args.getValue("argDefaults")
-            val functionName = ctx.evalExpression(functionNameExpr) as String
-            val argNames = ctx.evalExpression(argNamesExpr) as List<*>
+            val functionName =
+                ctx.evalExpressionDeprecated(functionNameExpr) as String
+            val argNames = ctx.evalExpressionDeprecated(argNamesExpr) as List<*>
             argDefaultsExpr as Expression.ObjectLiteral
 
             val finalArgDefaults = argDefaultsExpr.pairs.associate { (k, v) ->
-                ctx.evalExpression(k).toString() to v
+                ctx.evalExpressionDeprecated(k).toString() to v
             }
             val finalArgNames = argNames.map { name -> name as String }
 
@@ -106,7 +121,7 @@ object CoreDeprecated {
                     }
                 }
                 macroCtx.captureToString()
-                    .evalTemplate(cmd.body)
+                    .evalTemplateDeprecated(cmd.body)
                     .result
             }
         }

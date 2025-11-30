@@ -536,6 +536,19 @@ object Core {
             )
         }
 
+        .defineControlTag("set") { ctx, branches ->
+            val cmd = branches.single()
+            val varName = cmd.args.getValue("varName")
+            val value = ctx.scope()
+                .captureToString()
+                .evalTemplate(cmd.body)
+                .result
+            ctx.setVar(
+                ctx.evalExpression(varName) as String,
+                value
+            )
+        }
+
         .defineControlTag("if") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {

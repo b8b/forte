@@ -33,11 +33,11 @@ sealed class Forte(
         vars: Map<String, Any?>
     ): Any? {
         return if (vars.isEmpty()) {
-            context.evalExpression(expression)
+            context.evalExpressionDeprecated(expression)
         } else {
             context.builder()
                 .setVars(vars)
-                .evalExpression(expression)
+                .evalExpressionDeprecated(expression)
         }
     }
 
@@ -48,11 +48,11 @@ sealed class Forte(
         vararg vars: Pair<String, Any?>
     ): Any? {
         return if (vars.isEmpty()) {
-            context.evalExpression(expression)
+            context.evalExpressionDeprecated(expression)
         } else {
             context.builder()
                 .setVars(*vars)
-                .evalExpression(expression)
+                .evalExpressionDeprecated(expression)
         }
     }
 
@@ -82,7 +82,7 @@ sealed class Forte(
         vars: Map<String, Any?> = emptyMap()
     ): Context<Unit> {
         val parsedTemplate = parseTemplate(input, path)
-        return scope().setVars(vars).evalTemplate(parsedTemplate)
+        return scope().setVars(vars).evalTemplateDeprecated(parsedTemplate)
     }
 
     @Suppress("DEPRECATION")
@@ -93,7 +93,7 @@ sealed class Forte(
         path: UPath? = null
     ): Context<Unit> {
         val parsedTemplate = parseTemplate(input, path)
-        return scope().setVars(*vars).evalTemplate(parsedTemplate)
+        return scope().setVars(*vars).evalTemplateDeprecated(parsedTemplate)
     }
 
     @Suppress("DEPRECATION")
@@ -106,7 +106,7 @@ sealed class Forte(
         val parsedTemplate = parseTemplate(input, path)
         return captureToString()
             .setVars(vars)
-            .evalTemplate(parsedTemplate)
+            .evalTemplateDeprecated(parsedTemplate)
             .result
     }
 
@@ -120,7 +120,7 @@ sealed class Forte(
         val parsedTemplate = parseTemplate(input, path)
         return captureToString()
             .setVars(*vars)
-            .evalTemplate(parsedTemplate)
+            .evalTemplateDeprecated(parsedTemplate)
             .result
     }
 

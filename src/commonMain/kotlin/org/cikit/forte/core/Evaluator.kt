@@ -82,8 +82,14 @@ open class Undefined(open val message: String) {
 }
 
 @Suppress("DEPRECATION")
-@Deprecated("migrate to suspending api")
+@Deprecated("migrate to suspending api", level = DeprecationLevel.HIDDEN)
 fun <R> Context.Builder<R>.evalTemplate(
+    template: ParsedTemplate
+): Context.Builder<R> = evalTemplateDeprecated(template)
+
+@Suppress("DEPRECATION")
+@Deprecated("migrate to suspending api")
+internal fun <R> Context.Builder<R>.evalTemplateDeprecated(
     template: ParsedTemplate
 ): Context.Builder<R> {
     try {
@@ -145,7 +151,7 @@ private fun Context.Builder<*>.evalCommand(
         }
 
         is Node.Emit -> {
-            if (!tryEmit(evalExpression(cmd.content))) {
+            if (!tryEmit(tryEvalExpression(cmd.content).getOrThrow())) {
                 throw EvalException(
                     cmd,
                     "attempted to emit() value while capturing to flow"
@@ -155,8 +161,13 @@ private fun Context.Builder<*>.evalCommand(
     }
 }
 
-@Deprecated("migrate to suspending api")
+@Deprecated("migrate to suspending api", level = DeprecationLevel.HIDDEN)
 fun Context<*>.evalExpression(expression: Expression): Any? {
+    return tryEvalExpression(expression).getOrThrow()
+}
+
+@Deprecated("migrate to suspending api")
+internal fun Context<*>.evalExpressionDeprecated(expression: Expression): Any? {
     return tryEvalExpression(expression).getOrThrow()
 }
 

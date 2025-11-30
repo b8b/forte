@@ -3,8 +3,8 @@
 import kotlinx.serialization.json.*
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
-import org.cikit.forte.core.evalExpression
-import org.cikit.forte.core.evalTemplate
+import org.cikit.forte.core.evalExpressionDeprecated
+import org.cikit.forte.core.evalTemplateDeprecated
 import org.cikit.forte.parser.Declarations
 import org.cikit.forte.parser.Expression
 import kotlin.test.*
@@ -52,7 +52,7 @@ class TestEvaluator {
         val result = Forte
             .capture { println("--> $it") }
             .setVar("x", 2)
-            .evalTemplate(template)
+            .evalTemplateDeprecated(template)
         assertEquals(3, result.getVar("y"))
     }
 
@@ -60,9 +60,9 @@ class TestEvaluator {
     fun testContext() {
         with (Forte.scope { println("--> $it") }) {
             setVar("x", 2)
-            evalTemplate(Forte.parseTemplate("{% if true %}{% set y = x + 1 %}{% endif %}{{ y }}"))
+            evalTemplateDeprecated(Forte.parseTemplate("{% if true %}{% set y = x + 1 %}{% endif %}{{ y }}"))
             assertEquals(3, getVar("y"))
-            evalTemplate(Forte.parseTemplate("{% for x in [1] %}{% set y = x + 1 %}{% endfor %}{{ y }}"))
+            evalTemplateDeprecated(Forte.parseTemplate("{% for x in [1] %}{% set y = x + 1 %}{% endfor %}{{ y }}"))
             assertEquals(3, getVar("y"))
         }
     }
@@ -96,10 +96,10 @@ class TestEvaluator {
                 val branch = branches.single()
                 val jsonSource = ctx.scope()
                     .captureToString()
-                    .evalTemplate(branch.body)
+                    .evalTemplateDeprecated(branch.body)
                     .result
                 val result = Json.decodeFromString<JsonElement>(jsonSource)
-                val varName = ctx.evalExpression(
+                val varName = ctx.evalExpressionDeprecated(
                     branch.args.getValue("varName")
                 )
                 ctx.setVar(varName as String, result.toAny())
@@ -109,7 +109,7 @@ class TestEvaluator {
                 parser = { args["value"] = parseExpression() }
             )
             context.defineCommand("debug") { ctx, args ->
-                val value = ctx.evalExpression(args.getValue("value"))
+                val value = ctx.evalExpressionDeprecated(args.getValue("value"))
                 println("debug: $value")
             }
         }
@@ -152,7 +152,7 @@ class TestEvaluator {
             } catch (ex: EvalException) {
                 println(ex.detailedMessage)
                 assertEquals(0, ex.startToken.first)
-                assertContains(ex.message!!, "undefined variable: 'yes'")
+                assertContains(ex.message, "undefined variable: 'yes'")
                 throw ex
             }
         }
@@ -162,7 +162,7 @@ class TestEvaluator {
             } catch (ex: EvalException) {
                 println(ex.detailedMessage)
                 assertEquals(1, ex.startToken.first)
-                assertContains(ex.message!!, "'z'")
+                assertContains(ex.message, "'z'")
                 throw ex
             }
         }
@@ -174,7 +174,7 @@ class TestEvaluator {
                 // so expect the expression flash to fail
                 println(ex.detailedMessage)
                 assertEquals(14, ex.startToken.first)
-                assertContains(ex.message!!, "undefined variable: 'flash'")
+                assertContains(ex.message, "undefined variable: 'flash'")
                 throw ex
             }
         }

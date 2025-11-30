@@ -24,6 +24,8 @@ sealed class Node(
         val first: Token,
         val name: String,
         val content: Map<String, Expression>,
+        val branchAliases: Set<String>,
+        val endAliases: Set<String>,
         val last: Token,
         val allowHidden: Boolean = false,
         execute: Execute? = UNCOMPILED_NODE

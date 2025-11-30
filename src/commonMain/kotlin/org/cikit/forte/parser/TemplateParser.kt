@@ -7,7 +7,7 @@ class TemplateParser private constructor(
     val commandDeclarations: Map<String, Declarations.Command>,
     val unaryOpDeclarations: Map<String, Declarations.UnOp>,
     val binaryOpDeclarations: Map<String, Declarations.BinOp>,
-    private val context: Declarations.Command?
+    private val context: Node.Command?
 ) {
     constructor(
         tokenizer: TemplateTokenizer
@@ -72,7 +72,7 @@ class TemplateParser private constructor(
     private fun copy(
         tokenizer: TemplateTokenizer = this@TemplateParser.tokenizer,
         declarations: List<Declarations> = emptyList(),
-        context: Declarations.Command? = null
+        context: Node.Command? = null
     ): TemplateParser {
         // override declarations by primary name
         val newCommands = commandDeclarations.values.associateBy { it.name } +
@@ -126,10 +126,12 @@ class TemplateParser private constructor(
                             break
                         }
                     }
-                    nodes += commandDeclarations[cmd.name]
-                        ?.takeIf { it.endAliases.isNotEmpty() }
-                        ?.let { parseControl(cmd, it) }
-                        ?: cmd
+
+                    nodes += if (cmd.endAliases.isNotEmpty()) {
+                        parseControl(cmd)
+                    } else {
+                        cmd
+                    }
                 }
 
                 is Token.BeginEmit -> {
@@ -164,12 +166,14 @@ class TemplateParser private constructor(
             throw ParseException(tokenizer, nameToken, "expected command name")
         }
         val name = input.substring(nameToken.first..nameToken.last)
-        val argsParser = when {
+        val declaration: Declarations.Command? = when {
             context != null && (name in context.branchAliases ||
-                    name in context.endAliases) -> context.parser
+                    name in context.endAliases) ->
+                        commandDeclarations[context.name]
 
-            else -> commandDeclarations[name]?.parser
+            else -> commandDeclarations[name]
         }
+        val argsParser = declaration?.parser
         // build an expression parser that cannot consume beyond
         // the next command end token
         val subTokenizer = object : TemplateTokenizer by tokenizer {
@@ -220,6 +224,10 @@ class TemplateParser private constructor(
         )
         if (argsParser != null) {
             val args = mutableMapOf<String, Expression>()
+            val branchAliases = mutableSetOf<String>()
+            val endAliases = mutableSetOf<String>()
+            branchAliases.addAll(declaration.branchAliases)
+            endAliases.addAll(declaration.endAliases)
             val argBuilder = object :
                 CommandArgBuilder,
                 ExpressionParser by exprParser
@@ -228,6 +236,10 @@ class TemplateParser private constructor(
                     get() = name
                 override val args: MutableMap<String, Expression>
                     get() = args
+                override val branchAliases: MutableSet<String>
+                    get() = branchAliases
+                override val endAliases: MutableSet<String>
+                    get() = endAliases
             }
             argsParser(argBuilder)
             val endToken = tokenizer.tokenize(skipSpace = true)
@@ -242,6 +254,8 @@ class TemplateParser private constructor(
                 startToken,
                 name,
                 args.toMap(),
+                branchAliases.toSet(),
+                endAliases.toSet(),
                 endToken
             )
         }
@@ -258,6 +272,8 @@ class TemplateParser private constructor(
                     startToken,
                     name,
                     args.mapIndexed { i, v -> i.toString() to v }.toMap(),
+                    declaration?.branchAliases ?: emptySet(),
+                    declaration?.endAliases ?: emptySet(),
                     t
                 )
 
@@ -270,19 +286,16 @@ class TemplateParser private constructor(
         }
     }
 
-    private fun parseControl(
-        cmd: Node.Command,
-        decl: Declarations.Command
-    ): Node.Control {
+    private fun parseControl(cmd: Node.Command): Node.Control {
         val branches = mutableListOf<Node.Branch>()
         var branchStart = cmd
         while (true) {
-            val content = copy(context = decl).parse()
+            val content = copy(context = cmd).parse()
             val last = content.lastOrNull() as? Node.Command
                 ?: throw ParseException(
                     tokenizer,
                     tokenizer.peek(),
-                    "expected end command ${decl.endAliases}"
+                    "expected end command ${cmd.endAliases}"
                 )
             val firstNode = if (input[branchStart.last.first] == '-') {
                 (content.first() as? Node.Text)?.let { txt ->
@@ -297,7 +310,7 @@ class TemplateParser private constructor(
                 last
             )
             branchStart = last
-            if (last.name in decl.endAliases) {
+            if (last.name in cmd.endAliases) {
                 break
             }
         }
