@@ -3,6 +3,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.cikit.forte.Forte
 import org.cikit.forte.eval.evalTemplate
+import org.cikit.forte.types.RawString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -67,7 +68,7 @@ class TestCapture {
                 .evalTemplate(template)
         }
         assertEquals(
-            listOf("test 1", "test 2", "test 3", "undef"),
+            listOf("test 1", "test 2", "test 3", RawString("undef")),
             flow.toList()
         )
     }

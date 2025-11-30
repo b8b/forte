@@ -4,6 +4,7 @@ import org.cikit.forte.eval.tryEvalExpression
 import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.Node
 import org.cikit.forte.parser.ParsedTemplate
+import org.cikit.forte.types.RawString
 
 class Branch(
     val name: String,
@@ -141,7 +142,7 @@ private fun Context.Builder<*>.evalCommand(
                 else -> text
             }
             if (trimmed.isNotEmpty()) {
-                if (!tryEmit(trimmed)) {
+                if (!tryEmit(RawString(trimmed))) {
                     throw EvalException(
                         cmd,
                         "attempted to emit() value while capturing to flow"

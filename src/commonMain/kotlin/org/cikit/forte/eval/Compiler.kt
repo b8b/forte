@@ -9,6 +9,7 @@ import org.cikit.forte.core.Undefined
 import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.Node
 import org.cikit.forte.parser.ParsedTemplate
+import org.cikit.forte.types.RawString
 
 internal val UNCOMPILED_NODE: suspend (Context.Builder<*>) -> Unit = {}
 
@@ -116,7 +117,7 @@ private fun Node.Text.compile(template: ParsedTemplate): Node.Text {
         trimLeft,
         trimRight,
         if (trimmed.isNotEmpty()) {
-            { ctx -> ctx.resultBuilder.emit(trimmed) }
+            { ctx -> ctx.resultBuilder.emit(RawString(trimmed)) }
         } else {
             null
         }
