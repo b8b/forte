@@ -3,6 +3,59 @@ package org.cikit.forte.parser
 import org.cikit.forte.core.CoreOperators as OP
 
 val defaultDeclaredCommands = listOf(
+    Declarations.Command(
+        name = "raw",
+        endAliases = setOf("endraw"),
+        branchParser = { parser, cmd ->
+            var start: Token? = null
+            var end: Node.Command? = null
+            while (true) {
+                val (txt, t) = parser.tokenizer.tokenizeInitial()
+                if (start == null) {
+                    start = txt
+                }
+                if (t == null) {
+                    break
+                }
+                if (t is Token.BeginCommand) {
+                    val t1 = parser.tokenizer.peek(true)
+                    val name = parser.input.substring(t1.first .. t1.last)
+                    if (t1 is Token.Identifier && name in cmd.endAliases) {
+                        parser.tokenizer.consume(t1)
+                        val t2 = parser.tokenizer.tokenize(true)
+                        require(t2 is Token.EndCommand) {
+                            "expected end command: actual: ${2::class}"
+                        }
+                        end = Node.Command(
+                            first = t,
+                            name = name,
+                            content = emptyMap(),
+                            branchAliases = cmd.branchAliases,
+                            endAliases = cmd.endAliases,
+                            last = t2
+                        )
+                        break
+                    }
+                }
+            }
+            if (end == null) {
+                error("expected endraw command")
+            }
+            val trimLeft = parser.input[cmd.last.first] == '-'
+            val trimRight = parser.input[end.first.last] == '-'
+            val txtNode = Node.Text(
+                Token.Text(start.first..< end.first.first),
+                trimLeft = trimLeft,
+                trimRight = trimRight
+            )
+            val branch = Node.Branch(
+                first = cmd,
+                body = listOfNotNull(txtNode),
+                last = end
+            )
+            Node.Control(branch, emptyList())
+        }
+    ),
     Declarations.Command("set") {
         if (name == "set") {
             val variable = expect<Token.Identifier>()
@@ -188,6 +241,8 @@ sealed class Declarations {
         val name: String,
         val endAliases: Set<String> = emptySet(),
         val branchAliases: Set<String> = emptySet(),
+        val branchParser: ((TemplateParser, Node.Command) -> Node.Control)? =
+            null,
         val parser: (CommandArgBuilder.() -> Unit)? = null
     ) : Declarations() {
         override fun toString(): String = when {

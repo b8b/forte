@@ -549,6 +549,11 @@ object Core {
             )
         }
 
+        .defineControlTag("raw") { ctx, branches ->
+            val cmd = branches.single()
+            ctx.scope().evalTemplate(cmd.body)
+        }
+
         .defineControlTag("if") { ctx, branches ->
             for (cmd in branches) {
                 when (cmd.name) {

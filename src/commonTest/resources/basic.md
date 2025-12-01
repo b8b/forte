@@ -1,5 +1,19 @@
 # basic tests
 
+## Raw Tag
+
+```Twig
+{# no comment #}
+{% no command %}
+{{ no emit }}
+~
+{%- raw -%}
+{# no comment #}
+{% no command %}
+{{ no emit }}
+{%- endraw -%}
+```
+
 ## Range
 
 ```Twig

@@ -117,7 +117,7 @@ class TemplateParser private constructor(
                 }
 
                 is Token.BeginCommand -> {
-                    val cmd = parseCommand(t)
+                    val (decl, cmd) = parseCommand(t)
                     if (context != null) {
                         if (cmd.name in context.branchAliases ||
                             cmd.name in context.endAliases
@@ -127,7 +127,9 @@ class TemplateParser private constructor(
                         }
                     }
 
-                    nodes += if (cmd.endAliases.isNotEmpty()) {
+                    nodes += decl?.branchParser?.let { branchParser ->
+                        branchParser(this, cmd)
+                    } ?: if (cmd.endAliases.isNotEmpty()) {
                         parseControl(cmd)
                     } else {
                         cmd
@@ -160,7 +162,9 @@ class TemplateParser private constructor(
         return Node.Comment(startToken, txt, t)
     }
 
-    private fun parseCommand(startToken: Token): Node.Command {
+    private fun parseCommand(
+        startToken: Token
+    ): Pair<Declarations.Command?, Node.Command> {
         val nameToken = tokenizer.tokenize(skipSpace = true)
         if (nameToken !is Token.Identifier) {
             throw ParseException(tokenizer, nameToken, "expected command name")
@@ -253,7 +257,7 @@ class TemplateParser private constructor(
                     "expected ${Token.EndCommand::class}"
                 )
             }
-            return Node.Command(
+            return declaration to Node.Command(
                 startToken,
                 name,
                 argBuilder.args.toMap(),
@@ -269,7 +273,7 @@ class TemplateParser private constructor(
             if (arg != null) {
                 args += arg
             }
-            return when (val t = tokenizer.tokenize()) {
+            return declaration to when (val t = tokenizer.tokenize()) {
                 is Token.Space -> continue
                 is Token.EndCommand -> Node.Command(
                     startToken,
@@ -300,16 +304,28 @@ class TemplateParser private constructor(
                     tokenizer.peek(),
                     "expected end command ${cmd.endAliases}"
                 )
-            val firstNode = if (input[branchStart.last.first] == '-') {
-                (content.first() as? Node.Text)?.let { txt ->
-                    Node.Text(txt.content, trimLeft = true, txt.trimRight)
-                } ?: content.first()
-            } else {
-                content.first()
+            val body = buildList {
+                val firstNode = content.first()
+                if (firstNode is Node.Text &&
+                    input[branchStart.last.first] == '-')
+                {
+                    add(
+                        Node.Text(
+                            firstNode.content,
+                            trimLeft = true,
+                            trimRight = firstNode.trimRight
+                        )
+                    )
+                } else {
+                    add(firstNode)
+                }
+                for (i in 1 until content.size - 1) {
+                    add(content[i])
+                }
             }
             branches += Node.Branch(
                 branchStart,
-                listOf(firstNode) + content.subList(1, content.size - 1),
+                body,
                 last
             )
             branchStart = last
