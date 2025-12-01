@@ -223,23 +223,26 @@ class TemplateParser private constructor(
             binaryOpDeclarations
         )
         if (argsParser != null) {
-            val args = mutableMapOf<String, Expression>()
-            val branchAliases = mutableSetOf<String>()
-            val endAliases = mutableSetOf<String>()
-            branchAliases.addAll(declaration.branchAliases)
-            endAliases.addAll(declaration.endAliases)
             val argBuilder = object :
                 CommandArgBuilder,
                 ExpressionParser by exprParser
             {
                 override val name: String
                     get() = name
-                override val args: MutableMap<String, Expression>
-                    get() = args
-                override val branchAliases: MutableSet<String>
-                    get() = branchAliases
-                override val endAliases: MutableSet<String>
-                    get() = endAliases
+
+                override val args:
+                        MutableMap<String, Expression> = mutableMapOf()
+
+                override val branchAliases:
+                        MutableSet<String> = mutableSetOf()
+
+                override val endAliases:
+                        MutableSet<String> = mutableSetOf()
+
+                init {
+                    branchAliases.addAll(declaration.branchAliases)
+                    endAliases.addAll(declaration.endAliases)
+                }
             }
             argsParser(argBuilder)
             val endToken = tokenizer.tokenize(skipSpace = true)
@@ -253,9 +256,9 @@ class TemplateParser private constructor(
             return Node.Command(
                 startToken,
                 name,
-                args.toMap(),
-                branchAliases.toSet(),
-                endAliases.toSet(),
+                argBuilder.args.toMap(),
+                argBuilder.branchAliases.toSet(),
+                argBuilder.endAliases.toSet(),
                 endToken
             )
         }
