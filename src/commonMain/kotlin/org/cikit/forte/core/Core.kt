@@ -584,26 +584,91 @@ object Core {
                     else -> {
                         val varNames = cmd.args.getValue("varNames")
                         val listValue = cmd.args.getValue("listValue")
+                        val recursive = cmd.args["recursive"]
+                        val condition = cmd.args["condition"]
                         val varName = (ctx.evalExpression(varNames) as List<*>)
                             .singleOrNull() ?: throw IllegalArgumentException(
                                 "destructuring in for loop is not implemented"
                             )
-                        var done = false
+                        varName as String
                         val list = ctx.evalExpression(listValue)
-                        require(list is Iterable<*>) {
-                            "invalid type '${typeName(list)}' for arg " +
-                                    "'listValue': expected 'Iterable<*>'"
-
+                        if (recursive != null &&
+                            ctx.evalExpression(recursive) == true)
+                        {
+                            throw IllegalArgumentException(
+                                "recursive in for loop is not implemented"
+                            )
                         }
-                        for (item in list) {
-                            done = true
+                        val finalList = when {
+                            list !is Iterable<*> -> {
+                                throw IllegalArgumentException(
+                                    "invalid type '${typeName(list)}' for " +
+                                            "arg 'listValue': " +
+                                            "expected 'Iterable<*>'"
+                                )
+                            }
+                            condition != null -> {
+                                val scope = ctx.scope()
+                                list.filter { item ->
+                                    scope
+                                        .setVar(varName, item)
+                                        .evalExpression(condition) == true
+                                }
+                            }
+                            list is Collection<*> -> list
+                            else -> list.toList()
+                        }
+                        val size = finalList.size
+                        if (size == 0) {
+                            continue
+                        }
+                        var thisIndex = 0
+                        val loop = mutableMapOf<String, Any?>(
+                            "length" to size,
+                            "index" to thisIndex + 1,
+                            "index0" to thisIndex,
+                            "revindex" to size - thisIndex,
+                            "revindex0" to size - thisIndex - 1,
+                            "first" to true,
+                            "last" to false,
+                            "depth" to 1,
+                            "depth0" to 0,
+                            //"changed" preprocessor macro (unsupported)
+                        )
+                        val listIt = finalList.iterator()
+                        var lastItem = listIt.next()
+                        while (true) {
+                            val isLast = !listIt.hasNext()
+                            if (isLast) {
+                                loop["last"] = true
+                                loop.remove("nextitem")
+                            } else {
+                                loop["nextitem"] = listIt.next()
+                            }
+                            val thisLoop = loop.toMap()
                             ctx.scope()
-                                .setVar(varName as String, item)
+                                .setVar("loop", thisLoop)
+                                .setVar(varName, lastItem)
+                                .defineMethod("cycle") { _, subject, args ->
+                                    require(subject === thisLoop) {
+                                        "cannot call cycle on " +
+                                                typeName(subject)
+                                    }
+                                    args.values[thisIndex % args.values.size]
+                                }
                                 .evalTemplate(cmd.body)
+                            if (isLast) {
+                                break
+                            }
+                            loop["previtem"] = lastItem
+                            lastItem = loop["nextitem"]
+                            thisIndex++
+                            loop["index"] = thisIndex + 1
+                            loop["index0"] = thisIndex
+                            loop["revindex"] = size - thisIndex
+                            loop["revindex0"] = size - thisIndex - 1
                         }
-                        if (done) {
-                            break
-                        }
+                        break
                     }
                 }
             }

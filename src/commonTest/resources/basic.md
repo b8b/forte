@@ -19,9 +19,17 @@ OK
 ## ForElse
 
 ```Twig
+BAD
 OKOKOK
+OKa1OKb2OKa3
 ~
-{% for x in [1, 2, 3] %}OK{% else %}BAD{% endfor %}
+{% for x in [1, 2, 3] if x > 3 %}OK{% else %}BAD{% endfor %}
+{% for x in [1, 2, 3] %}OK{% endfor %}
+{% for x in [1, 2, 3] -%}
+  OK
+  {{- loop.cycle("a", "b") -}}
+  {{- loop.index -}}
+{% endfor %}
 ```
 
 ## ObjectLiteral
@@ -29,7 +37,7 @@ OKOKOK
 ```Twig
 {"a":11,"b":22}
 ~
-{{ {a: 11, b: 22}|json }}
+{{ {a: 11, b: 22, }|json }}
 ```
 
 ## Arithmetic
@@ -67,7 +75,7 @@ x: {{ x|default(-1) }}
 {{ jinja is not defined }}
 ```
 
-## Apply
+## Filter
 ```Twig
 apply_int: 123
 ~
@@ -127,7 +135,7 @@ true,xxc,abc
 ```Twig
 2,empty
 ~
-{{- ([1, 2, 3])[1] -}},
+{{- ([1, 2, 3, ])[1] -}},
 {{- ([])[0]|default("empty") -}}
 ```
 
