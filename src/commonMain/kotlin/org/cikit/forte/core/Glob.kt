@@ -356,7 +356,7 @@ class Glob(
                     convertSet(source, target)
                 }
                 '\\' -> {
-                    require(source.peek() != Separator) {
+                    require(source.peek() != UPath.SEPARATOR) {
                         "escaped separator"
                     }
                     source.haveLiteral()
@@ -381,7 +381,7 @@ class Glob(
                 '/' -> {
                     if (target.isEmpty()) {
                         source.requireAbsolutePath = true
-                    } else if (target.last() == Separator) {
+                    } else if (target.last() == UPath.SEPARATOR) {
                         source.requireNormalized = false
                     }
                     source.haveLiteral()

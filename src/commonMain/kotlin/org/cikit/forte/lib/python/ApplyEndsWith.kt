@@ -1,0 +1,65 @@
+package org.cikit.forte.lib.python
+
+import org.cikit.forte.core.Method
+import org.cikit.forte.core.NamedArgs
+import org.cikit.forte.core.optional
+import org.cikit.forte.core.require
+import org.cikit.forte.core.typeName
+
+/**
+ * Python 3.13
+ *
+ * str.endswith(suffix[, start[, end]])
+ *
+ * suffix
+ * The suffix to check for.
+ *
+ * start
+ * The starting position for the check.
+ *
+ * end
+ * The ending position for the check.
+ *
+ * empirical testing with python-3.12.3:
+ * * `end` seems nonInclusive
+ * * `length` seems to be added to negative indices
+ */
+class ApplyEndsWith : Method {
+    override fun invoke(subject: Any?, args: NamedArgs): Any {
+        val input = when (subject) {
+            is CharSequence -> subject
+            is Char -> subject.toString()
+
+            else -> throw IllegalArgumentException(
+                "invalid operand of type '${typeName(subject)}'"
+            )
+        }
+        val suffix: CharSequence
+        var start: Int
+        var end: Int
+        args.use {
+            suffix = require("suffix")
+            start = optional("start") { 0 }
+            end = optional("end") { input.length }
+        }
+        if (start >= input.length) {
+            return false
+        }
+        if (start < 0) {
+            start += input.length
+        }
+        if (start < 0) {
+            start = 0
+        }
+        if (end < 0) {
+            end += input.length
+        }
+        if (end < 0) {
+            return false
+        }
+        if (end > input.length) {
+            end = input.length
+        }
+        return input.substring(start, end).endsWith(suffix)
+    }
+}

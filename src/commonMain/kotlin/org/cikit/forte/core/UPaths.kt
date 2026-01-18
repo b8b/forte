@@ -2,9 +2,7 @@ package org.cikit.forte.core
 
 import kotlinx.io.bytestring.*
 
-const val Separator = '/'
-
-private const val BYTE_SEPARATOR = Separator.code.toByte()
+private const val BYTE_SEPARATOR = UPath.SEPARATOR.code.toByte()
 private const val BYTE_DOT = '.'.code.toByte()
 
 private val emptyByteString = ByteString()
@@ -15,6 +13,10 @@ class UPath private constructor (
     val encoded: ByteString,
     val isUtf8Only: Boolean
 ) : Comparable<UPath> {
+
+    companion object {
+        const val SEPARATOR = '/'
+    }
 
     private constructor(source: UPath) : this(
         source.encoded,
@@ -460,21 +462,21 @@ class UPath private constructor (
         while (iterator.hasNext()) {
             val first = iterator.next()
             val trimmed = if (iterator.hasNext()) {
-                first.trim(Separator)
+                first.trim(SEPARATOR)
             } else {
-                first.trimStart(Separator)
+                first.trimStart(SEPARATOR)
             }
             if (trimmed.isNotEmpty()) {
                 val builder = StringBuilder(trimmed)
                 while (iterator.hasNext()) {
                     val next = iterator.next()
                     val nextTrimmed = if (iterator.hasNext()) {
-                        next.trim(Separator)
+                        next.trim(SEPARATOR)
                     } else {
-                        next.trimStart(Separator)
+                        next.trimStart(SEPARATOR)
                     }
                     if (nextTrimmed.isNotEmpty()) {
-                        builder.append(Separator)
+                        builder.append(SEPARATOR)
                         builder.append(nextTrimmed)
                     }
                 }

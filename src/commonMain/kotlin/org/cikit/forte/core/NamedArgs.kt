@@ -26,7 +26,7 @@ class NamedArgs(
     }
 
     fun requireEmpty() {
-        require(values.isEmpty()) { "too many args" }
+        require(this === Empty || values.isEmpty()) { "too many args" }
     }
 }
 
@@ -42,24 +42,54 @@ class NamedArgsIterator(
         return index < positionalCount || consumed.any { !it }
     }
 
+    fun remaining(): NamedArgs {
+        val remainingNames = mutableListOf<String>()
+        val remainingValues = buildList {
+            while (index < positionalCount) {
+                add(values[index++])
+            }
+            for (nameIndex in 0 until names.size) {
+                val name = names[nameIndex]
+                if (!consumed[nameIndex]) {
+                    consumed[nameIndex] = true
+                    add(values[positionalCount + nameIndex])
+                    remainingNames.add(name)
+                }
+            }
+        }
+        if (remainingValues.isEmpty()) {
+            return NamedArgs.Empty
+        }
+        return NamedArgs(
+            values = remainingValues,
+            names = remainingNames.toList()
+        )
+    }
+
     fun requireAny(name: String): Any? {
         val nextIndex = next(name)
         require(nextIndex >= 0) { "missing required arg '$name'" }
         return values[nextIndex]
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> requireNullable(name: String, type: KClass<T>): T? {
         val nextIndex = next(name)
         require(nextIndex >= 0) { "missing required arg '$name'" }
         return castNullable(name, type, values[nextIndex])
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> require(name: String, type: KClass<T>): T {
         val nextIndex = next(name)
         require(nextIndex >= 0) { "missing required arg '$name'" }
         return cast(name, type, values[nextIndex])
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> optionalNullable(
         name: String,
         type: KClass<T>,
@@ -87,6 +117,8 @@ class NamedArgsIterator(
         }
     }
 
+    @Suppress("DEPRECATION")
+    @Deprecated("does not work correctly on js target")
     fun <T : Any> optional(
         name: String,
         type: KClass<T>,
@@ -114,6 +146,7 @@ class NamedArgsIterator(
         }
     }
 
+    @Deprecated("does not work correctly on js target")
     private fun <T: Any> cast(
         name: String,
         type: KClass<T>,
@@ -128,6 +161,7 @@ class NamedArgsIterator(
         return result
     }
 
+    @Deprecated("does not work correctly on js target")
     private fun <T: Any> castNullable(
         name: String,
         type: KClass<T>,
@@ -165,16 +199,42 @@ class NamedArgsIterator(
 inline fun <reified T: Any> NamedArgsIterator.requireNullable(
     name: String
 ): T? {
-    return requireNullable(name, T::class)
+    val value = requireAny(name) ?: return null
+    require(value is T) {
+        "invalid type '${typeName(value)}' " +
+                "for arg '$name': expected '${T::class}'"
+    }
+    return value
 }
 
 inline fun <reified T: Any> NamedArgsIterator.require(name: String): T {
-    return require(name, T::class)
+    val value = requireAny(name)
+    require(value != null) {
+        "invalid null value for arg '$name'"
+    }
+    require(value is T) {
+        "invalid type '${typeName(value)}' " +
+                "for arg '$name': expected '${T::class}'"
+    }
+    return value
 }
 
 inline fun <reified T: Any> NamedArgsIterator.optional(
     name: String,
     noinline defaultValue: () -> T
 ) : T {
-    return optional(name, T::class, defaultValue)
+    return optional(
+        name = name,
+        convertValue = { value ->
+            require(value != null) {
+                "invalid null value for arg '$name'"
+            }
+            require(value is T) {
+                "invalid type '${typeName(value)}' " +
+                        "for arg '$name': expected '${T::class}'"
+            }
+            value
+        },
+        defaultValue = defaultValue
+    )
 }

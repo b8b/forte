@@ -1,5 +1,6 @@
 package org.cikit.forte.core
 
+import org.cikit.forte.internal.LocationInfo
 import org.cikit.forte.parser.*
 
 class EvalException private constructor(
@@ -44,7 +45,10 @@ class EvalException private constructor(
     var location: Location? = null
         private set
 
-    val detailedMessage: String
+    val errorMessage: String
+        get() = super.message!!
+
+    override val message: String
         get() = buildString {
             append(template?.path ?: "<anonymous>")
             location?.let {
@@ -55,8 +59,12 @@ class EvalException private constructor(
                 append("]")
             }
             append(": ")
-            append(message)
+            append(super.message)
         }
+
+    @Deprecated("replace with message")
+    val detailedMessage: String
+        get() = message
 
     internal fun setTemplate(template: ParsedTemplate) {
         if (this.template == null) {
@@ -64,8 +72,9 @@ class EvalException private constructor(
             this.location = LocationInfo(
                 template.path,
                 template.input,
-                startToken
-            ).tokenStart
+                startToken,
+                endToken
+            ).startLocation
         }
     }
 }

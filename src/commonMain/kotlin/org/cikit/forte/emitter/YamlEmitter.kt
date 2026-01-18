@@ -18,7 +18,7 @@ class YamlEmitter(val target: Appendable) : Emitter {
     override fun emitNull() = emitter.emitNull()
     override fun emitScalar(value: Boolean) = emitter.emitScalar(value)
     override fun emitScalar(value: Number) = emitter.emitScalar(value)
-    override fun emitScalar(value: String) = emitter.emitScalar(value)
+    override fun emitScalar(value: CharSequence) = emitter.emitScalar(value)
     override fun emitScalar(value: ByteString) = emitter.emitScalar(value)
 
     override fun emitScalar(value: ByteArray) {
@@ -160,7 +160,7 @@ private class YamlShallowEmitter(
         }
     }
 
-    override fun emitScalar(value: String) {
+    override fun emitScalar(value: CharSequence) {
         if (value.endsWith("\n") && !value.first().isWhitespace()) {
             val lines = value.split("\n")
             val encoded = Array(lines.size + 1) { i ->
@@ -172,7 +172,7 @@ private class YamlShallowEmitter(
             }
             emitEncoded(*encoded)
         } else {
-            emitEncoded(json.encodeToString(value))
+            emitEncoded(json.encodeToString(value.toString()))
         }
     }
 

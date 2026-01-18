@@ -2,19 +2,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
-import org.cikit.forte.eval.evalExpression
-import org.cikit.forte.eval.evalTemplate
+import org.cikit.forte.lib.jinja.strictJinjaCompat
 import org.cikit.forte.parser.Declarations
 import org.cikit.forte.parser.Expression
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.set
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFails
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
+import kotlin.test.*
 
 class TestEval {
     private fun JsonElement.toAny(): Any? = when (this) {
@@ -29,10 +20,67 @@ class TestEval {
     }
 
     @Test
-    fun testBasic() = Forte.runSuspendingTests("basic.md")
+    fun testBasic() = Forte.runTests("basic.md")
 
     @Test
-    fun testTrim() = Forte.runSuspendingTests("trim.md")
+    fun testTrim() = Forte.runTests("trim.md")
+
+    @Test
+    fun testPython() = Forte.runTests("python.md") { source ->
+        val newSource = buildString {
+            val linesIt = source.splitToSequence("\n").iterator()
+            while (linesIt.hasNext()) {
+                val line = linesIt.next()
+                appendLine(line)
+                if (line.startsWith(">>> ")) {
+                    appendLine("'{{ ${line.removePrefix(">>> ")} }}'")
+                    linesIt.next()
+                }
+            }
+        }
+        println("---")
+        println(newSource)
+        println("---")
+        "$source\n~\n$newSource"
+    }
+
+    @Test
+    fun testJinjaCompat() = runTest {
+        val forte = Forte
+        val jinja = Forte {
+            strictJinjaCompat()
+        }
+
+        val template1 = "{{ \"hello #{world}\" }}"
+        assertEquals(
+            "hello #{world}",
+            jinja.renderToString()
+                .setVar("world", "moon")
+                .evalTemplate(jinja.parseTemplate(template1))
+                .result
+        )
+        assertEquals(
+            "hello moon",
+            forte.renderToString()
+                .setVar("world", "moon")
+                .evalTemplate(forte.parseTemplate(template1))
+                .result
+        )
+
+        val template2 = "{{ 2 ** 3 ** 4 }}"
+        assertEquals(
+            "4096",
+            jinja.renderToString()
+                .evalTemplate(jinja.parseTemplate(template2))
+                .result
+        )
+        assertEquals(
+            "2417851639229258349412352",
+            forte.renderToString()
+                .evalTemplate(forte.parseTemplate(template2))
+                .result
+        )
+    }
 
     @Test
     fun testSimple() = runTest {
@@ -61,7 +109,7 @@ class TestEval {
     fun testTemplate() = runTest {
         val template = Forte.parseTemplate("{% set y = x + 1 %}{{ y }}")
         val result = Forte
-            .capture { println("--> $it") }
+            .captureTo { println("--> $it") }
             .setVar("x", 2)
             .evalTemplate(template)
         assertEquals(3, result.getVar("y"))
@@ -69,7 +117,7 @@ class TestEval {
 
     @Test
     fun testContext() = runTest {
-        with (Forte.capture { println("--> $it") }) {
+        with (Forte.captureTo { println("--> $it") }) {
             setVar("x", 2)
             evalTemplate(Forte.parseTemplate("{% if true %}{% set y = x + 1 %}{% endif %}{{ y }}"))
             assertEquals(3, getVar("y"))
@@ -102,12 +150,12 @@ class TestEval {
                     }
                 }
             )
-            context.defineControlTag("load_json") { ctx, branches ->
+            context.defineControlTag("load_json") { ctx, template, branches ->
                 // expect single branch
                 val branch = branches.single()
                 val jsonSource = ctx.scope()
-                    .captureToString()
-                    .evalTemplate(branch.body)
+                    .renderToString()
+                    .evalNodes(template, branch.body)
                     .result
                 val result = Json.decodeFromString<JsonElement>(jsonSource)
                 val varName = ctx.evalExpression(
@@ -119,12 +167,12 @@ class TestEval {
                 "debug",
                 parser = { args["value"] = parseExpression() }
             )
-            context.defineCommandTag("debug") { ctx, args ->
+            context.defineCommandTag("debug") { ctx, _, args ->
                 val value = ctx.evalExpression(args.getValue("value"))
                 println("debug: $value")
             }
         }
-        forte.runSuspendingTests("custom_tags.md")
+        forte.runTests("custom_tags.md")
     }
 
     @Test
@@ -136,7 +184,7 @@ class TestEval {
 
     @Test
     fun testNamedArg() = runTest {
-        val result = Forte.captureToString().evalTemplate(
+        val result = Forte.renderToString().evalTemplate(
             Forte.parseTemplate("{{ range(start=1, end_inclusive=2)|json }}")
         ).result
         assertEquals("[1,2]", result)
@@ -144,7 +192,7 @@ class TestEval {
 
     @Test
     fun testControl() = runTest {
-        val result = Forte.captureToString().evalTemplate(
+        val result = Forte.renderToString().evalTemplate(
             Forte.parseTemplate("{% if true %}true{% endif %}")
         ).result
         assertEquals("true", result)
@@ -165,9 +213,9 @@ class TestEval {
                     .setVars(vars)
                     .evalExpression(Forte.parseExpression("yes.a.b.c"))
             } catch (ex: EvalException) {
-                println(ex.detailedMessage)
+                println(ex)
                 assertEquals(0, ex.startToken.first)
-                assertContains(ex.message!!, "undefined variable: 'yes'")
+                assertContains(ex.errorMessage, "undefined variable: 'yes'")
                 throw ex
             }
         }
@@ -177,9 +225,9 @@ class TestEval {
                     .setVars(vars)
                     .evalExpression(Forte.parseExpression("x.z.b.c"))
             } catch (ex: EvalException) {
-                println(ex.detailedMessage)
+                println(ex)
                 assertEquals(1, ex.startToken.first)
-                assertContains(ex.message!!, "'z'")
+                assertContains(ex.errorMessage, "'z'")
                 throw ex
             }
         }
@@ -191,9 +239,9 @@ class TestEval {
             } catch (ex: EvalException) {
                 // the expression "a.cat" is rescued
                 // so expect the expression flash to fail
-                println(ex.detailedMessage)
+                println(ex)
                 assertEquals(14, ex.startToken.first)
-                assertContains(ex.message!!, "undefined variable: 'flash'")
+                assertContains(ex.errorMessage, "undefined variable: 'flash'")
                 throw ex
             }
         }
@@ -204,7 +252,7 @@ class TestEval {
         val template = Forte.parseTemplate(
             "{% if (grains[\"zpool\"][\"data\"] is defined and grains[\"zpool\"][\"data\"]|string|matches_glob(\"*\")) %}BAD{% endif %}"
         )
-        val result = Forte.captureToString()
+        val result = Forte.renderToString()
             .setVars("grains" to mapOf("zpool" to emptyMap<String, Any?>()))
             .evalTemplate(template)
             .result
@@ -216,13 +264,32 @@ class TestEval {
         val result = Forte.scope()
             .setVars("a" to mapOf("x" to 1))
             .evalExpression(Forte.parseExpression("a.keys()"))
-        assertEquals(listOf("x"), result)
+        assertEquals(listOf("x"), (result as Iterable<*>).toList())
         val result2 = Forte {
-            context.defineMethod("invoke") { _, subject, args ->
+            context.defineMethod("invoke") { subject, args ->
                 args.requireEmpty()
                 subject
             }
         }.scope().evalExpression(Forte.parseExpression("'test'()"))
         assertEquals("test", result2)
+    }
+
+    @Test
+    fun testIfExpression() = runTest {
+        assertEquals(
+            1,
+            Forte.scope()
+                .evalExpression(Forte.parseExpression("1 if true else 2"))
+        )
+        assertFailsWith<EvalException> {
+            Forte.renderToString()
+                .evalTemplate(Forte.parseTemplate("{{ 3 if false }}"))
+                .result
+        }
+        assertEquals(
+            4,
+            Forte.scope()
+                .evalExpression(Forte.parseExpression("3 if false else 4"))
+        )
     }
 }

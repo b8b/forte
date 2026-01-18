@@ -67,6 +67,11 @@ private val singleEscapeTokenizer = RegexTokenizer(
 )
 
 private val doubleEscapeTokenizer = RegexTokenizer(
+    Patterns.doubleQuote,
+    Patterns.uEscape, Patterns.escape, Patterns.invEscape
+)
+
+private val doubleEscapeTokenizerWithInterpolation = RegexTokenizer(
     Patterns.doubleQuote, Patterns.interpolation,
     Patterns.uEscape, Patterns.escape, Patterns.invEscape
 )
@@ -108,7 +113,13 @@ class Tokenizer(
 
     override fun tokenizeSingleString() = tokenizeString(singleEscapeTokenizer)
 
-    override fun tokenizeDoubleString() = tokenizeString(doubleEscapeTokenizer)
+    override fun tokenizeDoubleString(
+        stringInterpolation: Boolean
+    ) = if (stringInterpolation) {
+        tokenizeString(doubleEscapeTokenizerWithInterpolation)
+    } else {
+        tokenizeString(doubleEscapeTokenizer)
+    }
 
     private fun tokenizeString(tokenizer: RegexTokenizer): Pair<Token, Token> {
         val t2 = tokenizer.find(input, startIndex)

@@ -3,7 +3,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.cikit.forte.Forte
 import org.cikit.forte.core.*
-import org.cikit.forte.eval.evalExpression
 import java.security.MessageDigest
 import kotlin.concurrent.thread
 import kotlin.test.Test
@@ -14,7 +13,7 @@ class TestEvalSuspended {
     private val crypto = Dispatchers.IO.limitedParallelism(1, name = "crypto")
 
     private val forte = Forte {
-        context.defineMethod("sha256", "pipe") { _, subject, args ->
+        context.defineFilter("sha256") { subject, args ->
             args.requireEmpty()
             when (subject) {
                 is String -> Suspended {
@@ -28,17 +27,15 @@ class TestEvalSuspended {
                 else -> error("invalid type for sha256: ${typeName(subject)}")
             }
         }
-        context.defineMethod("good", "is") { _, subject, args ->
-            Suspended { subject == 42 }
-        }
-        context.defineMethod("good", "is_not") { _, subject, args ->
-            Suspended { subject != 42 }
+        context.defineTest("good") { subject, args ->
+            args.requireEmpty()
+            subject == 42
         }
     }
 
     @Test
     fun testSimple() {
-        val ctx = forte.captureToString()
+        val ctx = forte.renderToString()
         val expression = forte.parseExpression("'abc'|sha256")
         (0 until 10).map {
             thread {
@@ -53,7 +50,7 @@ class TestEvalSuspended {
     @Test
     fun testSelect() {
         val input = (0 until 100)
-        val ctx = forte.captureToString().setVar("input", input)
+        val ctx = forte.renderToString().setVar("input", input)
         val expression = forte.parseExpression(
             "[input|select('good'), input|reject('good')]"
         )

@@ -13,8 +13,11 @@ import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import org.cikit.forte.Forte
-import org.cikit.forte.eval.evalTemplate
+import org.cikit.forte.core.Branch
+import org.cikit.forte.core.Context
+import org.cikit.forte.core.ControlTag
 import org.cikit.forte.parser.Declarations
+import org.cikit.forte.parser.ParsedTemplate
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
@@ -24,17 +27,26 @@ val scope = MainScope()
 
 val forte = Forte {
     declarations += Declarations.Command("load_json", setOf("endload"))
-    context.defineControlTag("load_json") { ctx, branches ->
-        val tag = branches.single()
-        val jsonText = ctx.scope()
-            .captureToString()
-            .evalTemplate(tag.body)
-            .result
-        val data = Json.decodeFromString<JsonObject>(jsonText)
-        for ((k, v) in data) {
-            ctx.setVar(k, v.toAny())
+    context.defineControlTag(
+        "load_json",
+        object : ControlTag {
+            override suspend fun invoke(
+                ctx: Context.Builder<*>,
+                template: ParsedTemplate,
+                branches: List<Branch>
+            ) {
+                val tag = branches.single()
+                val jsonText = ctx.scope()
+                    .renderToString()
+                    .evalNodes(template, tag.body)
+                    .result
+                val data = Json.decodeFromString<JsonObject>(jsonText)
+                for ((k, v) in data) {
+                    ctx.setVar(k, v.toAny())
+                }
+            }
         }
-    }
+    )
 }
 
 fun main() {
@@ -83,7 +95,7 @@ private suspend fun render(template: HTMLTextAreaElement) {
     try {
         val templateText = template.value
         val parsedTemplate = forte.parseTemplate(templateText)
-        root.innerHTML = forte.captureToString()
+        root.innerHTML = forte.renderToString()
             .evalTemplate(parsedTemplate)
             .result
     } catch (ex: Exception) {

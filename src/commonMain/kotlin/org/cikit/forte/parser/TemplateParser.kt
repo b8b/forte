@@ -1,13 +1,17 @@
 package org.cikit.forte.parser
 
-import org.cikit.forte.eval.compile
+import org.cikit.forte.core.EvalException
+import org.cikit.forte.core.compile
+import org.cikit.forte.internal.parseInt
 
 class TemplateParser private constructor(
     val tokenizer: TemplateTokenizer,
+    val stringInterpolation: Boolean = true,
+    val postProcessors: List<PostProcessor>,
     val commandDeclarations: Map<String, Declarations.Command>,
     val unaryOpDeclarations: Map<String, Declarations.UnOp>,
     val binaryOpDeclarations: Map<String, Declarations.BinOp>,
-    private val context: Declarations.Command?
+    private val context: Node.Command?
 ) {
     constructor(
         tokenizer: TemplateTokenizer
@@ -18,6 +22,48 @@ class TemplateParser private constructor(
         declarations: List<Declarations> = defaultDeclarations,
     ) : this(
         tokenizer = tokenizer,
+        declarations = declarations,
+        stringInterpolation = true
+    )
+
+    constructor(
+        tokenizer: TemplateTokenizer,
+        stringInterpolation: Boolean,
+        declarations: List<Declarations> = defaultDeclarations,
+    ) : this(
+        tokenizer = tokenizer,
+        stringInterpolation = stringInterpolation,
+        postProcessors = emptyList(),
+        declarations = declarations
+    )
+
+    constructor(
+        tokenizer: TemplateTokenizer,
+        postProcessors: List<PostProcessor>,
+        declarations: List<Declarations> = defaultDeclarations,
+    ) : this(
+        tokenizer = tokenizer,
+        stringInterpolation = true,
+        postProcessors = postProcessors,
+        declarations = declarations
+    )
+
+    constructor(
+        tokenizer: TemplateTokenizer,
+        stringInterpolation: Boolean,
+        postProcessors: List<PostProcessor>,
+        declarations: List<Declarations> = defaultDeclarations
+    ) : this(
+        tokenizer = tokenizer,
+        stringInterpolation = stringInterpolation,
+        postProcessors = buildList {
+            for (v in declarations) {
+                if (v is Declarations.Command && v.postProcessor != null) {
+                    add(v.postProcessor)
+                }
+            }
+            addAll(postProcessors)
+        },
         commandDeclarations = Declarations.mapOf(
             declarations.filterIsInstance<Declarations.Command>()
         ),
@@ -34,30 +80,56 @@ class TemplateParser private constructor(
 
     fun parseTemplate(): ParsedTemplate {
         val nodes = parse()
-        val parsedTemplate = ParsedTemplate(
+        var parsedTemplate = ParsedTemplate(
             tokenizer.input,
             tokenizer.path,
             nodes
         )
-        return parsedTemplate.compile()
+        for (postProcessor in postProcessors) {
+            parsedTemplate = postProcessor.transform(parsedTemplate)
+        }
+        return parsedTemplate
     }
 
     fun parseExpression(): Expression {
         val exprParser = ExpressionParserImpl(
             tokenizer,
             unaryOpDeclarations,
-            binaryOpDeclarations
+            binaryOpDeclarations,
+            stringInterpolation = stringInterpolation
         )
-        return exprParser.parseExpression().compile()
+        val parsedExpression = exprParser.parseExpression()
+        val compiledExpression = try {
+            parsedExpression.compile()
+        } catch (ex: ParseException) {
+            throw ex
+        } catch (ex: EvalException) {
+            throw ex
+        } catch (ex: Exception) {
+            throw ParseException(tokenizer, parsedExpression, ex)
+        }
+        return compiledExpression
     }
 
     fun parseExpressionOrNull(): Expression? {
         val exprParser = ExpressionParserImpl(
             tokenizer,
             unaryOpDeclarations,
-            binaryOpDeclarations
+            binaryOpDeclarations,
+            stringInterpolation = stringInterpolation
         )
-        return exprParser.parseExpressionOrNull()?.compile()
+        val parsedExpression = exprParser.parseExpressionOrNull()
+            ?: return null
+        val compiledExpression = try {
+            parsedExpression.compile()
+        } catch (ex: ParseException) {
+            throw ex
+        } catch (ex: EvalException) {
+            throw ex
+        } catch (ex: Exception) {
+            throw ParseException(tokenizer, parsedExpression, ex)
+        }
+        return compiledExpression
     }
 
     fun copy(
@@ -66,30 +138,48 @@ class TemplateParser private constructor(
     ) = copy(
         tokenizer = tokenizer,
         declarations = declarations,
-        context = null
+        stringInterpolation = stringInterpolation,
+        postProcessors = postProcessors,
+        context = context
     )
 
     private fun copy(
-        tokenizer: TemplateTokenizer = this@TemplateParser.tokenizer,
+        tokenizer: TemplateTokenizer = this.tokenizer,
         declarations: List<Declarations> = emptyList(),
-        context: Declarations.Command? = null
+        stringInterpolation: Boolean = this.stringInterpolation,
+        postProcessors: List<PostProcessor> = this.postProcessors,
+        context: Node.Command? = null
     ): TemplateParser {
-        // override declarations by primary name
-        val newCommands = commandDeclarations.values.associateBy { it.name } +
-                declarations.filterIsInstance<Declarations.Command>()
-                    .associateBy { it.name }
-        val newOps = binaryOpDeclarations.values.associateBy { it.name } +
-                declarations.filterIsInstance<Declarations.BinOp>()
-                    .associateBy { it.name }
-        val newUnOps = unaryOpDeclarations.values.associateBy { it.name } +
-                declarations.filterIsInstance<Declarations.UnOp>()
-                    .associateBy { it.name }
-        // rebuild declaration lookup tables with all aliases
+        val newCommands: Map<String, Declarations.Command>
+        val newBinOps: Map<String, Declarations.BinOp>
+        val newUnOps: Map<String, Declarations.UnOp>
+        if (declarations.isEmpty()) {
+            newCommands = commandDeclarations
+            newBinOps = binaryOpDeclarations
+            newUnOps = unaryOpDeclarations
+        } else {
+            // rebuild declaration lookup tables with all aliases
+            val commands = commandDeclarations.values.toMutableList()
+            val binOps = binaryOpDeclarations.values.toMutableList()
+            val unOps = unaryOpDeclarations.values.toMutableList()
+            for (decl in declarations) {
+                when (decl) {
+                    is Declarations.Command -> commands += decl
+                    is Declarations.BinOp -> binOps += decl
+                    is Declarations.UnOp -> unOps += decl
+                }
+            }
+            newCommands = Declarations.mapOf(commands)
+            newBinOps = Declarations.mapOf(binOps)
+            newUnOps = Declarations.mapOf(unOps)
+        }
         return TemplateParser(
             tokenizer = tokenizer,
-            commandDeclarations = Declarations.mapOf(newCommands.values),
-            unaryOpDeclarations = Declarations.mapOf(newUnOps.values),
-            binaryOpDeclarations = Declarations.mapOf(newOps.values),
+            stringInterpolation = stringInterpolation,
+            postProcessors = postProcessors,
+            commandDeclarations = newCommands,
+            unaryOpDeclarations = newUnOps,
+            binaryOpDeclarations = newBinOps,
             context = context
         )
     }
@@ -107,7 +197,12 @@ class TemplateParser private constructor(
             }
             val trimLeft = lastToken != null && input[lastToken.first] == '-'
             val trimRight = t != null && input[t.last] == '-'
-            nodes += Node.Text(txt, trimLeft = trimLeft, trimRight = trimRight)
+            nodes += Node.Text(
+                input,
+                txt,
+                trimLeft = trimLeft,
+                trimRight = trimRight
+            )
             if (t == null) {
                 break
             }
@@ -117,7 +212,7 @@ class TemplateParser private constructor(
                 }
 
                 is Token.BeginCommand -> {
-                    val cmd = parseCommand(t)
+                    val (decl, cmd) = parseCommand(t)
                     if (context != null) {
                         if (cmd.name in context.branchAliases ||
                             cmd.name in context.endAliases
@@ -126,10 +221,23 @@ class TemplateParser private constructor(
                             break
                         }
                     }
-                    nodes += commandDeclarations[cmd.name]
-                        ?.takeIf { it.endAliases.isNotEmpty() }
-                        ?.let { parseControl(cmd, it) }
-                        ?: cmd
+
+                    nodes += decl?.branchParser?.let { branchParser ->
+                        //TODO error reporting
+                        var newControl = branchParser(this, cmd)
+                        for (postProcessor in postProcessors) {
+                           newControl = postProcessor.transform(newControl)
+                        }
+                        newControl
+                    } ?: if (cmd.endAliases.isNotEmpty()) {
+                        var newControl = parseControl(cmd)
+                        for (postProcessor in postProcessors) {
+                            newControl = postProcessor.transform(newControl)
+                        }
+                        newControl
+                    } else {
+                        cmd
+                    }
                 }
 
                 is Token.BeginEmit -> {
@@ -139,7 +247,7 @@ class TemplateParser private constructor(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t"
+                    "unexpected token ${t::class}"
                 )
             }
         }
@@ -152,24 +260,28 @@ class TemplateParser private constructor(
             throw ParseException(
                 tokenizer,
                 t,
-                "expected 'end comment' token"
+                "expected ${Token.EndComment::class}"
             )
         }
         return Node.Comment(startToken, txt, t)
     }
 
-    private fun parseCommand(startToken: Token): Node.Command {
+    private fun parseCommand(
+        startToken: Token
+    ): Pair<Declarations.Command?, Node.Command> {
         val nameToken = tokenizer.tokenize(skipSpace = true)
         if (nameToken !is Token.Identifier) {
             throw ParseException(tokenizer, nameToken, "expected command name")
         }
         val name = input.substring(nameToken.first..nameToken.last)
-        val argsParser = when {
+        val declaration: Declarations.Command? = when {
             context != null && (name in context.branchAliases ||
-                    name in context.endAliases) -> context.parser
+                    name in context.endAliases) ->
+                        commandDeclarations[context.name]
 
-            else -> commandDeclarations[name]?.parser
+            else -> commandDeclarations[name]
         }
+        val argsParser = declaration?.parser
         // build an expression parser that cannot consume beyond
         // the next command end token
         val subTokenizer = object : TemplateTokenizer by tokenizer {
@@ -216,18 +328,30 @@ class TemplateParser private constructor(
         val exprParser = ExpressionParserImpl(
             subTokenizer,
             unaryOpDeclarations,
-            binaryOpDeclarations
+            binaryOpDeclarations,
+            stringInterpolation = stringInterpolation
         )
         if (argsParser != null) {
-            val args = mutableMapOf<String, Expression>()
             val argBuilder = object :
                 CommandArgBuilder,
                 ExpressionParser by exprParser
             {
                 override val name: String
                     get() = name
-                override val args: MutableMap<String, Expression>
-                    get() = args
+
+                override val args:
+                        MutableMap<String, Expression> = mutableMapOf()
+
+                override val branchAliases:
+                        MutableSet<String> = mutableSetOf()
+
+                override val endAliases:
+                        MutableSet<String> = mutableSetOf()
+
+                init {
+                    branchAliases.addAll(declaration.branchAliases)
+                    endAliases.addAll(declaration.endAliases)
+                }
             }
             argsParser(argBuilder)
             val endToken = tokenizer.tokenize(skipSpace = true)
@@ -235,68 +359,85 @@ class TemplateParser private constructor(
                 throw ParseException(
                     tokenizer,
                     endToken,
-                    "expected 'end command' token"
+                    "expected ${Token.EndCommand::class}"
                 )
             }
-            return Node.Command(
+            return declaration to Node.Command(
                 startToken,
                 name,
-                args.toMap(),
+                argBuilder.args.toMap(),
+                argBuilder.branchAliases.toSet(),
+                argBuilder.endAliases.toSet(),
                 endToken
             )
         }
         // generic
-        val args = mutableListOf<Expression>()
+        val args = mutableMapOf<String, Expression>()
         while (true) {
             val arg = exprParser.parsePrimaryOrNull()
             if (arg != null) {
-                args += arg
+                args[(args.size + 1).toString()] = arg.compile()
             }
-            return when (val t = tokenizer.tokenize()) {
+            when (val t = tokenizer.tokenize()) {
                 is Token.Space -> continue
-                is Token.EndCommand -> Node.Command(
-                    startToken,
-                    name,
-                    args.mapIndexed { i, v -> i.toString() to v }.toMap(),
-                    t
-                )
+                is Token.EndCommand -> {
+                    return declaration to Node.Command(
+                        startToken,
+                        name,
+                        args.toMap(),
+                        declaration?.branchAliases ?: emptySet(),
+                        declaration?.endAliases ?: emptySet(),
+                        t
+                    )
+                }
 
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t"
+                    "unexpected token ${t::class}"
                 )
             }
         }
     }
 
-    private fun parseControl(
-        cmd: Node.Command,
-        decl: Declarations.Command
-    ): Node.Control {
+    private fun parseControl(cmd: Node.Command): Node.Control {
         val branches = mutableListOf<Node.Branch>()
         var branchStart = cmd
         while (true) {
-            val content = copy(context = decl).parse()
-            val last = content.last() as? Node.Command ?: throw ParseException(
-                tokenizer,
-                content.last(),
-                "expected end command ${decl.endAliases}"
-            )
-            val firstNode = if (input[branchStart.last.first] == '-') {
-                (content.first() as? Node.Text)?.let { txt ->
-                    Node.Text(txt.content, trimLeft = true, txt.trimRight)
-                } ?: content.first()
-            } else {
-                content.first()
+            val content = copy(context = cmd).parse()
+            val last = content.lastOrNull() as? Node.Command
+                ?: throw ParseException(
+                    tokenizer,
+                    tokenizer.peek(), //TBD better to report start token?
+                    "expected end command ${cmd.endAliases}"
+                )
+            val body = buildList {
+                val firstNode = content.first()
+                if (firstNode is Node.Text &&
+                    input[branchStart.last.first] == '-')
+                {
+                    add(
+                        Node.Text(
+                            input,
+                            firstNode.content,
+                            trimLeft = true,
+                            trimRight = firstNode.trimRight,
+                        )
+                    )
+                } else {
+                    add(firstNode)
+                }
+                for (i in 1 until content.size - 1) {
+                    add(content[i])
+                }
             }
             branches += Node.Branch(
                 branchStart,
-                listOf(firstNode) + content.subList(1, content.size - 1),
+                body,
                 last
             )
             branchStart = last
-            if (last.name in decl.endAliases) {
+            if (last.name in cmd.endAliases) {
                 break
             }
         }
@@ -310,15 +451,16 @@ class TemplateParser private constructor(
         val exprParser = ExpressionParserImpl(
             tokenizer,
             unaryOpDeclarations,
-            binaryOpDeclarations
+            binaryOpDeclarations,
+            stringInterpolation = stringInterpolation
         )
-        val content = exprParser.parseExpression()
+        val content = exprParser.parseExpression().compile()
         val t = tokenizer.tokenize(skipSpace = true)
         if (t !is Token.EndEmit) {
             throw ParseException(
                 tokenizer,
                 t,
-                "expected 'end emit' token"
+                "expected ${Token.EndEmit::class}"
             )
         }
         return Node.Emit(startToken, content, t)
@@ -329,6 +471,7 @@ private class ExpressionParserImpl(
     override val tokenizer: ExpressionTokenizer,
     val unaryOpDeclarations: Map<String, Declarations.UnOp>,
     val binaryOpDeclarations: Map<String, Declarations.BinOp>,
+    val stringInterpolation: Boolean
 ) : ExpressionParser {
 
     override fun copy(declarations: List<Declarations>): ExpressionParser {
@@ -344,6 +487,7 @@ private class ExpressionParserImpl(
             tokenizer = tokenizer,
             unaryOpDeclarations = Declarations.mapOf(newUnOps.values),
             binaryOpDeclarations = Declarations.mapOf(newOps.values),
+            stringInterpolation = stringInterpolation
         )
     }
 
@@ -398,14 +542,18 @@ private class ExpressionParserImpl(
                 break
             }
             tokenizer.consume(tokens1.last())
+            val alias = tokens1.joinToString(" ") { token ->
+                input.substring(token.first .. token.last)
+            }
 
             var rhs: Expression = parsePrimary()
 
             if (op1 is Declarations.TransformOp) {
-                mutLhs = when (rhs) {
+                val expression = when (rhs) {
                     is Expression.Variable -> Expression.TransformOp(
                         tokens1 + rhs.first,
                         op1,
+                        alias,
                         mutLhs,
                         rhs.name,
                         Expression.NamedArgs()
@@ -413,15 +561,58 @@ private class ExpressionParserImpl(
                     is Expression.FunctionCall -> Expression.TransformOp(
                         tokens1 + rhs.first,
                         op1,
+                        alias,
                         mutLhs,
                         rhs.name,
                         rhs.args
                     )
+                    is Expression.BooleanLiteral -> Expression.TransformOp(
+                        tokens1 + rhs.token,
+                        op1,
+                        alias,
+                        mutLhs,
+                        input.substring(rhs.token.first, rhs.token.last),
+                        Expression.NamedArgs()
+                    )
+                    is Expression.NullLiteral -> Expression.TransformOp(
+                        tokens1 + rhs.token,
+                        op1,
+                        alias,
+                        mutLhs,
+                        input.substring(rhs.token.first, rhs.token.last),
+                        Expression.NamedArgs()
+                    )
+                    is Expression.NumericLiteral -> {
+                        val source = input.substring(
+                            rhs.first.first,
+                            rhs.first.last
+                        )
+                        if (source != "nan" || rhs.first != rhs.last) {
+                            throw ParseException(
+                                tokenizer,
+                                rhs,
+                                "expected function call"
+                            )
+                        }
+                        Expression.TransformOp(
+                            tokens1 + rhs.first,
+                            op1,
+                            alias,
+                            mutLhs,
+                            source,
+                            Expression.NamedArgs()
+                        )
+                    }
                     else -> throw ParseException(
                         tokenizer,
                         rhs,
                         "expected function call"
                     )
+                }
+                mutLhs = try {
+                    op1.transform?.invoke(expression) ?: expression
+                } catch (ex: Exception) {
+                    throw ParseException(tokenizer, expression, ex)
                 }
                 continue
             }
@@ -436,6 +627,7 @@ private class ExpressionParserImpl(
                             throw ParseException(
                                 tokenizer,
                                 tokens2.first(),
+                                tokens2.last(),
                                 "unexpected operator"
                             )
                         }
@@ -447,7 +639,12 @@ private class ExpressionParserImpl(
                 })
             }
 
-            mutLhs = Expression.BinOp(tokens1, op1, mutLhs, rhs)
+            val expression = Expression.BinOp(tokens1, op1, alias, mutLhs, rhs)
+            mutLhs = try {
+                op1.transform?.invoke(expression) ?: expression
+            } catch (ex: Exception) {
+                throw ParseException(tokenizer, expression, ex)
+            }
         }
 
         return mutLhs
@@ -491,7 +688,7 @@ private class ExpressionParserImpl(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t in string"
+                    "unexpected token ${t::class} in string"
                 )
             }
         }
@@ -502,7 +699,9 @@ private class ExpressionParserImpl(
         var isConstString = true
         val content = mutableListOf<Expression>()
         while (true) {
-            val (txt, t2) = tokenizer.tokenizeDoubleString()
+            val (txt, t2) = tokenizer.tokenizeDoubleString(
+                stringInterpolation = stringInterpolation
+            )
             if (isConstString) {
                 constContent.append(input, txt.first, txt.last + 1)
             }
@@ -556,7 +755,7 @@ private class ExpressionParserImpl(
                 else -> throw ParseException(
                     tokenizer,
                     t,
-                    "unexpected token $t in string"
+                    "unexpected token ${t::class} in string"
                 )
             }
         }
@@ -565,10 +764,19 @@ private class ExpressionParserImpl(
     override fun parsePrimaryOrNull(): Expression? {
         peekOp(unaryOpDeclarations)?.let { (unOpDecl, unOpTokens) ->
             tokenizer.consume(unOpTokens.last())
+            val alias = unOpTokens.joinToString(" ") { token ->
+                input.substring(token.first .. token.last)
+            }
             val p = parsePrimary()
             val rhs = parseExpression(p, minPrecedence = unOpDecl.precedence)
-            return Expression.UnOp(unOpTokens, unOpDecl, rhs)
+            val expression = Expression.UnOp(unOpTokens, unOpDecl, alias, rhs)
+            return try {
+                unOpDecl.transform?.invoke(expression) ?: expression
+            } catch (ex: Exception) {
+                throw ParseException(tokenizer, expression, ex)
+            }
         }
+        val unexpectedBinOp = peekOp(binaryOpDeclarations)
         var primary: Expression
         while (true) {
             when (val t = tokenizer.peek()) {
@@ -667,7 +875,7 @@ private class ExpressionParserImpl(
                     val s = input.substring(t.first .. t.last)
                     val v: Number = when {
                         '.' in s -> s.toDouble()
-                        else -> s.toInt()
+                        else -> parseInt(s)
                     }
                     primary = Expression.NumericLiteral(t, t, v)
                     break
@@ -705,6 +913,14 @@ private class ExpressionParserImpl(
         while (true) {
             when (val t = tokenizer.peek(skipSpace = true)) {
                 is Token.Dot -> {
+                    unexpectedBinOp?.let { (binOpDecl, binOpTokens) ->
+                        throw ParseException(
+                            tokenizer,
+                            binOpTokens.first(),
+                            binOpTokens.last(),
+                            "unexpected binary operator `${binOpDecl.name}`"
+                        )
+                    }
                     val t2 = tokenizer.peekAfter(t, skipSpace = true)
                     if (t2 !is Token.Identifier) {
                         // maybe operator
@@ -715,8 +931,16 @@ private class ExpressionParserImpl(
                     primary = Expression.Access(t, t2, primary, name)
                 }
                 is Token.LBracket -> {
+                    unexpectedBinOp?.let { (binOpDecl, binOpTokens) ->
+                        throw ParseException(
+                            tokenizer,
+                            binOpTokens.first(),
+                            binOpTokens.last(),
+                            "unexpected binary operator `${binOpDecl.name}`"
+                        )
+                    }
                     tokenizer.consume(t)
-                    val args = parseExpressionOrNull()
+                    val args = parseSliceIndex()
                     val t2 = tokenizer.tokenize(skipSpace = true)
                     if (t2 !is Token.RBracket) {
                         throw ParseException(
@@ -725,15 +949,46 @@ private class ExpressionParserImpl(
                             "expected closing bracket"
                         )
                     }
-                    val arg = when (args) {
-                        null -> throw ParseException(
-                            tokenizer,
-                            t2,
-                            "unexpected token $t2"
+                    if (args.size > 1) {
+                        val argNames = mutableListOf<String>()
+                        val argValues = mutableListOf<Expression>()
+                        args[0]?.let {
+                            argNames += "start"
+                            argValues += it
+                        }
+                        args[1]?.let {
+                            argNames += "end"
+                            argValues += it
+                        }
+                        if (args.size > 2) {
+                            args[2]?.let {
+                                argNames += "step"
+                                argValues += it
+                            }
+                        }
+                        primary = Expression.SliceAccess(
+                            t,
+                            primary,
+                            Expression.NamedArgs(
+                                argNames.toList(),
+                                argValues.toList()
+                            )
                         )
-                        else -> args
+                    } else {
+                        val arg = if (args.isEmpty()) {
+                            null
+                        } else {
+                            args[0]
+                        }
+                        if (arg == null) {
+                            throw ParseException(
+                                tokenizer,
+                                t, t2,
+                                "no key passed"
+                            )
+                        }
+                        primary = Expression.CompAccess(t, primary, arg)
                     }
-                    primary = Expression.CompAccess(t, primary, arg)
                 }
                 is Token.LPar -> {
                     tokenizer.consume(t)
@@ -766,6 +1021,16 @@ private class ExpressionParserImpl(
                 else -> break
             }
         }
+        if (primary is Expression.Variable) {
+            unexpectedBinOp?.let { (binOpDecl, binOpTokens) ->
+                throw ParseException(
+                    tokenizer,
+                    binOpTokens.first(),
+                    binOpTokens.last(),
+                    "unexpected binary operator `${binOpDecl.name}`"
+                )
+            }
+        }
         return primary
     }
 
@@ -776,6 +1041,23 @@ private class ExpressionParserImpl(
             result += expression
             val t = tokenizer.peek(true)
             if (t !is Token.Comma) {
+                break
+            }
+            tokenizer.consume(t)
+        }
+        return result.toList()
+    }
+
+    private fun parseSliceIndex(): List<Expression?> {
+        val result = mutableListOf<Expression?>()
+        while (true) {
+            val expression = parseExpressionOrNull()
+            result += expression
+            if (result.size == 3) {
+                break
+            }
+            val t = tokenizer.peek(true)
+            if (t !is Token.Colon) {
                 break
             }
             tokenizer.consume(t)
@@ -822,7 +1104,7 @@ private class ExpressionParserImpl(
                     throw ParseException(
                         tokenizer,
                         expression,
-                        "expected arg name"
+                        "expected arg name, actual ${expression::class}"
                     )
                 }
                 tokenizer.consume(t)

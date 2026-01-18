@@ -2,20 +2,69 @@ package org.cikit.forte
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import org.cikit.forte.core.*
+import org.cikit.forte.core.Context
+import org.cikit.forte.core.ResultBuilder
+import org.cikit.forte.core.TemplateLoader
+import org.cikit.forte.core.UPath
+import org.cikit.forte.internal.TemplateLoaderImpl
+import org.cikit.forte.lib.common.defineCommonExtensions
+import org.cikit.forte.lib.core.defineCoreExtensions
+import org.cikit.forte.lib.jinja.defineJinjaExtensions
+import org.cikit.forte.lib.python.definePythonExtensions
+import org.cikit.forte.lib.salt.defineSaltExtensions
 import org.cikit.forte.parser.*
 
-sealed class Forte(
-    private val declarations: List<Declarations> = defaultDeclarations,
-    private val context: Context<*> = Core.context
+expect fun <R> Context.Builder<R>.definePlatformExtensions(): Context.Builder<R>
+
+sealed class Forte private constructor(
+    val declarations: List<Declarations>,
+    val stringInterpolation: Boolean,
+    context: Context.Builder<*>,
+    templateLoader: TemplateLoader
 ) {
-    companion object Default : Forte()
+    companion object Default : Forte(
+        declarations = defaultDeclarations,
+        stringInterpolation = true,
+        context = Context.builder()
+            .defineCoreExtensions()
+            .definePlatformExtensions()
+            .defineCommonExtensions()
+            .defineJinjaExtensions()
+            .definePythonExtensions()
+            .defineSaltExtensions(),
+        templateLoader = TemplateLoader.Empty
+    )
+
+    constructor(builder: ForteBuilder) : this(
+        declarations = builder.declarations.toList(),
+        stringInterpolation = builder.stringInterpolation,
+        context = builder.context,
+        templateLoader = builder.templateLoader
+    )
+
+    val context = Context.Builder.from(
+        context,
+        when (templateLoader) {
+            is TemplateLoaderImpl -> when (templateLoader) {
+                is TemplateLoaderImpl.Empty -> templateLoader
+                is TemplateLoaderImpl.Caching -> TemplateLoaderImpl.Caching(
+                    this,
+                    templateLoader.templateLoader
+                )
+                is TemplateLoaderImpl.Static -> TemplateLoaderImpl.Static(
+                    this,
+                    templateLoader.templates
+                )
+            }
+            else -> TemplateLoaderImpl.Caching(this, templateLoader)
+        }
+    )
 
     fun parser(input: String, path: UPath? = null) =
         parser(Tokenizer(input, path))
 
     fun parser(tokenizer: TemplateTokenizer) =
-        TemplateParser(tokenizer, declarations)
+        TemplateParser(tokenizer, stringInterpolation, declarations)
 
     fun parseTemplate(input: String, path: UPath? = null) =
         parser(input, path).parseTemplate()
@@ -26,137 +75,65 @@ sealed class Forte(
     fun parseExpression(input: String): Expression =
         parser(input).parseExpression()
 
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalExpression(
-        expression: Expression,
-        vars: Map<String, Any?>
-    ): Any? {
-        return if (vars.isEmpty()) {
-            context.evalExpression(expression)
-        } else {
-            context.builder()
-                .setVars(vars)
-                .evalExpression(expression)
-        }
-    }
+    fun scope(): Context.Builder<Unit> = context.scope()
 
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalExpression(
-        expression: Expression,
-        vararg vars: Pair<String, Any?>
-    ): Any? {
-        return if (vars.isEmpty()) {
-            context.evalExpression(expression)
-        } else {
-            context.builder()
-                .setVars(*vars)
-                .evalExpression(expression)
-        }
-    }
+    fun captureTo(target: (Any?) -> Unit) =
+        scope().captureTo(target)
 
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalExpression(
-        input: String,
-        vars: Map<String, Any?>
-    ): Any? {
-        return evalExpression(parseExpression(input), vars)
-    }
+    fun captureTo(flowCollector: FlowCollector<Any?>) =
+        scope().captureTo(flowCollector)
 
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalExpression(
-        input: String,
-        vararg vars: Pair<String, Any?>
-    ): Any? {
-        return evalExpression(parseExpression(input), *vars)
-    }
+    fun captureTo(resultBuilder: ResultBuilder) =
+        scope().captureTo(resultBuilder)
 
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalTemplate(
-        input: String,
-        path: UPath? = null,
-        vars: Map<String, Any?> = emptyMap()
-    ): Context<Unit> {
-        val parsedTemplate = parseTemplate(input, path)
-        return scope().setVars(vars).evalTemplate(parsedTemplate)
-    }
-
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalTemplate(
-        input: String,
-        vararg vars: Pair<String, Any?>,
-        path: UPath? = null
-    ): Context<Unit> {
-        val parsedTemplate = parseTemplate(input, path)
-        return scope().setVars(*vars).evalTemplate(parsedTemplate)
-    }
-
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalTemplateToString(
-        input: String,
-        path: UPath? = null,
-        vars: Map<String, Any?> = emptyMap()
-    ): String {
-        val parsedTemplate = parseTemplate(input, path)
-        return captureToString()
-            .setVars(vars)
-            .evalTemplate(parsedTemplate)
-            .result
-    }
-
-    @Suppress("DEPRECATION")
-    @Deprecated("migrate to suspending api")
-    fun evalTemplateToString(
-        input: String,
-        vararg vars: Pair<String, Any?>,
-        path: UPath? = null
-    ): String {
-        val parsedTemplate = parseTemplate(input, path)
-        return captureToString()
-            .setVars(*vars)
-            .evalTemplate(parsedTemplate)
-            .result
-    }
-
-    fun scope(): Context.Builder<Unit> = context.builder()
-
-    @Deprecated("replace with capture")
-    fun scope(captureFunction: (Any?) -> Unit) =
-        context.builder().capture(captureFunction)
-
-    fun capture(captureFunction: (Any?) -> Unit) =
-        context.builder().capture(captureFunction)
-
-    fun captureToString() = context.builder().captureToString()
-
-    fun captureToList() = context.builder().captureToList()
-
-    fun captureToFlow(flowCollector: FlowCollector<Any?>) =
-        context.builder().captureToFlow(flowCollector)
+    fun captureToList() = scope().captureToList()
 
     fun flow(block: suspend Context.Builder<Unit>.() -> Unit): Flow<Any?> =
         kotlinx.coroutines.flow.flow {
-            captureToFlow(this).block()
+            captureTo(this).block()
         }
+
+    fun renderTo(target: Appendable) =
+        scope().renderTo(target)
+
+    fun renderTo(target: FlowCollector<CharSequence>) =
+        scope().renderTo(target)
+
+    fun renderToString() = scope().renderToString()
 }
 
-class ForteBuilder {
-    var declarations = defaultDeclarations.toMutableList()
-    val context: Context.Builder<Unit> = Core.context.builder()
+interface ForteBuilder {
+    var declarations: MutableList<Declarations>
+    var stringInterpolation: Boolean
+    var context: Context.Builder<Unit>
+    val templateLoader: TemplateLoader
+    fun templateLoader(templateLoader: TemplateLoader)
+    fun templateLoader(vararg template: Pair<UPath, String>)
 }
 
-private class ForteInstance(
-    builder: ForteBuilder
-) : Forte(builder.declarations.toList(), builder.context.build())
+private class ForteBuilderImpl : ForteBuilder {
+    override var declarations = defaultDeclarations.toMutableList()
+    override var stringInterpolation: Boolean = true
+    override var context: Context.Builder<Unit> = Forte.scope()
+    override var templateLoader: TemplateLoader = TemplateLoaderImpl.Empty
+        private set
+
+    override fun templateLoader(templateLoader: TemplateLoader) {
+        this.templateLoader = templateLoader
+    }
+
+    override fun templateLoader(vararg template: Pair<UPath, String>) {
+        this.templateLoader = TemplateLoaderImpl.Static(
+            Forte,
+            template.asSequence()
+        )
+    }
+}
+
+private class ForteInstance(builder: ForteBuilder) : Forte(builder)
 
 fun Forte(builder: ForteBuilder.() -> Unit): Forte {
-    val result = ForteBuilder()
+    val result = ForteBuilderImpl()
     builder(result)
     return ForteInstance(result)
 }

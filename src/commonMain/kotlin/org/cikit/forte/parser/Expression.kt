@@ -2,8 +2,8 @@ package org.cikit.forte.parser
 
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.indices
-import org.cikit.forte.eval.Operation
-import org.cikit.forte.eval.UNCOMPILED_EXPRESSION
+import org.cikit.forte.core.Operation
+import org.cikit.forte.internal.UNCOMPILED_EXPRESSION
 
 sealed class Expression(
     val operations: List<Operation> = UNCOMPILED_EXPRESSION
@@ -40,10 +40,12 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(content)
+        override fun toString() = "SubExpression($content)"
     }
 
     class Malformed(val tokens: List<Token>) : Expression() {
         override val children: Iterable<Expression> get() = emptyList()
+        override fun toString() = "Malformed($tokens)"
     }
 
     class Variable(
@@ -53,10 +55,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = emptyList()
-
-        override fun toString(): String {
-            return "Var($name)"
-        }
+        override fun toString() = "Var($name)"
     }
 
     class NullLiteral(
@@ -65,10 +64,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = emptyList()
-
-        override fun toString(): String {
-            return "Literal(null)"
-        }
+        override fun toString() = "Literal(null)"
     }
 
     class BooleanLiteral(
@@ -78,10 +74,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = emptyList()
-
-        override fun toString(): String {
-            return "Literal($value)"
-        }
+        override fun toString() = "Literal($value)"
     }
 
     class NumericLiteral(
@@ -92,10 +85,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = emptyList()
-
-        override fun toString(): String {
-            return "Literal($value)"
-        }
+        override fun toString() = "Literal($value)"
     }
 
     class StringLiteral(
@@ -106,10 +96,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = emptyList()
-
-        override fun toString(): String {
-            return "Literal('$value')"
-        }
+        override fun toString() = "Literal('$value')"
     }
 
     class ByteStringLiteral(
@@ -121,36 +108,34 @@ sealed class Expression(
         override val children: Iterable<Expression>
             get() = emptyList()
 
-        override fun toString(): String {
-            return buildString {
-                append("ByteStringLiteral('")
-                for (i in value.indices) {
-                    val b = value[i].toInt()
-                    when (val ch = b.toChar()) {
-                        '\\' -> append("\\\\")
+        override fun toString() = buildString {
+            append("ByteStringLiteral('")
+            for (i in value.indices) {
+                val b = value[i].toInt()
+                when (val ch = b.toChar()) {
+                    '\\' -> append("\\\\")
 
-                        in '\u0021' .. '\u007e' -> append(ch)
+                    in '\u0021'..'\u007e' -> append(ch)
 
-                        '\u0007' -> append("\\a")
-                        '\u0008' -> append("\\b")
-                        '\u0009' -> append("\\t")
-                        '\u000A' -> append("\\n")
-                        '\u000B' -> append("\\v")
-                        '\u000C' -> append("\\f")
-                        '\u000D' -> append("\\r")
+                    '\u0007' -> append("\\a")
+                    '\u0008' -> append("\\b")
+                    '\u0009' -> append("\\t")
+                    '\u000A' -> append("\\n")
+                    '\u000B' -> append("\\v")
+                    '\u000C' -> append("\\f")
+                    '\u000D' -> append("\\r")
 
-                        else -> {
-                            append("\\")
-                            val oct = (b and 0xFF).toString(8)
-                            if (oct.length < 3) {
-                                append("0".repeat(oct.length - 3))
-                            }
-                            append(oct)
+                    else -> {
+                        append("\\")
+                        val oct = (b and 0xFF).toString(8)
+                        if (oct.length < 3) {
+                            append("0".repeat(oct.length - 3))
                         }
+                        append(oct)
                     }
                 }
-                append("')")
             }
+            append("')")
         }
     }
 
@@ -158,9 +143,7 @@ sealed class Expression(
         override val children: List<Expression>,
         operations: List<Operation> = UNCOMPILED_EXPRESSION
     ) : Expression(operations) {
-        override fun toString(): String {
-            return "String(...)"
-        }
+        override fun toString() = "String(...)"
     }
 
     class ArrayLiteral(
@@ -169,9 +152,7 @@ sealed class Expression(
         override val children: List<Expression>,
         operations: List<Operation> = UNCOMPILED_EXPRESSION
     ) : Expression(operations) {
-        override fun toString(): String {
-            return "Literal([...])"
-        }
+        override fun toString() = "Literal([...])"
     }
 
     class ObjectLiteral(
@@ -182,10 +163,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = pairs.flatMap { (k, v) -> listOf(k, v) }
-
-        override fun toString(): String {
-            return "Literal({...})"
-        }
+        override fun toString() = "Literal({...})"
     }
 
     class Access(
@@ -197,10 +175,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(left)
-
-        override fun toString(): String {
-            return "Access($left . $name)"
-        }
+        override fun toString() = "Access($left . $name)"
     }
 
     class CompAccess(
@@ -211,9 +186,26 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(left, right)
+        override fun toString() = "CompAccess($left [ $right ])"
+    }
+
+    class SliceAccess(
+        val first: Token,
+        val left: Expression,
+        val args: NamedArgs,
+        operations: List<Operation> = UNCOMPILED_EXPRESSION
+    ) : Expression(operations) {
+        override val children: Iterable<Expression>
+            get() = listOf(left) + args.values
 
         override fun toString(): String {
-            return "CompAccess($left [ $right ])"
+            return buildString {
+                append("SliceAccess(")
+                append(left)
+                append(" [ ")
+                append(args)
+                append(" ])")
+            }
         }
     }
 
@@ -225,44 +217,38 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = args.values
-
-        override fun toString(): String {
-            return "Call($name ...)"
-        }
+        override fun toString() = "Call($name ...)"
     }
 
     class UnOp(
         val tokens: List<Token>,
         val decl: Declarations.UnOp,
+        val alias: String,
         val right: Expression,
         operations: List<Operation> = UNCOMPILED_EXPRESSION
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(right)
-
-        override fun toString(): String {
-            return "Op(`${decl.name}` $right)"
-        }
+        override fun toString() = "Op(`$alias` $right)"
     }
 
     class BinOp(
         val tokens: List<Token>,
         val decl: Declarations.BinOp,
+        val alias: String,
         val left: Expression,
         val right: Expression,
         operations: List<Operation> = UNCOMPILED_EXPRESSION
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(left, right)
-
-        override fun toString(): String {
-            return "Op($left `${decl.name}` $right)"
-        }
+        override fun toString() = "Op($left `$alias` $right)"
     }
 
     class TransformOp(
         val tokens: List<Token>,
         val decl: Declarations.TransformOp,
+        val alias: String,
         val left: Expression,
         val name: String,
         val args: NamedArgs,
@@ -270,10 +256,7 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(left) + args.values
-
-        override fun toString(): String {
-            return "Transform($left `${decl.name}` $name(...))"
-        }
+        override fun toString() = "Transform($left `$alias` $name(...))"
     }
 
     class InvokeOp(
@@ -285,9 +268,6 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = listOf(left) + args.values
-
-        override fun toString(): String {
-            return "Invoke($left)"
-        }
+        override fun toString() = "Invoke($left)"
     }
 }

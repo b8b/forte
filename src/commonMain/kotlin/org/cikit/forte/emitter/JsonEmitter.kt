@@ -5,6 +5,7 @@ import kotlinx.io.bytestring.encode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.cikit.forte.core.concatToString
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -117,8 +118,8 @@ class JsonEmitter(
     override fun emitScalar(value: Number) =
         emitEncoded(value.toString())
 
-    override fun emitScalar(value: String) =
-        emitEncoded(json.encodeToString(value))
+    override fun emitScalar(value: CharSequence) =
+        emitEncoded(json.encodeToString(value.concatToString()))
 
     override fun emitScalar(value: ByteArray) {
         when (byteStringEncoding) {

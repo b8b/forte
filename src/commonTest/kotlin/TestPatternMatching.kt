@@ -1,6 +1,8 @@
 import kotlinx.coroutines.test.runTest
 import org.cikit.forte.Forte
-import org.cikit.forte.eval.evalExpression
+import org.cikit.forte.core.Method
+import org.cikit.forte.core.NamedArgs
+import org.cikit.forte.core.typeName
 import org.cikit.forte.parser.Declarations
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,9 +11,32 @@ class TestPatternMatching {
 
     sealed class MatchSubject(message: String) {
         data object None : MatchSubject("no subject")
+        data object Matched : MatchSubject("matched subject")
         class Unmatched(val subject: Any?) : MatchSubject("unmatched subject")
-        class Matched(val subject: Any?) : MatchSubject("matched subject")
         class Result(val result: Any?) : MatchSubject("result")
+    }
+
+    class ThenReturn : Method {
+        override val operator: String
+            get() = "then"
+
+        override val isRescue: Boolean
+            get() = true
+
+        override fun invoke(subject: Any?, args: NamedArgs): Any {
+            val right: Any?
+            args.use {
+                right = requireAny("result")
+            }
+            return when (subject) {
+                is MatchSubject -> when (subject) {
+                    is MatchSubject.Matched -> MatchSubject.Result(right)
+                    else -> subject
+                }
+
+                else -> error("invalid type for then: $subject")
+            }
+        }
     }
 
     @Test
@@ -21,9 +46,10 @@ class TestPatternMatching {
             declarations += Declarations.BinOp(6, "with", left = true)
             declarations += Declarations.BinOp(6, "else")
 
-            val eq = context.getBinaryOpFunction("eq")!!
+            val eq = context.getBinaryOpFunction("eq")
+                ?: error("binary operator 'eq' is not defined")
 
-            context.defineFunction("match") { _, args ->
+            context.defineFunction("match") { args ->
                 args.use {
                     optionalNullable(
                         "subject",
@@ -33,20 +59,20 @@ class TestPatternMatching {
                 }
             }
 
-            context.defineBinaryOpFunction("with") { ctx, left, right ->
+            context.defineBinaryOpFunction("with") { left, right ->
                 when (left) {
                     is MatchSubject -> when (left) {
                         is MatchSubject.None -> {
                             if (right as Boolean) {
-                                MatchSubject.Matched(left)
+                                MatchSubject.Matched
                             } else {
                                 left
                             }
                         }
 
                         is MatchSubject.Unmatched -> {
-                            if (eq(ctx, left.subject, right) as Boolean) {
-                                MatchSubject.Matched(left.subject)
+                            if (eq(left.subject, right) as Boolean) {
+                                MatchSubject.Matched
                             } else {
                                 left
                             }
@@ -57,25 +83,13 @@ class TestPatternMatching {
                         }
                     }
 
-                    else -> error("invalid type for with: $left")
+                    else -> error("invalid type for with: ${typeName(left)}")
                 }
             }
 
-            context.defineMethod("return", "then") { _, subject, args ->
-                args.use {
-                    val right = requireAny("result")
-                    when (subject) {
-                        is MatchSubject -> when (subject) {
-                            is MatchSubject.Matched -> MatchSubject.Result(right)
-                            else -> subject
-                        }
+            context.defineMethod("return", ThenReturn())
 
-                        else -> error("invalid type for then: $subject")
-                    }
-                }
-            }
-
-            context.defineBinaryOpFunction("else") { _, left, right ->
+            context.defineBinaryOpFunction("else") { left, right ->
                 when (left) {
                     is MatchSubject -> when (left) {
                         is MatchSubject.Result -> left.result
@@ -87,10 +101,14 @@ class TestPatternMatching {
             }
         }
 
-        println(forte.parseExpression(""" match(x) with 1 -> return("a") with 2 -> return("b") else "c" """))
-        val expr = forte.parseExpression(
-            """ match(x) with 1 -> return("a") with 2 -> return("b") else "c" """
-        )
+        val badUsage = """ match(x) with 1 """
+        val badExpr = forte.parseExpression(badUsage)
+        val badResult = forte.scope().setVars("x" to 1).evalExpression(badExpr)
+        println(badResult)
+
+        val src = """ match(x) with 1 -> return("a") with 2 -> return("b") else "c" """
+        val expr = forte.parseExpression(src)
+        println(expr)
         assertEquals("a", forte.scope().setVars("x" to 1).evalExpression(expr))
         assertEquals("b", forte.scope().setVars("x" to 2).evalExpression(expr))
         assertEquals("c", forte.scope().setVars("x" to 22).evalExpression(expr))

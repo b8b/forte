@@ -48,7 +48,7 @@ fun UPath.toNioPath(): Path {
     }
     val absolute = isAbsolute
     val urlPath = toUrlPath()
-    val trimmed = urlPath.trimStart(Separator)
+    val trimmed = urlPath.trimStart(UPath.SEPARATOR)
     if (trimmed.isEmpty()) {
         return rootUriPath
     }

@@ -8,7 +8,7 @@ interface Emitter {
 
     fun emitScalar(value: Boolean)
     fun emitScalar(value: Number)
-    fun emitScalar(value: String)
+    fun emitScalar(value: CharSequence)
     fun emitScalar(value: ByteArray)
     fun emitScalar(value: ByteString)
 
@@ -42,7 +42,7 @@ interface Emitter {
             }
             is Boolean -> emitScalar(value)
             is Number -> emitScalar(value)
-            is String -> emitScalar(value)
+            is CharSequence -> emitScalar(value)
             else -> emitScalar(value.toString())
         }
     }

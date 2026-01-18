@@ -2,7 +2,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.cikit.forte.Forte
-import org.cikit.forte.eval.evalTemplate
+import org.cikit.forte.core.RawString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -19,7 +19,7 @@ class TestCapture {
 
     @Test
     fun testCaptureToString() = runTest {
-        val result = Forte.captureToString()
+        val result = Forte.renderToString()
             .setVars("x" to 1, "y" to 2)
             .evalTemplate(template)
             .result
@@ -38,7 +38,7 @@ class TestCapture {
     @Test
     fun testCapture() = runTest {
         val result = buildList {
-            Forte.capture { value -> add(value) }
+            Forte.captureTo { value -> add(value) }
                 .setVars("x" to 1, "y" to 2)
                 .evalTemplate(template)
         }
@@ -62,12 +62,12 @@ class TestCapture {
                 .setVars("x" to 1, "y" to 2)
                 .evalTemplate(template)
             // inherit the CaptureFunction of ctx in a fresh context
-            Forte.captureToFlow(ctx.resultBuilder)
+            Forte.captureTo(ctx.resultBuilder)
                 .setVars("x" to 3)
                 .evalTemplate(template)
         }
         assertEquals(
-            listOf("test 1", "test 2", "test 3", "undef"),
+            listOf("test 1", "test 2", "test 3", RawString("undef")),
             flow.toList()
         )
     }

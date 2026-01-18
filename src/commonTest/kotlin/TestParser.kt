@@ -170,4 +170,25 @@ class TestParser {
             Forte.parseTemplate("{% macro f(x) for ever %}fail{% endmacro %}")
         }
     }
+
+    @Test
+    fun testParseInt() {
+        assertEquals(-2147483648, "-2147483648".toIntOrNull())
+        assertEquals(null, "-2147483649".toIntOrNull())
+        assertEquals(2147483647, "2147483647".toIntOrNull())
+        assertEquals(null, "2147483648".toIntOrNull())
+    }
+
+    @Test
+    fun testParseBigInt() {
+        println(Forte.parseExpression("2147483648"))
+    }
+
+    @Test
+    fun testChainedIfExpression() {
+        val expr = Forte.parseExpression(
+            "'Excellent' if cat_revenue > 50000 else 'Good' if cat_revenue > 20000 else 'Needs Work'"
+        )
+        println(expr)
+    }
 }

@@ -1,42 +1,72 @@
 package org.cikit.forte.parser
 
-import org.cikit.forte.core.LocationInfo
+import org.cikit.forte.internal.LocationInfo
 
 class ParseException private constructor(
     locationInfo: LocationInfo,
     val tokenizer: ExpressionTokenizer,
+    @Deprecated("parser should come up with more specific error location")
     val node: Node?,
     val expression: Expression?,
-    val errorMessage: String,
-) : RuntimeException(
-    locationInfo.buildMessage(node, expression, errorMessage)
-) {
-    val token: Token = locationInfo.token
-    val tokenStart = locationInfo.tokenStart
-    val tokenEnd = locationInfo.tokenEnd
+    errorMessage: String,
+    cause: Throwable?
+) : RuntimeException(errorMessage, cause) {
+    val location: Location = locationInfo.startLocation
+    val startToken: Token = locationInfo.startToken
+    val endToken: Token = locationInfo.endToken
+
+    @Deprecated("replace with startToken")
+    val token: Token
+        get() = startToken
+
+    @Deprecated("replace with location")
+    val tokenStart: Location
+        get() = location
+
+    @Deprecated("use location + endToken.last - startToken.first")
+    val tokenEnd = locationInfo.endLocation
 
     constructor(
         tokenizer: ExpressionTokenizer,
         token: Token,
         errorMessage: String,
     ) : this(
-        locationInfo = LocationInfo(tokenizer, token),
+        locationInfo = LocationInfo(tokenizer, token, token),
         tokenizer = tokenizer,
         node = null,
         expression = null,
-        errorMessage = errorMessage
+        errorMessage = errorMessage,
+        cause = null
     )
 
+    constructor(
+        tokenizer: ExpressionTokenizer,
+        startToken: Token,
+        endToken: Token,
+        errorMessage: String,
+    ) : this(
+        locationInfo = LocationInfo(tokenizer, startToken, endToken),
+        tokenizer = tokenizer,
+        node = null,
+        expression = null,
+        errorMessage = errorMessage,
+        cause = null
+    )
+
+    @Deprecated("parser should come up with more specific error location")
     constructor(
         tokenizer: ExpressionTokenizer,
         node: Node,
         errorMessage: String,
     ) : this(
-        LocationInfo(tokenizer, node.sourceTokenRange().first),
-        tokenizer,
-        node,
-        null,
-        errorMessage
+        locationInfo = node.sourceTokenRange().let { (t1, t2) ->
+            LocationInfo(tokenizer, t1, t2)
+        },
+        tokenizer = tokenizer,
+        node = node,
+        expression = null,
+        errorMessage = errorMessage,
+        cause = null
     )
 
     constructor(
@@ -44,12 +74,42 @@ class ParseException private constructor(
         expression: Expression,
         errorMessage: String,
     ) : this(
-        LocationInfo(tokenizer, expression.sourceTokenRange().first),
-        tokenizer,
-        null,
-        expression,
-        errorMessage
+        locationInfo = expression.sourceTokenRange().let { (t1, t2) ->
+            LocationInfo(tokenizer, t1, t2)
+        },
+        tokenizer = tokenizer,
+        node = null,
+        expression = expression,
+        errorMessage = errorMessage,
+        cause = null
     )
+
+    constructor(
+        tokenizer: ExpressionTokenizer,
+        expression: Expression,
+        cause: Throwable
+    ) : this(
+        locationInfo = expression.sourceTokenRange().let { (t1, t2) ->
+            LocationInfo(tokenizer, t1, t2)
+        },
+        tokenizer = tokenizer,
+        node = null,
+        expression = expression,
+        errorMessage = cause.message ?: cause.toString(),
+        cause = null
+    )
+
+    override val message: String
+        get() = buildString {
+            append(tokenizer.path ?: "<anonymous>")
+            append("[")
+            append(location.lineNumber)
+            append(":")
+            append(location.columnNumber)
+            append("]")
+            append(": ")
+            append(super.message)
+        }
 }
 
 class Location(
@@ -91,5 +151,6 @@ fun Expression.sourceTokenRange(): Pair<Token, Token> = when (val node = this) {
     is Expression.UnOp -> node.tokens.first() to node.tokens.last()
     is Expression.Access -> node.first to node.last
     is Expression.CompAccess -> node.first to node.first
+    is Expression.SliceAccess -> node.first to node.first
     is Expression.Malformed -> node.tokens.first() to node.tokens.last()
 }
