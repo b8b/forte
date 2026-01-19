@@ -2,52 +2,47 @@ package org.cikit.forte.internal
 
 import org.cikit.forte.Forte
 import org.cikit.forte.core.Context
+import org.cikit.forte.core.Context.Builder
 import org.cikit.forte.core.TemplateLoader
 import org.cikit.forte.core.UPath
 import org.cikit.forte.parser.ParsedTemplate
 
-internal sealed class TemplateLoaderImpl(
-) : TemplateLoader {
+internal sealed class TemplateLoaderImpl : TemplateLoader {
 
-    abstract suspend fun includeTemplate(
-        search: Iterable<UPath>,
-        relativeTo: UPath?,
-        ignoreMissing: Boolean = false,
-        block: suspend (ParsedTemplate) -> Unit
-    )
+    abstract val rootContext: Context<Unit>
 
-    abstract suspend fun importTemplate(
+    abstract suspend fun <T> loadTemplate(
         search: Iterable<UPath>,
-        relativeTo: UPath?,
-        ignoreMissing: Boolean = false,
-        block: suspend (ParsedTemplate, Context<List<Any?>>) -> Unit
-    )
+        relativeTo: UPath? = null,
+        block: suspend (ParsedTemplate) -> T
+    ): T?
+
+    abstract suspend fun <T> importTemplate(
+        search: Iterable<UPath>,
+        relativeTo: UPath? = null,
+        block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+    ): T?
 
     object Empty : TemplateLoaderImpl() {
-        override fun loadTemplate(path: UPath): String? = null
+        override val rootContext: Context<Unit>
+            get() = Context
 
-        override suspend fun includeTemplate(
+        override suspend fun loadTemplate(path: UPath): String? = null
+
+        override suspend fun <T> loadTemplate(
             search: Iterable<UPath>,
             relativeTo: UPath?,
-            ignoreMissing: Boolean,
-            block: suspend (ParsedTemplate) -> Unit
-        ) {
-            if (ignoreMissing) {
-                return
-            }
-            error("Template not found: $search")
+            block: suspend (ParsedTemplate) -> T
+        ): T? {
+            return null
         }
 
-        override suspend fun importTemplate(
+        override suspend fun <T> importTemplate(
             search: Iterable<UPath>,
             relativeTo: UPath?,
-            ignoreMissing: Boolean,
-            block: suspend (ParsedTemplate, Context<List<Any?>>) -> Unit
-        ) {
-            if (ignoreMissing) {
-                return
-            }
-            error("Template not found: $search")
+            block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+        ): T? {
+            return null
         }
     }
 
@@ -61,12 +56,14 @@ internal sealed class TemplateLoaderImpl(
         protected val cachedImports: MutableMap<UPath, Context<List<Any?>>> =
             HashMap()
 
-        override suspend fun includeTemplate(
+        override val rootContext: Context<Unit>
+            get() = forte.context
+
+        override suspend fun <T> loadTemplate(
             search: Iterable<UPath>,
             relativeTo: UPath?,
-            ignoreMissing: Boolean,
-            block: suspend (ParsedTemplate) -> Unit
-        ) {
+            block: suspend (ParsedTemplate) -> T
+        ): T? {
             val result = search.firstNotNullOfOrNull { path ->
                 val path = resolveTemplate(path, relativeTo)
                 val cached = cachedTemplates[path]
@@ -83,40 +80,32 @@ internal sealed class TemplateLoaderImpl(
                 } else {
                     path to cached
                 }
-            }
-            if (result == null) {
-                if (ignoreMissing) {
-                    return
-                }
-                error("Template not found: $search")
-            }
+            } ?: return null
             val (path, parsedTemplate) = result
             if (path in includedTemplates) {
                 error("Error importing '$path': cyclic include detected")
             }
             includedTemplates.add(path)
             try {
-                block(parsedTemplate)
+                return block(parsedTemplate)
             } finally {
                 includedTemplates.remove(path)
             }
         }
 
-        override suspend fun importTemplate(
+        override suspend fun <T> importTemplate(
             search: Iterable<UPath>,
             relativeTo: UPath?,
-            ignoreMissing: Boolean,
-            block: suspend (ParsedTemplate, Context<List<Any?>>) -> Unit
-        ) {
-            includeTemplate(
+            block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+        ): T? {
+            return loadTemplate(
                 search = search,
                 relativeTo = relativeTo,
-                ignoreMissing = ignoreMissing
             ) { parsedTemplate ->
                 val path = parsedTemplate.path
                     ?: error("Included template has no path")
                 val ctx = cachedImports.getOrPut(path) {
-                    forte.scope()
+                    Builder.from(rootContext, this)
                         .captureToList()
                         .evalTemplate(parsedTemplate)
                         .build()
@@ -128,7 +117,7 @@ internal sealed class TemplateLoaderImpl(
 
     class Static(
         forte: Forte,
-        val templates: Map<UPath, String>
+        val templates: Map<UPath, String> = emptyMap()
     ) : Simple(forte) {
         constructor(
             forte: Forte,
@@ -140,7 +129,7 @@ internal sealed class TemplateLoaderImpl(
             }
         )
 
-        override fun loadTemplate(path: UPath): String? {
+        override suspend fun loadTemplate(path: UPath): String? {
             return templates[path]
         }
     }
@@ -151,7 +140,7 @@ internal sealed class TemplateLoaderImpl(
     ) : Simple(forte), TemplateLoader by templateLoader {
         val cachedInputs: MutableMap<UPath, String> = HashMap()
 
-        override fun loadTemplate(path: UPath): String? {
+        override suspend fun loadTemplate(path: UPath): String? {
             val cached = cachedInputs[path]
             if (cached != null) {
                 return cached

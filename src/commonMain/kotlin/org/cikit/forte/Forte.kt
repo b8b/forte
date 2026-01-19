@@ -19,7 +19,7 @@ expect fun <R> Context.Builder<R>.definePlatformExtensions(): Context.Builder<R>
 sealed class Forte private constructor(
     val declarations: List<Declarations>,
     val stringInterpolation: Boolean,
-    context: Context.Builder<*>,
+    context: Context.Builder<Unit>,
     templateLoader: TemplateLoader
 ) {
     companion object Default : Forte(
@@ -42,23 +42,21 @@ sealed class Forte private constructor(
         templateLoader = builder.templateLoader
     )
 
-    val context = Context.Builder.from(
-        context,
-        when (templateLoader) {
-            is TemplateLoaderImpl -> when (templateLoader) {
-                is TemplateLoaderImpl.Empty -> templateLoader
-                is TemplateLoaderImpl.Caching -> TemplateLoaderImpl.Caching(
-                    this,
-                    templateLoader.templateLoader
-                )
-                is TemplateLoaderImpl.Static -> TemplateLoaderImpl.Static(
-                    this,
-                    templateLoader.templates
-                )
-            }
-            else -> TemplateLoaderImpl.Caching(this, templateLoader)
-        }
-    )
+    private val templateLoader: TemplateLoaderImpl = when (templateLoader) {
+        is TemplateLoaderImpl.Caching -> TemplateLoaderImpl.Caching(
+            this,
+            templateLoader.templateLoader
+        )
+        is TemplateLoaderImpl.Static -> TemplateLoaderImpl.Static(
+            this,
+            templateLoader.templates
+        )
+        is TemplateLoader.Empty -> TemplateLoaderImpl.Static(this)
+
+        else -> TemplateLoaderImpl.Caching(this, templateLoader)
+    }
+
+    val context: Context<Unit> = context.build()
 
     fun parser(input: String, path: UPath? = null) =
         parser(Tokenizer(input, path))
@@ -75,7 +73,8 @@ sealed class Forte private constructor(
     fun parseExpression(input: String): Expression =
         parser(input).parseExpression()
 
-    fun scope(): Context.Builder<Unit> = context.scope()
+    fun scope(): Context.Builder<Unit> = Context.Builder
+        .from(context, templateLoader)
 
     fun captureTo(target: (Any?) -> Unit) =
         scope().captureTo(target)
@@ -115,7 +114,7 @@ private class ForteBuilderImpl : ForteBuilder {
     override var declarations = defaultDeclarations.toMutableList()
     override var stringInterpolation: Boolean = true
     override var context: Context.Builder<Unit> = Forte.scope()
-    override var templateLoader: TemplateLoader = TemplateLoaderImpl.Empty
+    override var templateLoader: TemplateLoader = TemplateLoader.Empty
         private set
 
     override fun templateLoader(templateLoader: TemplateLoader) {

@@ -1,6 +1,7 @@
 package org.cikit.forte.core
 
 import kotlinx.coroutines.flow.FlowCollector
+import org.cikit.forte.Forte
 import org.cikit.forte.internal.EvaluatorStateImpl
 import org.cikit.forte.internal.TemplateLoaderImpl
 import org.cikit.forte.lib.core.FilterGet
@@ -133,9 +134,7 @@ sealed class Context<R> {
     abstract fun <T: Method> getMethod(key: Key.Apply<T>): T?
 
     open suspend fun evalExpression(expression: Expression): Any? {
-        return Builder
-            .from(this, TemplateLoaderImpl.Empty)
-            .evalExpression(expression)
+        return Forte.scope().withScope(this).evalExpression(expression)
     }
 
     internal abstract fun dependencyAware():
@@ -434,7 +433,7 @@ sealed class Context<R> {
         override fun dependencyAware() = scope.dependencyAware()
 
         override fun withRootScope(): Builder<R> = Builder(
-            scope.reset(),
+            importContext(templateLoader.rootContext),
             resultGetter,
             templateLoader,
             resultBuilder
@@ -559,6 +558,13 @@ sealed class Context<R> {
             return evaluator.evalExpression(this, expression)
         }
 
+        suspend fun evalTemplate(path: UPath): Builder<R> {
+            loadTemplate(listOf(path), null) { parsedTemplate ->
+                evalTemplate(parsedTemplate)
+            }
+            return this
+        }
+
         suspend fun evalTemplate(template: ParsedTemplate): Builder<R> {
             try {
                 for (cmd in template.nodes) {
@@ -586,34 +592,100 @@ sealed class Context<R> {
             }
         }
 
+        @Deprecated("confusing name. replace with loadTemplate", level = DeprecationLevel.HIDDEN)
         suspend fun includeTemplate(
             search: Iterable<UPath>,
             relativeTo: UPath?,
             ignoreMissing: Boolean = false,
             block: suspend (ParsedTemplate) -> Unit
         ): Builder<R> {
-            templateLoader.includeTemplate(
-                search = search,
-                relativeTo = relativeTo,
-                ignoreMissing = ignoreMissing,
-                block = block
-            )
+            if (ignoreMissing) {
+                loadTemplateOrNull(search, relativeTo, block)
+            } else {
+                loadTemplate(search, relativeTo, block)
+            }
             return this
         }
 
+        suspend fun <T> loadTemplate(
+            path: UPath,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate) -> T
+        ): T = loadTemplateOrNull(listOf(path), relativeTo, block)
+            ?: error("Template not found: $path")
+
+        suspend fun <T> loadTemplate(
+            search: Iterable<UPath>,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate) -> T
+        ): T = loadTemplateOrNull(search, relativeTo, block)
+            ?: error("Template not found: $search")
+
+        suspend fun <T> loadTemplateOrNull(
+            path: UPath,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate) -> T
+        ): T? = loadTemplateOrNull(listOf(path), relativeTo, block)
+
+        suspend fun <T> loadTemplateOrNull(
+            search: Iterable<UPath>,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate) -> T
+        ): T? {
+            return templateLoader.loadTemplate(
+                search = search,
+                relativeTo = relativeTo,
+            ) { parsedTemplate ->
+                block(parsedTemplate)
+            }
+        }
+
+        @Deprecated("complicated API", level = DeprecationLevel.HIDDEN)
         suspend fun importTemplate(
             search: Iterable<UPath>,
             relativeTo: UPath?,
             ignoreMissing: Boolean = false,
             block: suspend (ParsedTemplate, Context<List<Any?>>) -> Unit
         ): Builder<R> {
-            templateLoader.importTemplate(
+            if (ignoreMissing) {
+                importTemplate(search, relativeTo, block)
+            } else {
+                importTemplate(search, relativeTo, block)
+            }
+            return this
+        }
+
+        suspend fun <T> importTemplate(
+            path: UPath,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+        ): T = importTemplateOrNull(listOf(path), relativeTo, block)
+            ?: error("Template not found: $path")
+
+        suspend fun <T> importTemplate(
+            search: Iterable<UPath>,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+        ): T = importTemplateOrNull(search, relativeTo, block)
+            ?: error("Template not found: $search")
+
+        suspend fun <T> importTemplateOrNull(
+            path: UPath,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+        ): T? = importTemplateOrNull(listOf(path), relativeTo, block)
+
+        suspend fun <T> importTemplateOrNull(
+            search: Iterable<UPath>,
+            relativeTo: UPath? = null,
+            block: suspend (ParsedTemplate, Context<List<Any?>>) -> T
+        ): T? {
+            return templateLoader.importTemplate(
                 search = search,
                 relativeTo = relativeTo,
-                ignoreMissing = ignoreMissing,
-                block = block
-            )
-            return this
+            ) { parsedTemplate, importedTemplate ->
+                block(parsedTemplate, importedTemplate)
+            }
         }
 
         fun build(): Context<R> {

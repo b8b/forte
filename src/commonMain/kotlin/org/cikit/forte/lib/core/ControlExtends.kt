@@ -1,6 +1,7 @@
 package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
+import org.cikit.forte.parser.Node
 import org.cikit.forte.parser.ParsedTemplate
 
 class ControlExtends: ControlTag {
@@ -17,48 +18,50 @@ class ControlExtends: ControlTag {
         val fileStr = ctx.evalExpression(fileExpr) as CharSequence
         val file = UPath(fileStr.concatToString(), DecodeUrlPath)
 
-        val blocks = mutableMapOf<String, ParsedTemplate>()
+        val blocks = mutableMapOf<String, List<Node>>()
         for (i in 1 until branches.size) {
             val block = branches[i]
             val blockName = ctx.evalExpression(
                 block.args.getValue("blockName")
             ) as String
-            blocks[blockName] = ParsedTemplate(
-                input = template.input,
-                path = template.path,
-                nodes = block.body
-            )
+            blocks[blockName] = block.body
         }
 
-        val embedScope = ctx.scope().discard()
-        embedScope.evalNodes(template, branch.body)
-        embedScope.importTemplate(
-            listOf(file),
-            template.path
-        ) { _, importedCtx ->
+        ctx.discard().evalNodes(template, branch.body)
+
+        ctx.importTemplate(listOf(file), template.path) { _, importedCtx ->
             for (superBlock in importedCtx.result) {
-                if (superBlock is ControlBlock.RenderedBlock) {
-                    val derivedBlock = blocks[superBlock.blockName]
-                    if (derivedBlock == null) {
-                        ctx.emitValue(superBlock)
-                    } else {
-                        val renderedValue = embedScope
-                            .scope()
-                            .renderToString()
-                            .defineFunction("super") { args ->
-                                args.requireEmpty()
-                                superBlock
-                            }
-                            .evalTemplate(derivedBlock)
-                            .result
-                        val renderedBlock = ControlBlock.RenderedBlock(
-                            superBlock.blockName,
-                            renderedValue
-                        )
-                        ctx.emitValue(renderedBlock)
+                when (superBlock) {
+                    is ControlBlock.RenderedBlock -> {
+                        val derivedBlock = blocks[superBlock.blockName]
+                        if (derivedBlock == null) {
+                            ctx.emitValue(superBlock)
+                        } else {
+                            val renderedValue = ctx.scope()
+                                .renderToString()
+                                .defineFunction("super") { args ->
+                                    args.requireEmpty()
+                                    superBlock
+                                }
+                                .evalNodes(template, derivedBlock)
+                                .result
+                            val renderedBlock = ControlBlock.RenderedBlock(
+                                superBlock.blockName,
+                                renderedValue
+                            )
+                            ctx.emitValue(renderedBlock)
+                        }
                     }
-                } else {
-                    ctx.emitValue(superBlock)
+
+                    is CharSequence -> {
+                        ctx.emitValue(superBlock)
+                    }
+
+                    else -> {
+                        val renderedValue = importedCtx
+                            .filterString(superBlock, NamedArgs.Empty)
+                        ctx.emitValue(renderedValue)
+                    }
                 }
             }
         }

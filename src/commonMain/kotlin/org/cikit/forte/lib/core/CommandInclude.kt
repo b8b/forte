@@ -20,7 +20,7 @@ class CommandInclude : CommandTag {
             }
             else -> error("invalid type '${typeName(file)}' for arg 'file'")
         }
-        ctx.includeTemplate(files, template.path) { parsedTemplate ->
+        ctx.loadTemplate(files, template.path) { parsedTemplate ->
             ctx.withRootScope().evalTemplate(parsedTemplate)
         }
     }
