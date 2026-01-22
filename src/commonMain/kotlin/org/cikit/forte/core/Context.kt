@@ -495,7 +495,13 @@ sealed class Context<R> {
             scope,
             ::noop,
             templateLoader,
-            ResultBuilder.Render { value -> target.append(value) }
+            ResultBuilder.Render { value ->
+                if (value is InlineString) {
+                    value.appendTo(target)
+                } else {
+                    target.append(value)
+                }
+            }
         )
 
         fun renderTo(flowCollector: FlowCollector<CharSequence>) = Builder(
@@ -511,7 +517,13 @@ sealed class Context<R> {
                 scope,
                 stringBuilder::toString,
                 templateLoader,
-                ResultBuilder.Render { value -> stringBuilder.append(value) }
+                ResultBuilder.Render { value ->
+                    if (value is InlineString) {
+                        value.appendTo(stringBuilder)
+                    } else {
+                        stringBuilder.append(value)
+                    }
+                }
             )
         }
 

@@ -12,7 +12,13 @@ fun typeName(value: Any?): String {
     return value::class.simpleName ?: value::class.toString()
 }
 
-interface InlineString : CharSequence
+interface InlineString : CharSequence {
+    fun appendTo(target: Appendable) =
+        target.append(this.toString())
+
+    fun appendTo(stringBuilder: StringBuilder) =
+        stringBuilder.append(this.toString())
+}
 
 class RawString(
     val input: String,
@@ -22,6 +28,14 @@ class RawString(
 
     override val length: Int
         get() = endIndex - startIndex
+
+    override fun appendTo(target: Appendable): Appendable {
+        return target.append(input, startIndex, endIndex)
+    }
+
+    override fun appendTo(stringBuilder: StringBuilder): StringBuilder {
+        return stringBuilder.append(input, startIndex, endIndex)
+    }
 
     override fun get(index: Int): Char {
         val realIndex = startIndex + index
