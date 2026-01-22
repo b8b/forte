@@ -137,8 +137,8 @@ sealed class Context<R> {
         return Forte.scope().withScope(this).evalExpression(expression)
     }
 
-    internal abstract fun dependencyAware():
-            Iterable<Pair<String, DependencyAware>>
+    internal abstract fun dependencyAware(): Iterable<String>
+    internal abstract fun dependencyAware(key: String): DependencyAware?
 
     protected fun resolveFilter(key: Key.Apply<FilterMethod>): FilterMethod {
         return getMethod(key) ?: object : FilterMethod {
@@ -158,8 +158,8 @@ sealed class Context<R> {
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? = null
         override fun getFunction(key: Key.Call): Function? = null
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? = null
-        override fun dependencyAware(): Iterable<Pair<String, DependencyAware>> =
-            emptyList()
+        override fun dependencyAware(): Iterable<String> = emptyList()
+        override fun dependencyAware(key: String): DependencyAware? = null
 
         fun builder() = Builder.from(this, TemplateLoaderImpl.Empty)
     }
@@ -195,7 +195,12 @@ sealed class Context<R> {
                 is ReadOnlyContext<*> -> ctx.toMutableContext()
                 is MutableContext -> ctx.copy()
                 is Builder -> ctx.scope.copy()
-                is StaticContext -> MutableContext(ctx)
+                is StaticContext -> MutableContext(
+                    ctx,
+                    dependencyAware = ctx.dependencyAware()
+                )
+
+                else -> throw IllegalArgumentException()
             }
 
             private fun noop() {}
@@ -431,6 +436,9 @@ sealed class Context<R> {
         }
 
         override fun dependencyAware() = scope.dependencyAware()
+
+        override fun dependencyAware(key: String): DependencyAware? =
+            scope.dependencyAware(key)
 
         override fun withRootScope(): Builder<R> = Builder(
             importContext(templateLoader.rootContext),
@@ -705,32 +713,10 @@ sealed class Context<R> {
         }
     }
 
-    /**
-     * import scope (entries must be in correct order) into an unordered
-     * HashMap and a separate index for dependency awares
-     */
-    private class StaticContext(scope: Map<String, Any?>) : Context<Unit>() {
-        private val scope: Map<String, Any?>
-        private val dependencyAware: List<Pair<String, DependencyAware>>
-
-        init {
-            // copy all items into this.scope
-            val mutableScope = HashMap(scope)
-            val mutableList = mutableListOf<Pair<String, DependencyAware>>()
-            this.scope = mutableScope
-            // reimport and index dependency awares
-            for ((k, currentValue) in scope) {
-                if (currentValue is DependencyAware) {
-                    val withDependencies = currentValue.withDependencies(this)
-                    if (withDependencies !== currentValue) {
-                        mutableScope[k] = withDependencies
-                    }
-                    mutableList.add(k to withDependencies)
-                }
-            }
-            this.dependencyAware = mutableList.toList()
-        }
-
+    private class StaticContext(
+        private val scope: Map<String, Any?>,
+        private val dependencyAware: List<String>
+    ) : Context<Unit>() {
         override val result: Unit
             get() = Unit
 
@@ -756,46 +742,31 @@ sealed class Context<R> {
         }
 
         override fun dependencyAware() = dependencyAware
+
+        override fun dependencyAware(key: String): DependencyAware? =
+            scope[key] as? DependencyAware
     }
 
-    /**
-     * import scope into a LinkedHashMap, optionally using an index of
-     * dependency awares to retain the correct order.
-     * in case the index is not provided (set to null), the entries of
-     * scope must be in correct order.
-     */
     private class MutableContext(
         val rootContext: Context<*>,
         scope: Map<String, Any?> = emptyMap(),
-        dependencyAware: List<Pair<String, DependencyAware>>? = null,
-        filterGet: FilterGet? = null,
-        filterSlice: FilterSlice? = null,
-        filterString: FilterString? = null,
+        dependencyAware: List<String> = emptyList(),
+        filterGet: FilterMethod? = null,
+        filterSlice: FilterMethod? = null,
+        filterString: FilterMethod? = null,
     ) : Context<Unit>() {
 
-        private val scope: MutableMap<String, Any?>
+        private val scope: MutableMap<String, Any?> = HashMap(scope)
+        private var dependencyAware = ArrayList(dependencyAware)
 
         override var filterGet: FilterMethod
         override var filterSlice: FilterMethod
         override var filterString: FilterMethod
 
         init {
-            // copy all items into this.scope
-            val mutableScope = LinkedHashMap(scope)
-            this.scope = mutableScope
             this.filterGet = filterGet ?: resolveFilter(FilterGet.KEY)
             this.filterSlice = filterSlice ?: resolveFilter(FilterSlice.KEY)
             this.filterString = filterString ?: resolveFilter(FilterString.KEY)
-            if (dependencyAware != null) {
-                // reimport dependency awares
-                for ((k, currentValue) in dependencyAware) {
-                    val withDependencies = currentValue.withDependencies(this)
-                    if (withDependencies !== currentValue) {
-                        mutableScope[k] = withDependencies
-                        updateMutableRef(k)
-                    }
-                }
-            }
         }
 
         override val result: Unit
@@ -908,22 +879,22 @@ sealed class Context<R> {
             )
         }
 
-        override fun dependencyAware() = sequence {
-            for (pair in rootContext.dependencyAware()) {
-                if (!scope.containsKey(pair.first)) {
-                    yield(pair)
-                }
-            }
-            for ((k, v) in scope) {
-                if (v is DependencyAware) {
-                    yield(k to v)
-                }
-            }
-        }.asIterable()
+        override fun dependencyAware() = dependencyAware
 
-        fun copy(): MutableContext = MutableContext(rootContext, scope)
+        override fun dependencyAware(key: String): DependencyAware? {
+            return scope[key]
+                ?.let { it as? DependencyAware}
+                ?: rootContext.dependencyAware(key)
+        }
 
-        fun reset(): MutableContext = MutableContext(rootContext, emptyMap())
+        fun copy(): MutableContext = MutableContext(
+            rootContext = rootContext,
+            scope = scope,
+            dependencyAware = dependencyAware,
+            filterGet = filterGet,
+            filterSlice = filterSlice,
+            filterString = filterString
+        )
 
         fun <R> build(result: R): Context<R> {
             return if (rootContext === Companion) {
@@ -931,16 +902,24 @@ sealed class Context<R> {
                     rootContext = if (scope.isEmpty()) {
                         Companion
                     } else {
-                        StaticContext(scope)
+                        StaticContext(scope.toMap(), dependencyAware.toList())
                     },
                     scope = emptyMap(),
+                    dependencyAware = dependencyAware.toList(),
                     result = result,
+                    filterGet = filterGet,
+                    filterSlice = filterSlice,
+                    filterString = filterString
                 )
             } else {
                 ReadOnlyContext(
                     rootContext = rootContext,
-                    scope = scope,
+                    scope = scope.toMap(),
+                    dependencyAware = dependencyAware.toList(),
                     result = result,
+                    filterGet = filterGet,
+                    filterSlice = filterSlice,
+                    filterString = filterString
                 )
             }
         }
@@ -950,31 +929,82 @@ sealed class Context<R> {
             initialImplementation: Any?,
             implementation: Any
         ) {
-            if (initialImplementation != null) {
-                // redefine item and reimport all dependency awares
-                scope[key] = implementation
-                val keys = scope.keys
-                for ((k, v) in rootContext.dependencyAware()) {
-                    if (k !in keys) {
-                        import(k, v)
+            if (initialImplementation != null || scope.containsKey(key)) {
+                if (implementation is DependencyAware) {
+                    val dt = DependencyTracker(this)
+                    scope[key] = implementation.withDependencies(dt)
+                    // the new implementation may not introduce cycles, so
+                    // any dependency referenced by the new implementation
+                    // is not allowed to change.
+                    for (d in dt.dependencies) {
+                        val local = scope[d]
+                        val v = if (local != null) {
+                            local as? DependencyAware ?: continue
+                        } else {
+                            rootContext.dependencyAware(d) ?: continue
+                        }
+                        if (v !== v.withDependencies(this)) {
+                            throw IllegalStateException("cyclic dependency")
+                        }
                     }
-                }
-                for (k in keys) {
-                    val v = scope[k] as? DependencyAware
-                    if (v != null) {
-                        import(k, v)
+                    // reimport items depending on the new implementation
+                    var oldIndex = -1
+                    var insertAt = -1
+                    for (i in 0 until dependencyAware.size) {
+                        val k = dependencyAware[i]
+                        if (k == key) {
+                            oldIndex = i
+                            continue
+                        }
+                        if (k in dt.dependencies) {
+                            // already handled
+                            continue
+                        }
+                        val v = dependencyAware(k) as DependencyAware
+                        val withDependencies = v.withDependencies(this)
+                        if (v !== withDependencies) {
+                            scope[k] = withDependencies
+                            if (insertAt < 0) {
+                                insertAt = i
+                            }
+                        }
                     }
-                }
-            } else if (scope.containsKey(key)) {
-                // redefine item and reimport all dependency awares in scope
-                scope[key] = implementation
-                for ((k, v) in scope) {
-                    if (v is DependencyAware) {
-                        import(k, v)
+                    // move key of new implementation further to the beginning
+                    // if required
+                    if (oldIndex < 0) {
+                        if (insertAt < 0) {
+                            dependencyAware.add(key)
+                        } else {
+                            dependencyAware.add(insertAt, key)
+                        }
+                    } else if (insertAt in (0 until oldIndex)) {
+                        dependencyAware.removeAt(oldIndex)
+                        dependencyAware.add(insertAt, key)
+                    }
+                } else {
+                    scope[key] = implementation
+                    val oldIndex = dependencyAware.lastIndexOf(key)
+                    val startIndex: Int
+                    val endIndex: Int
+                    if (oldIndex < 0) {
+                        // non-da -> non-da
+                        startIndex = 0
+                        endIndex = dependencyAware.size
+                    } else {
+                        // da -> non-da
+                        dependencyAware.removeAt(oldIndex)
+                        startIndex = oldIndex
+                        endIndex = dependencyAware.size
+                    }
+                    for (i in startIndex until endIndex) {
+                        val key = dependencyAware[i]
+                        val value = dependencyAware(key)
+                        import(key, value as DependencyAware)
                     }
                 }
             } else if (implementation is DependencyAware) {
-                // define new context aware
+                // define new dependency aware
+                dependencyAware.add(key)
                 scope[key] = implementation.withDependencies(this)
             } else {
                 // define new item
@@ -1005,14 +1035,64 @@ sealed class Context<R> {
         }
     }
 
-    /**
-     * import scope (entries must be in correct order) into an unordered
-     * HashMap and a separate index for dependency awares
-     */
+    private class DependencyTracker(
+        val delegate: Context<*>,
+        val dependencies: MutableSet<String> = HashSet()
+    ) : Context<Unit>() {
+        override val result: Unit
+            get() = Unit
+
+        override fun getVar(name: String): Any? {
+            throw IllegalStateException("cannot depend on variables")
+        }
+
+        override fun getCommandTag(key: Key.Command): CommandTag? {
+            dependencies.add(key.value)
+            return delegate.getCommandTag(key)
+        }
+
+        override fun getControlTag(key: Key.Control): ControlTag? {
+            dependencies.add(key.value)
+            return delegate.getControlTag(key)
+        }
+
+        override fun getOpFunction(key: Key.Unary): UnOpFunction? {
+            dependencies.add(key.value)
+            return delegate.getOpFunction(key)
+        }
+
+        override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
+            dependencies.add(key.value)
+            return delegate.getBinaryOpFunction(key)
+        }
+
+        override fun getFunction(key: Key.Call): Function? {
+            dependencies.add(key.value)
+            return delegate.getFunction(key)
+        }
+
+        override fun <T : Method> getMethod(key: Key.Apply<T>): T? {
+            dependencies.add(key.value)
+            return delegate.getMethod(key)
+        }
+
+        override fun dependencyAware(): Iterable<String> {
+            return delegate.dependencyAware()
+        }
+
+        override fun dependencyAware(key: String): DependencyAware? {
+            return delegate.dependencyAware(key)
+        }
+    }
+
     private class ReadOnlyContext<R>(
         val rootContext: Context<*>,
-        scope: Map<String, Any?>,
+        private val scope: Map<String, Any?>,
+        private val dependencyAware: List<String>,
         override val result: R,
+        filterGet: FilterMethod? = null,
+        filterSlice: FilterMethod? = null,
+        filterString: FilterMethod? = null,
     ) : Context<R>() {
         override var filterGet: FilterMethod
             private set
@@ -1023,45 +1103,10 @@ sealed class Context<R> {
         override var filterString: FilterMethod
             private set
 
-        private val scope: Map<String, Any?>
-        private val dependencyAware: List<Pair<String, DependencyAware>>
-
         init {
-            // copy all items into this.scope
-            val mutableScope = HashMap(scope)
-            val mutableList = mutableListOf<Pair<String, DependencyAware>>()
-            this.scope = mutableScope
-            this.filterGet = resolveFilter(FilterGet.KEY)
-            this.filterSlice = resolveFilter(FilterSlice.KEY)
-            this.filterString = resolveFilter(FilterString.KEY)
-            // reimport dependency awares
-            val imported = HashSet<String>()
-            for ((k, v) in rootContext.dependencyAware()) {
-                val currentValue = if (scope.containsKey(k)) {
-                    imported.add(k)
-                    scope[k] as? DependencyAware ?: continue
-                } else {
-                    v
-                }
-                val withDependencies = currentValue.withDependencies(this)
-                if (withDependencies !== currentValue) {
-                    mutableScope[k] = withDependencies
-                }
-                mutableList.add(k to withDependencies)
-            }
-            for ((k, currentValue) in scope) {
-                if (k !in imported && currentValue is DependencyAware) {
-                    val withDependencies = currentValue.withDependencies(this)
-                    if (withDependencies !== currentValue) {
-                        mutableScope[k] = withDependencies
-                    }
-                    mutableList.add(k to withDependencies)
-                }
-            }
-            this.filterGet = resolveFilter(FilterGet.KEY)
-            this.filterSlice = resolveFilter(FilterSlice.KEY)
-            this.filterString = resolveFilter(FilterString.KEY)
-            this.dependencyAware = mutableList.toList()
+            this.filterGet = filterGet ?: resolveFilter(FilterGet.KEY)
+            this.filterSlice = filterSlice ?: resolveFilter(FilterSlice.KEY)
+            this.filterString = filterString ?: resolveFilter(FilterString.KEY)
         }
 
         override fun getVar(name: String): Any? {
@@ -1106,10 +1151,19 @@ sealed class Context<R> {
 
         override fun dependencyAware() = dependencyAware
 
+        override fun dependencyAware(key: String): DependencyAware? {
+            return scope[key]
+                ?.let { it as? DependencyAware }
+                ?: rootContext.dependencyAware(key)
+        }
+
         fun toMutableContext() = MutableContext(
             rootContext = rootContext,
             scope = scope,
-            dependencyAware = dependencyAware
+            dependencyAware = dependencyAware,
+            filterGet = filterGet,
+            filterSlice = filterSlice,
+            filterString = filterString,
         )
     }
 }
