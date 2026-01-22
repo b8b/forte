@@ -2,7 +2,7 @@
 
 ## Slice
 
-```Python
+```twig
 >>> "abcdefghijk"[1:3:-1]
 ''
 >>> "abcdefghijk"[3:1:-1]
@@ -41,7 +41,7 @@
 
 ## startswith
 
-```Twig
+```twig
 >>> "12345".startswith("")
 'true'
 >>> "12345".startswith("1234")

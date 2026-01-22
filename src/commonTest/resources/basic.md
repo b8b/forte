@@ -2,7 +2,7 @@
 
 ## Raw Tag
 
-```Twig
+```twig
 {# no comment #}
 {% no command %}
 {{ no emit }}
@@ -16,15 +16,15 @@
 
 ## Range
 
-```Twig
+```twig
 1, 2
 ~
-{{ range(1, 2)|join(", ") }}
+{{ range(1, 3)|join(", ") }}
 ```
 
 ## IfElse
 
-```Twig
+```twig
 OK
 ~
 {% if true %}OK{% else %}BAD{% endif %}
@@ -32,7 +32,7 @@ OK
 
 ## ForElse
 
-```Twig
+```twig
 BAD
 OKOKOK
 OKa1OKb2OKa3
@@ -48,7 +48,7 @@ OKa1OKb2OKa3
 
 ## ObjectLiteral
 
-```Twig
+```twig
 {"a":11,"b":22}
 ~
 {{ {a: 11, b: 22, }|json }}
@@ -56,7 +56,7 @@ OKa1OKb2OKa3
 
 ## Arithmetic
 
-```Twig
+```twig
 2
 1208925819614629174706177
 1152921504606846976
@@ -69,7 +69,7 @@ OKa1OKb2OKa3
 ```
 
 ## StringConcat
-```Twig
+```twig
 hello yes true
 hello yes true
 ~
@@ -78,7 +78,7 @@ hello {{ "yes " ~ true }}
 ```
 
 ## String Escapes
-```Twig
+```twig
 "* \b \t \f \n \r \\ \" ' *"
 "* \b \t \f \n \r \\ \" ' *"
 ~
@@ -87,7 +87,7 @@ hello {{ "yes " ~ true }}
 ```
 
 ## Undefined
-```Twig
+```twig
 x: -1
 OK
 true
@@ -98,14 +98,14 @@ x: {{ x|default(-1) }}
 ```
 
 ## Filter
-```Twig
+```twig
 apply_int: 123
 ~
 apply_int: {{ '123'|int }}
 ```
 
 ## Macro
-```Twig
+```twig
 13
 ~
 {% macro test1(a, b = 4 * 2) %}
@@ -114,7 +114,7 @@ apply_int: {{ '123'|int }}
 ```
 
 ## Nested Macro
-```Twig
+```twig
 13
 ~
 {% macro test1(a, b = 4 * 2) %}
@@ -126,7 +126,7 @@ apply_int: {{ '123'|int }}
 ```
 
 ## Access vars from Macro
-```Twig
+```twig
 3
 ~
 {%- set a = 1 -%}
@@ -137,7 +137,7 @@ apply_int: {{ '123'|int }}
 ```
 
 ## Regex
-```Twig
+```twig
 true,xxc,abc
 ~
 {{- "abc"|matches_regex("[a-z]+") -}},
@@ -146,7 +146,7 @@ true,xxc,abc
 ```
 
 ## Reject
-```Twig
+```twig
 [1,3],[2]
 ~
 {{- [1, 2, 3]|reject("==", 2)|json -}},
@@ -154,7 +154,7 @@ true,xxc,abc
 ```
 
 ## ArrayAccess
-```Twig
+```twig
 2,empty
 ~
 {{- ([1, 2, 3, ])[1] -}},
@@ -162,7 +162,7 @@ true,xxc,abc
 ```
 
 ## Set Control
-```Twig
+```twig
 hello there
 ~
 {%- set name = "there" -%}
@@ -173,7 +173,7 @@ hello {{ name }}
 ```
 
 ## Selectattr
-```Twig
+```twig
 [{"a":false}]
 [{"a":false}]
 []
@@ -191,7 +191,7 @@ hello {{ name }}
 ```
 
 ## Map
-```Twig
+```twig
 ["10","2","3"]
 [2,3,10]
 ~
@@ -200,14 +200,14 @@ hello {{ name }}
 ```
 
 ## In
-```Twig
+```twig
 true
 ~
 {{ 1.0 in [1, 2, 3] }}
 ```
 
 ## Dictsort
-```Twig
+```twig
 a=2,z=1,
 ~
 {% for k, v in {z: 1, a: 2}|dictsort -%}
@@ -216,21 +216,21 @@ a=2,z=1,
 ```
 
 ## Generic sort
-```Twig
+```twig
 ["BWYFiOpx","RcNbwutO","xCIexbxF"]
 ~
 {{ ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]|map("base64_decode")|sort|map("base64_encode")|json }}
 ```
 
 ## Iterable compare
-```Twig
+```twig
 true
 ~
 {{ [1, 2, 3] < [1, 2, 4] }}
 ```
 
 ## Filter call
-```Twig
+```twig
 BLAH
 ~
 {% filter upper -%}
@@ -239,14 +239,14 @@ blah
 ```
 
 ## Set multiple variables
-```Twig
+```twig
 1
 ~
 {% set x, y = [1, 2] %}{{ x }}
 ```
 
 ## Eq
-```Twig
+```twig
 false,true,true,false
 false,true,true,false
 ~
@@ -256,7 +256,7 @@ false,true,true,false
 ```
 
 ## If expression
-```Twig
+```twig
 1
 4
 ~
@@ -265,7 +265,7 @@ false,true,true,false
 ```
 
 ## MinMax
-```Twig
+```twig
 1
 3
 ~
@@ -274,7 +274,7 @@ false,true,true,false
 ```
 
 ## Yaml
-```Twig
+```twig
 "a": 1
 ~
 {{ {a: 1}|yaml }}

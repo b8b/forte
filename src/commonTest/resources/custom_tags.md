@@ -4,7 +4,7 @@
 
 Command tag with single expression. No output.
 
-```Twig
+```twig
 none
 ~
 {% debug 1 + 1 %}none
@@ -12,7 +12,7 @@ none
 
 ## load_json
 
-```Twig
+```twig
 [1,2,3]
 ~
 {% load_json as x %}

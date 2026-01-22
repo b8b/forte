@@ -2,7 +2,7 @@
 
 ## test1
 
-```Twig
+```twig
 line1
 line2
 line3
@@ -14,7 +14,7 @@ line3
 
 ## test2
 
-```Twig
+```twig
 line1
 line2
 line3
@@ -27,7 +27,7 @@ line3
 
 ## test3
 
-```Twig
+```twig
 line1
 line2
 line3
@@ -40,7 +40,7 @@ line3
 
 ## test4
 
-```Twig
+```twig
 line1
 line2
 line3
@@ -53,7 +53,7 @@ line3
 
 ## test5
 
-```Twig
+```twig
 line1
 line2
 line3
