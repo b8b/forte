@@ -185,7 +185,7 @@ class TestEval {
     @Test
     fun testNamedArg() = runTest {
         val result = Forte.renderToString().evalTemplate(
-            Forte.parseTemplate("{{ range(start=1, end_inclusive=2)|json }}")
+            Forte.parseTemplate("{{ range(start=1, stop=3)|json }}")
         ).result
         assertEquals("[1,2]", result)
     }

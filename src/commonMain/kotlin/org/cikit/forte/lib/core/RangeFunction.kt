@@ -1,53 +1,58 @@
 package org.cikit.forte.lib.core
 
-import org.cikit.forte.core.BinOpFunction
 import org.cikit.forte.core.Function
-import org.cikit.forte.core.NamedArgs
-import org.cikit.forte.core.require
+import org.cikit.forte.core.*
 
 class RangeFunction : Function, BinOpFunction {
     override val isHidden: Boolean
         get() = false
 
-    override fun invoke(args: NamedArgs): Any {
-        val start: Number
-        val end: Number
+    override fun invoke(args: NamedArgs): Iterable<Int> {
+        val start: Int
+        val end: Int
+        val step: Int
         if (args.values.size == 1) {
             args.use {
                 start = 0
-                end = require("end_inclusive")
+                end = require("stop")
+                step = 1
             }
         } else {
             args.use {
                 start = require("start")
-                end = require("end_inclusive")
+                end = require("stop")
+                step = optional("step") { 1 }
             }
         }
-        return range(start, end)
+        return range(start, end, step)
     }
 
-    override fun invoke(left: Any?, right: Any?): Any {
+    override fun invoke(left: Any?, right: Any?): Iterable<Int> {
+        if (left !is Int || right !is Int) {
+            binOpTypeError("range", left, right)
+        }
         return range(left, right)
     }
 
-    private fun range(subject: Any?, other: Any?): Any = when (subject) {
-        is Int -> when (other) {
-            is Long -> (subject .. other).toList()
-            is Number -> (subject..other.toInt()).toList()
-            else -> binOpTypeError("range", subject, other)
-        }
+    private fun range(start: Int, stop: Int) = start until stop
 
-        is Long -> when (other) {
-            is Number -> (subject..other.toLong()).toList()
-            else -> binOpTypeError("range", subject, other)
+    private fun range(
+        start: Int,
+        stop: Int,
+        step: Int
+    ): Iterable<Int> {
+        if (step > 0) {
+            if (start >= stop) {
+                return IntRange.EMPTY
+            }
+            return start until stop step step
         }
-
-        is Number -> when (other) {
-            is Long -> (subject.toLong()..other).toList()
-            is Number -> (subject.toInt()..other.toInt()).toList()
-            else -> binOpTypeError("range", subject, other)
+        if (step < 0) {
+            if (start <= stop) {
+                return IntRange.EMPTY
+            }
+            return start downTo (stop + 1) step (- step)
         }
-
-        else -> binOpTypeError("range", subject, other)
+        error("range step cannot be zero")
     }
 }
