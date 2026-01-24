@@ -1,6 +1,7 @@
 package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
+import org.cikit.forte.core.Context.Key
 import org.cikit.forte.parser.ParsedTemplate
 
 class ControlFor : ControlTag {
@@ -14,13 +15,7 @@ class ControlFor : ControlTag {
         val listValue = cmd.args.getValue("listValue")
         val recursive = cmd.args["recursive"]
         val condition = cmd.args["condition"]
-        val varNames = buildList {
-            val varNames = ctx.evalExpression(varNamesExpr)
-            varNames as List<*>
-            for (varName in varNames) {
-                add(varName as String)
-            }
-        }
+        val varNames = ctx.evalExpression(varNamesExpr) as List<*>
         val list = ctx.evalExpression(listValue)
         if (recursive != null &&
             ctx.evalExpression(recursive) == true)
@@ -50,48 +45,34 @@ class ControlFor : ControlTag {
         }
         val size = finalList.size
         if (size > 0) {
-            var thisIndex = 0
-            val loop = mutableMapOf<String, Any?>(
-                "length" to size,
-                "index" to thisIndex + 1,
-                "index0" to thisIndex,
-                "revindex" to size - thisIndex,
-                "revindex0" to size - thisIndex - 1,
-                "first" to true,
-                "last" to false,
-                "depth" to 1,
-                "depth0" to 0,
-                //"changed" preprocessor macro (unsupported)
+            val loop = Loop(
+                length = size,
+                index = 0,
+                nextItem = null,
+                prevItem = null
             )
+            val outerScope = ctx.scope()
+                .setVar("loop", loop)
+                .defineMethod(Loop.KEY_CYCLE, loop)
             val listIt = finalList.iterator()
             var lastItem = listIt.next()
             while (true) {
                 val isLast = !listIt.hasNext()
                 if (isLast) {
-                    loop["last"] = true
-                    loop.remove("nextitem")
+                    loop.nextItem = null
                 } else {
-                    loop["nextitem"] = listIt.next()
+                    loop.nextItem = listIt.next()
                 }
-                val thisLoop = loop.toMap()
-                ctx.scope()
-                    .setVar("loop", thisLoop)
+                outerScope
+                    .scope()
                     .setVars(*unpackList(varNames, lastItem))
-                    .defineMethod(
-                        "cycle",
-                        CycleMethod(thisLoop, thisIndex)
-                    )
                     .evalNodes(template, cmd.body)
                 if (isLast) {
                     break
                 }
-                loop["previtem"] = lastItem
-                lastItem = loop["nextitem"]
-                thisIndex++
-                loop["index"] = thisIndex + 1
-                loop["index0"] = thisIndex
-                loop["revindex"] = size - thisIndex
-                loop["revindex0"] = size - thisIndex - 1
+                loop.prevItem = lastItem
+                lastItem = loop.nextItem
+                loop.index++
             }
         } else {
             val cmdElse = branches.getOrNull(1) ?: return
@@ -102,16 +83,70 @@ class ControlFor : ControlTag {
         }
     }
 
-    private class CycleMethod(
-        val thisLoop: Map<String, Any?>,
-        val thisIndex: Int
-    ) : Method {
+    private class Loop(
+        val length: Int,
+        var index: Int,
+        var nextItem: Any?,
+        var prevItem: Any?,
+    ) : Method, Map<String, Any?> {
+        companion object {
+            val KEY_CYCLE = Key.Apply.create("cycle", Method.OPERATOR)
+            val attributes = setOf(
+                "length", "index", "index0", "revindex", "revindex0",
+                "first", "last", "depth", "depth0", "nextitem", "previtem"
+            )
+        }
+
         override fun invoke(subject: Any?, args: NamedArgs): Any? {
-            require(subject === thisLoop) {
+            require(subject === this) {
                 "cannot call cycle on " +
                         typeName(subject)
             }
-            return args.values[thisIndex % args.values.size]
+            return args.values[index % args.values.size]
+        }
+
+        override val size: Int
+            get() = attributes.size
+
+        override val keys: Set<String>
+            get() = attributes
+
+        override val values: Collection<Any?>
+            get() = listOf(
+                length, index + 1, index, length - index, length - index - 1,
+                index == 0, index == length - 1, 1, 0, nextItem, prevItem
+            )
+
+        override val entries: Set<Map.Entry<String, Any?>>
+            get() = attributes.associateWith { this[it] }.entries
+
+        override fun isEmpty(): Boolean = false
+
+        override fun containsKey(key: String): Boolean = key in attributes
+
+        override fun containsValue(value: Any?): Boolean = value in values
+
+        override fun get(key: String): Any? = when (key) {
+            "index" -> index + 1
+            "index0" -> index
+            "revindex" -> length - index
+            "revindex0" -> length - index - 1
+            "first" -> index == 0
+            "last" -> index == length - 1
+            "depth" -> 1
+            "depth0" -> 0
+            "nextitem" -> if (index == length - 1) {
+                Undefined("key 'nextitem' is not defined")
+            } else {
+                nextItem
+            }
+            "previtem" -> if (index == 0) {
+                Undefined("key 'previtem' is not defined")
+            } else {
+                prevItem
+            }
+
+            else -> null
         }
     }
 }
