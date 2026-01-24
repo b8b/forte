@@ -106,6 +106,125 @@ sealed class Context<R> {
         }
     }
 
+    protected sealed class WithDependants(
+        protected var dependants: Array<String?>
+    ) : Iterable<String?> {
+        abstract val implementation: Any
+        abstract fun update(implementation: Any): WithDependants
+        abstract fun append(key: String): WithDependants
+        abstract fun remove(key: String): WithDependants
+
+        override fun iterator(): Iterator<String?> = dependants.iterator()
+
+        companion object {
+            fun Array<String?>.append(key: String): Array<String?> {
+                return copyOf(size + 1).also { it[it.size - 1] = key }
+            }
+
+            fun Array<String?>.removeAt(i: Int): Array<String?> {
+                if (i == size - 1) {
+                    return copyOf(size - 1)
+                }
+                if (i == 0) {
+                    return copyOfRange(1, size)
+                }
+                val result = arrayOfNulls<String>(size - 1)
+                copyInto(result, 0, 0, i)
+                copyInto(result, i, i + 1, size)
+                return result
+            }
+        }
+
+        class Mutable private constructor(
+            override var implementation: Any,
+            dependants: Array<String?>
+        ): WithDependants(dependants) {
+            constructor(implementation: Any, dependant: String) : this(
+                implementation,
+                arrayOf(dependant)
+            )
+
+            constructor(frozen: Frozen, implementation: Any) : this(
+                implementation,
+                frozen.dependants
+            )
+
+            constructor(
+                frozen: Frozen,
+                implementation: Any,
+                key: String,
+            ) : this(
+                implementation,
+                frozen.dependants.append(key)
+            )
+
+            constructor(
+                frozen: Frozen,
+                implementation: Any,
+                removeAt: Int,
+            ) : this(
+                implementation,
+                frozen.dependants.removeAt(removeAt)
+            )
+
+            override fun update(implementation: Any): WithDependants {
+                this.implementation = implementation
+                return this
+            }
+
+            override fun append(key: String): WithDependants {
+                if (key !in dependants) {
+                    dependants = dependants.append(key)
+                }
+                return this
+            }
+
+            override fun remove(key: String): WithDependants {
+                val i = dependants.indexOf(key)
+                if (i >= 0) {
+                    dependants = dependants.removeAt(i)
+                }
+                return this
+            }
+
+            fun copy(): Mutable = Mutable(
+                implementation,
+                dependants
+            )
+
+            fun freeze(): Frozen = Frozen(this)
+        }
+
+        class Frozen private constructor(
+            override val implementation: Any,
+            dependants: Array<String?>
+        ): WithDependants(dependants) {
+            constructor(from: Mutable) : this(
+                from.implementation,
+                from.dependants
+            )
+
+            override fun update(implementation: Any): WithDependants {
+                return Mutable(this, implementation)
+            }
+
+            override fun append(key: String): WithDependants {
+                if (key in dependants) {
+                    return this
+                }
+                return Mutable(this, implementation, key)
+            }
+
+            override fun remove(key: String): WithDependants {
+                val i = dependants.indexOf(key)
+                if (i < 0) {
+                    return this
+                }
+                return Mutable(this, implementation, removeAt = i)
+            }
+        }
+    }
+
     abstract val result: R
 
     open val filterGet: FilterMethod
@@ -137,14 +256,21 @@ sealed class Context<R> {
         return Forte.scope().withScope(this).evalExpression(expression)
     }
 
-    internal abstract fun dependencyAware(): Iterable<String>
-    internal abstract fun dependencyAware(key: String): DependencyAware?
-
     protected fun resolveFilter(key: Key.Apply<FilterMethod>): FilterMethod {
         return getMethod(key) ?: object : FilterMethod {
             override fun invoke(subject: Any?, args: NamedArgs): Any? {
                 error("$key is not defined")
             }
+        }
+    }
+
+    protected abstract fun getImplementation(key: String): Any?
+
+    protected inline fun <reified T> Any.castImplementation(): T {
+        return if (this is WithDependants) {
+            implementation as T
+        } else {
+            this as T
         }
     }
 
@@ -158,8 +284,7 @@ sealed class Context<R> {
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? = null
         override fun getFunction(key: Key.Call): Function? = null
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? = null
-        override fun dependencyAware(): Iterable<String> = emptyList()
-        override fun dependencyAware(key: String): DependencyAware? = null
+        override fun getImplementation(key: String): Any? = null
 
         fun builder() = Builder.from(this, TemplateLoaderImpl.Empty)
     }
@@ -195,10 +320,7 @@ sealed class Context<R> {
                 is ReadOnlyContext<*> -> ctx.toMutableContext()
                 is MutableContext -> ctx.copy()
                 is Builder -> ctx.scope.copy()
-                is StaticContext -> MutableContext(
-                    ctx,
-                    dependencyAware = ctx.dependencyAware()
-                )
+                is StaticContext -> ctx.toMutableContext()
 
                 else -> throw IllegalArgumentException()
             }
@@ -434,11 +556,6 @@ sealed class Context<R> {
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? {
             return scope.getMethod(key)
         }
-
-        override fun dependencyAware() = scope.dependencyAware()
-
-        override fun dependencyAware(key: String): DependencyAware? =
-            scope.dependencyAware(key)
 
         override fun withRootScope(): Builder<R> = Builder(
             importContext(templateLoader.rootContext),
@@ -711,11 +828,14 @@ sealed class Context<R> {
         fun build(): Context<R> {
             return scope.build(result)
         }
+
+        override fun getImplementation(key: String): Any? {
+            return scope.getImplementation(key)
+        }
     }
 
     private class StaticContext(
         private val scope: Map<String, Any?>,
-        private val dependencyAware: List<String>
     ) : Context<Unit>() {
         override val result: Unit
             get() = Unit
@@ -727,43 +847,50 @@ sealed class Context<R> {
             return Undefined("undefined variable: '$name'")
         }
         override fun getCommandTag(key: Key.Command): CommandTag? =
-            scope[key.value]?.let { it as CommandTag}
+            scope[key.value]?.castImplementation()
         override fun getControlTag(key: Key.Control): ControlTag? =
-            scope[key.value]?.let { it as ControlTag}
+            scope[key.value]?.castImplementation()
         override fun getOpFunction(key: Key.Unary): UnOpFunction? =
-            scope[key.value]?.let { it as UnOpFunction }
+            scope[key.value]?.castImplementation()
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? =
-            scope[key.value]?.let { it as BinOpFunction }
+            scope[key.value]?.castImplementation()
         override fun getFunction(key: Key.Call): Function? =
-            scope[key.value]?.let { it as Function }
+            scope[key.value]?.castImplementation()
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? {
             @Suppress("UNCHECKED_CAST")
-            return scope[key.value]?.let { it as T }
+            return scope[key.value]
+                ?.let { it.castImplementation<Method>() as T }
         }
 
-        override fun dependencyAware() = dependencyAware
+        override fun getImplementation(key: String): Any? = scope[key]
 
-        override fun dependencyAware(key: String): DependencyAware? =
-            scope[key] as? DependencyAware
+        fun toMutableContext(): MutableContext = MutableContext(
+            rootContext = this,
+        )
     }
 
     private class MutableContext(
         val rootContext: Context<*>,
         scope: Map<String, Any?> = emptyMap(),
-        dependencyAware: List<String> = emptyList(),
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
         filterString: FilterMethod? = null,
     ) : Context<Unit>() {
 
-        private val scope: MutableMap<String, Any?> = HashMap(scope)
-        private var dependencyAware = ArrayList(dependencyAware)
+        private val scope: MutableMap<String, Any?> = HashMap(scope.size)
 
         override var filterGet: FilterMethod
         override var filterSlice: FilterMethod
         override var filterString: FilterMethod
 
         init {
+            for ((k, v) in scope) {
+                if (v is WithDependants.Mutable) {
+                    this.scope[k] = v.copy()
+                } else {
+                    this.scope[k] = v
+                }
+            }
             this.filterGet = filterGet ?: resolveFilter(FilterGet.KEY)
             this.filterSlice = filterSlice ?: resolveFilter(FilterSlice.KEY)
             this.filterString = filterString ?: resolveFilter(FilterString.KEY)
@@ -786,7 +913,7 @@ sealed class Context<R> {
 
         override fun getCommandTag(key: Key.Command): CommandTag? {
             return scope[key.value]
-                ?.let { it as CommandTag }
+                ?.castImplementation()
                 ?: rootContext.getCommandTag(key)
         }
 
@@ -799,7 +926,7 @@ sealed class Context<R> {
 
         override fun getControlTag(key: Key.Control): ControlTag? {
             return scope[key.value]
-                ?.let { it as ControlTag }
+                ?.castImplementation()
                 ?: rootContext.getControlTag(key)
         }
 
@@ -812,7 +939,7 @@ sealed class Context<R> {
 
         override fun getOpFunction(key: Key.Unary): UnOpFunction? {
             return scope[key.value]
-                ?.let { it as UnOpFunction }
+                ?.castImplementation()
                 ?: rootContext.getOpFunction(key)
         }
 
@@ -820,16 +947,12 @@ sealed class Context<R> {
             key: Key.Unary,
             implementation: UnOpFunction
         ) {
-            define(
-                key.value,
-                rootContext.getOpFunction(key),
-                implementation
-            )
+            define(key.value, implementation)
         }
 
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
             return scope[key.value]
-                ?.let { it as BinOpFunction}
+                ?.castImplementation()
                 ?: rootContext.getBinaryOpFunction(key)
         }
 
@@ -837,16 +960,12 @@ sealed class Context<R> {
             key: Key.Binary,
             implementation: BinOpFunction
         ) {
-            define(
-                key.value,
-                rootContext.getBinaryOpFunction(key),
-                implementation
-            )
+            define(key.value, implementation)
         }
 
         override fun getFunction(key: Key.Call): Function? {
             return scope[key.value]
-                ?.let { it as Function }
+                ?.castImplementation()
                 ?: rootContext.getFunction(key)
         }
 
@@ -854,17 +973,13 @@ sealed class Context<R> {
             key: Key.Call,
             implementation: Function
         ) {
-            define(
-                key.value,
-                rootContext.getFunction(key),
-                implementation
-            )
+            define(key.value, implementation)
         }
 
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? {
             @Suppress("UNCHECKED_CAST")
             return scope[key.value]
-                ?.let { it as T }
+                ?.let { it.castImplementation<Method>() as T }
                 ?: rootContext.getMethod(key)
         }
 
@@ -872,25 +987,23 @@ sealed class Context<R> {
             key: Key.Apply<*>,
             implementation: Method
         ) {
-            define(
-                key.value,
-                rootContext.getMethod(key),
-                implementation
-            )
-        }
-
-        override fun dependencyAware() = dependencyAware
-
-        override fun dependencyAware(key: String): DependencyAware? {
-            return scope[key]
-                ?.let { it as? DependencyAware}
-                ?: rootContext.dependencyAware(key)
+            define(key.value, implementation)
+            when (key.value) {
+                FilterGet.KEY.value -> {
+                    filterGet = resolveFilter(FilterGet.KEY)
+                }
+                FilterSlice.KEY.value -> {
+                    filterSlice = resolveFilter(FilterSlice.KEY)
+                }
+                FilterString.KEY.value -> {
+                    filterString = resolveFilter(FilterString.KEY)
+                }
+            }
         }
 
         fun copy(): MutableContext = MutableContext(
             rootContext = rootContext,
             scope = scope,
-            dependencyAware = dependencyAware,
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString
@@ -902,10 +1015,9 @@ sealed class Context<R> {
                     rootContext = if (scope.isEmpty()) {
                         Companion
                     } else {
-                        StaticContext(scope.toMap(), dependencyAware.toList())
+                        StaticContext(buildScope())
                     },
                     scope = emptyMap(),
-                    dependencyAware = dependencyAware.toList(),
                     result = result,
                     filterGet = filterGet,
                     filterSlice = filterSlice,
@@ -914,8 +1026,7 @@ sealed class Context<R> {
             } else {
                 ReadOnlyContext(
                     rootContext = rootContext,
-                    scope = scope.toMap(),
-                    dependencyAware = dependencyAware.toList(),
+                    scope = buildScope(),
                     result = result,
                     filterGet = filterGet,
                     filterSlice = filterSlice,
@@ -924,171 +1035,224 @@ sealed class Context<R> {
             }
         }
 
-        private fun define(
-            key: String,
-            initialImplementation: Any?,
-            implementation: Any
-        ) {
-            if (initialImplementation != null || scope.containsKey(key)) {
-                if (implementation is DependencyAware) {
-                    val dt = DependencyTracker(this)
-                    scope[key] = implementation.withDependencies(dt)
-                    // the new implementation may not introduce cycles, so
-                    // any dependency referenced by the new implementation
-                    // is not allowed to change.
-                    for (d in dt.dependencies) {
-                        val local = scope[d]
-                        val v = if (local != null) {
-                            local as? DependencyAware ?: continue
-                        } else {
-                            rootContext.dependencyAware(d) ?: continue
-                        }
-                        if (v !== v.withDependencies(this)) {
-                            throw IllegalStateException("cyclic dependency")
-                        }
+        private fun buildScope() = buildMap(scope.size) {
+            for ((k, v) in scope) {
+                if (v is WithDependants.Mutable) {
+                    put(k, v.freeze())
+                } else {
+                    put(k, v)
+                }
+            }
+        }
+
+        public override fun getImplementation(key: String): Any? {
+            return if (scope.containsKey(key)) {
+                scope[key]
+            } else {
+                rootContext.getImplementation(key)
+            }
+        }
+
+        private fun define(key: String, implementation: Any) {
+            val existing = getImplementation(key)
+            val newDependencies: Set<String>
+            val newImplementation: Any
+            if (implementation is DependencyAware) {
+                val dependencies = HashSet<String>()
+                val withDependencies = implementation.withDependencies(
+                    DependencyTracker(dependencies)
+                )
+                for (d in dependencies) {
+                    if (d == key) {
+                        error("cyclic dependency: $key")
                     }
-                    // reimport items depending on the new implementation
-                    var oldIndex = -1
-                    var insertAt = -1
-                    for (i in 0 until dependencyAware.size) {
-                        val k = dependencyAware[i]
-                        if (k == key) {
-                            oldIndex = i
-                            continue
+                    val current = scope[d]
+                        ?: continue // optional dependency has been tracked
+                    if (current is WithDependants) {
+                        val newEntry = current.append(key)
+                        if (newEntry !== current) {
+                            scope[d] = newEntry
                         }
-                        if (k in dt.dependencies) {
-                            // already handled
-                            continue
-                        }
-                        val v = dependencyAware(k) as DependencyAware
-                        val withDependencies = v.withDependencies(this)
-                        if (v !== withDependencies) {
-                            scope[k] = withDependencies
-                            if (insertAt < 0) {
-                                insertAt = i
+                    } else {
+                        scope[d] = WithDependants.Mutable(current, key)
+                    }
+                }
+                newDependencies = dependencies
+                newImplementation = withDependencies
+            } else {
+                newDependencies = emptySet()
+                newImplementation = implementation
+            }
+            when (existing) {
+                is WithDependants.Mutable -> {
+                    updateDependencies(
+                        key,
+                        existing.implementation,
+                        newDependencies
+                    )
+                    existing.implementation = newImplementation
+                    updateDependants(existing)
+                }
+                is WithDependants -> {
+                    updateDependencies(
+                        key,
+                        existing.implementation,
+                        newDependencies
+                    )
+                    scope[key] = existing.update(newImplementation)
+                    updateDependants(existing)
+                }
+
+                else -> {
+                    scope[key] = newImplementation
+                }
+            }
+        }
+
+        private fun updateDependencies(
+            key: String,
+            oldImplementation: Any,
+            newDependencies: Set<String>
+        ) {
+            if (oldImplementation is DependencyAware) {
+                val oldDependencies = HashSet<String>()
+                oldImplementation.withDependencies(
+                    DependencyTracker(oldDependencies)
+                )
+                for (d in oldDependencies) {
+                    if (d !in newDependencies) {
+                        when (val current = getImplementation(d)) {
+                            is WithDependants.Mutable -> {
+                                current.remove(key)
+                            }
+                            is WithDependants -> {
+                                scope[d] = current.remove(key)
                             }
                         }
                     }
-                    // move key of new implementation further to the beginning
-                    // if required
-                    if (oldIndex < 0) {
-                        if (insertAt < 0) {
-                            dependencyAware.add(key)
-                        } else {
-                            dependencyAware.add(insertAt, key)
-                        }
-                    } else if (insertAt in (0 until oldIndex)) {
-                        dependencyAware.removeAt(oldIndex)
-                        dependencyAware.add(insertAt, key)
-                    }
-                } else {
-                    scope[key] = implementation
-                    val oldIndex = dependencyAware.lastIndexOf(key)
-                    val startIndex: Int
-                    val endIndex: Int
-                    if (oldIndex < 0) {
-                        // non-da -> non-da
-                        startIndex = 0
-                        endIndex = dependencyAware.size
-                    } else {
-                        // da -> non-da
-                        dependencyAware.removeAt(oldIndex)
-                        startIndex = oldIndex
-                        endIndex = dependencyAware.size
-                    }
-                    for (i in startIndex until endIndex) {
-                        val key = dependencyAware[i]
-                        val value = dependencyAware(key)
-                        import(key, value as DependencyAware)
-                    }
                 }
-            } else if (implementation is DependencyAware) {
-                // define new dependency aware
-                dependencyAware.add(key)
-                scope[key] = implementation.withDependencies(this)
-            } else {
-                // define new item
-                scope[key] = implementation
-            }
-            updateMutableRef(key)
-        }
-
-        private fun import(key: String, value: DependencyAware) {
-            val withContext = value.withDependencies(this)
-            if (withContext !== value) {
-                scope[key] = withContext
             }
         }
 
-        private fun updateMutableRef(key: String) = when (key) {
-            FilterGet.KEY.value -> {
-                filterGet = resolveFilter(FilterGet.KEY)
+        private fun updateDependants(
+            dependants: Iterable<String?>,
+            visited: HashSet<String> = HashSet()
+        ) {
+            for (key in dependants) {
+                if (key == null) {
+                    continue
+                }
+                if (key in visited) {
+                    error("cyclic dependency: $key")
+                }
+                visited.add(key)
+                val existing = getImplementation(key)
+                val dependencyAware: DependencyAware?
+                val withDependants: WithDependants?
+                if (existing is WithDependants) {
+                    dependencyAware =
+                        existing.implementation as? DependencyAware
+                    withDependants = existing
+                } else {
+                    dependencyAware = existing as? DependencyAware
+                    withDependants = null
+                }
+                if (dependencyAware == null) {
+                    //this dependant seems not dependant anymore
+                    continue
+                }
+                val withDependencies = dependencyAware
+                    .withDependencies(this)
+                if (withDependencies === dependencyAware) {
+                    //this dependant seems not dependant anymore
+                    continue
+                }
+                if (withDependants == null) {
+                    scope[key] = withDependencies
+                } else {
+                    if (withDependants is WithDependants.Mutable) {
+                        withDependants.implementation = withDependencies
+                    } else {
+                        scope[key] = withDependants.update(withDependants)
+                    }
+                    updateDependants(withDependants, visited)
+                }
             }
-            FilterSlice.KEY.value -> {
-                filterSlice = resolveFilter(FilterSlice.KEY)
+        }
+
+        inner class DependencyTracker(
+            val dependencies: MutableSet<String> = HashSet()
+        ) : Context<Unit>() {
+            override val result: Unit
+                get() = Unit
+
+            override val filterGet: FilterMethod
+                get() {
+                    dependencies.add(FilterGet.KEY.value)
+                    return super.filterGet
+                }
+
+            override val filterSlice: FilterMethod
+                get() {
+                    dependencies.add(FilterSlice.KEY.value)
+                    return super.filterSlice
+                }
+
+            override val filterString: FilterMethod
+                get() {
+                    dependencies.add(FilterString.KEY.value)
+                    return super.filterString
+                }
+
+            override fun getVar(name: String): Any? {
+                throw IllegalStateException("cannot depend on variables")
             }
-            FilterString.KEY.value -> {
-                filterString = resolveFilter(FilterString.KEY)
+
+            override fun getCommandTag(key: Key.Command): CommandTag? {
+                dependencies.add(key.value)
+                return this@MutableContext.getCommandTag(key)
             }
 
-            else -> {}
-        }
-    }
+            override fun getControlTag(key: Key.Control): ControlTag? {
+                dependencies.add(key.value)
+                return this@MutableContext.getControlTag(key)
+            }
 
-    private class DependencyTracker(
-        val delegate: Context<*>,
-        val dependencies: MutableSet<String> = HashSet()
-    ) : Context<Unit>() {
-        override val result: Unit
-            get() = Unit
+            override fun getOpFunction(key: Key.Unary): UnOpFunction? {
+                dependencies.add(key.value)
+                return this@MutableContext.getOpFunction(key)
+            }
 
-        override fun getVar(name: String): Any? {
-            throw IllegalStateException("cannot depend on variables")
-        }
+            override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
+                dependencies.add(key.value)
+                return this@MutableContext.getBinaryOpFunction(key)
+            }
 
-        override fun getCommandTag(key: Key.Command): CommandTag? {
-            dependencies.add(key.value)
-            return delegate.getCommandTag(key)
-        }
+            override fun getFunction(key: Key.Call): Function? {
+                dependencies.add(key.value)
+                return this@MutableContext.getFunction(key)
+            }
 
-        override fun getControlTag(key: Key.Control): ControlTag? {
-            dependencies.add(key.value)
-            return delegate.getControlTag(key)
-        }
+            override fun <T : Method> getMethod(key: Key.Apply<T>): T? {
+                dependencies.add(key.value)
+                return this@MutableContext.getMethod(key)
+            }
 
-        override fun getOpFunction(key: Key.Unary): UnOpFunction? {
-            dependencies.add(key.value)
-            return delegate.getOpFunction(key)
-        }
+            override suspend fun evalExpression(expression: Expression): Any? {
+                throw IllegalStateException(
+                    "cannot evaluate expressions on $this"
+                )
+            }
 
-        override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
-            dependencies.add(key.value)
-            return delegate.getBinaryOpFunction(key)
-        }
-
-        override fun getFunction(key: Key.Call): Function? {
-            dependencies.add(key.value)
-            return delegate.getFunction(key)
-        }
-
-        override fun <T : Method> getMethod(key: Key.Apply<T>): T? {
-            dependencies.add(key.value)
-            return delegate.getMethod(key)
-        }
-
-        override fun dependencyAware(): Iterable<String> {
-            return delegate.dependencyAware()
-        }
-
-        override fun dependencyAware(key: String): DependencyAware? {
-            return delegate.dependencyAware(key)
+            override fun getImplementation(key: String): Any? {
+                return this@MutableContext.getImplementation(key)
+            }
         }
     }
 
     private class ReadOnlyContext<R>(
         val rootContext: Context<*>,
         private val scope: Map<String, Any?>,
-        private val dependencyAware: List<String>,
         override val result: R,
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
@@ -1118,49 +1282,52 @@ sealed class Context<R> {
 
         override fun getCommandTag(key: Key.Command): CommandTag? {
             return scope[key.value]
-                ?.let { it as CommandTag }
+                ?.castImplementation()
                 ?: rootContext.getCommandTag(key)
         }
 
         override fun getControlTag(key: Key.Control): ControlTag? {
             return scope[key.value]
-                ?.let { it as ControlTag }
+                ?.castImplementation()
                 ?: rootContext.getControlTag(key)
         }
 
         override fun getOpFunction(key: Key.Unary): UnOpFunction? {
-            return scope[key.value]?.let { it as UnOpFunction}
+            return scope[key.value]
+                ?.castImplementation()
                 ?: rootContext.getOpFunction(key)
         }
 
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
-            return scope[key.value]?.let { it as BinOpFunction }
+            return scope[key.value]
+                ?.castImplementation()
                 ?: rootContext.getBinaryOpFunction(key)
         }
 
         override fun getFunction(key: Key.Call): Function? {
-            return scope[key.value]?.let { it as Function }
+            return scope[key.value]
+                ?.castImplementation()
                 ?: rootContext.getFunction(key)
         }
 
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? {
             @Suppress("UNCHECKED_CAST")
-            return scope[key.value]?.let { it as T }
+            return scope[key.value]
+                ?.let { castImplementation<Method>() as T }
                 ?: rootContext.getMethod(key)
         }
 
-        override fun dependencyAware() = dependencyAware
-
-        override fun dependencyAware(key: String): DependencyAware? {
-            return scope[key]
-                ?.let { it as? DependencyAware }
-                ?: rootContext.dependencyAware(key)
+        override fun getImplementation(key: String): Any? {
+            return if (scope.containsKey(key)) {
+                scope[key]
+            } else {
+                rootContext.getImplementation(key)
+            }
         }
 
         fun toMutableContext() = MutableContext(
             rootContext = rootContext,
             scope = scope,
-            dependencyAware = dependencyAware,
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
