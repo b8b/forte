@@ -1046,11 +1046,7 @@ sealed class Context<R> {
         }
 
         public override fun getImplementation(key: String): Any? {
-            return if (scope.containsKey(key)) {
-                scope[key]
-            } else {
-                rootContext.getImplementation(key)
-            }
+            return scope[key] ?: rootContext.getImplementation(key)
         }
 
         private fun define(key: String, implementation: Any) {
