@@ -56,6 +56,7 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 api("org.jetbrains.kotlinx:kotlinx-io-bytestring:0.8.0")
                 api("org.jetbrains.kotlinx:kotlinx-io-core:0.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.4.0")
             }
         }
         commonTest {

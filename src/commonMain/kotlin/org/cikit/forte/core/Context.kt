@@ -1,5 +1,9 @@
 package org.cikit.forte.core
 
+import kotlinx.collections.immutable.PersistentCollection
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentHashMapOf
+import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.coroutines.flow.FlowCollector
 import org.cikit.forte.Forte
 import org.cikit.forte.internal.EvaluatorStateImpl
@@ -106,121 +110,39 @@ sealed class Context<R> {
         }
     }
 
-    protected sealed class WithDependants(
-        protected var dependants: Array<String?>
-    ) : Iterable<String?> {
-        abstract val implementation: Any
-        abstract fun update(implementation: Any): WithDependants
-        abstract fun append(key: String): WithDependants
-        abstract fun remove(key: String): WithDependants
+    protected class WithDependants(
+        val implementation: Any,
+        val dependants: PersistentCollection<String>
+    ) {
+        constructor(implementation: Any, key: String) : this(
+            implementation,
+            persistentHashSetOf(key)
+        )
 
-        override fun iterator(): Iterator<String?> = dependants.iterator()
+        fun update(implementation: Any): WithDependants = WithDependants(
+            implementation,
+            dependants
+        )
 
-        companion object {
-            fun Array<String?>.append(key: String): Array<String?> {
-                return copyOf(size + 1).also { it[it.size - 1] = key }
-            }
-
-            fun Array<String?>.removeAt(i: Int): Array<String?> {
-                if (i == size - 1) {
-                    return copyOf(size - 1)
-                }
-                if (i == 0) {
-                    return copyOfRange(1, size)
-                }
-                val result = arrayOfNulls<String>(size - 1)
-                copyInto(result, 0, 0, i)
-                copyInto(result, i, i + 1, size)
-                return result
+        fun append(key: String): WithDependants {
+            return if (key in dependants) {
+                this
+            } else {
+                WithDependants(
+                    implementation,
+                    dependants.add(key)
+                )
             }
         }
 
-        class Mutable private constructor(
-            override var implementation: Any,
-            dependants: Array<String?>
-        ): WithDependants(dependants) {
-            constructor(implementation: Any, dependant: String) : this(
-                implementation,
-                arrayOf(dependant)
-            )
-
-            constructor(frozen: Frozen, implementation: Any) : this(
-                implementation,
-                frozen.dependants
-            )
-
-            constructor(
-                frozen: Frozen,
-                implementation: Any,
-                key: String,
-            ) : this(
-                implementation,
-                frozen.dependants.append(key)
-            )
-
-            constructor(
-                frozen: Frozen,
-                implementation: Any,
-                removeAt: Int,
-            ) : this(
-                implementation,
-                frozen.dependants.removeAt(removeAt)
-            )
-
-            override fun update(implementation: Any): WithDependants {
-                this.implementation = implementation
-                return this
-            }
-
-            override fun append(key: String): WithDependants {
-                if (key !in dependants) {
-                    dependants = dependants.append(key)
-                }
-                return this
-            }
-
-            override fun remove(key: String): WithDependants {
-                val i = dependants.indexOf(key)
-                if (i >= 0) {
-                    dependants = dependants.removeAt(i)
-                }
-                return this
-            }
-
-            fun copy(): Mutable = Mutable(
-                implementation,
-                dependants
-            )
-
-            fun freeze(): Frozen = Frozen(this)
-        }
-
-        class Frozen private constructor(
-            override val implementation: Any,
-            dependants: Array<String?>
-        ): WithDependants(dependants) {
-            constructor(from: Mutable) : this(
-                from.implementation,
-                from.dependants
-            )
-
-            override fun update(implementation: Any): WithDependants {
-                return Mutable(this, implementation)
-            }
-
-            override fun append(key: String): WithDependants {
-                if (key in dependants) {
-                    return this
-                }
-                return Mutable(this, implementation, key)
-            }
-
-            override fun remove(key: String): WithDependants {
-                val i = dependants.indexOf(key)
-                if (i < 0) {
-                    return this
-                }
-                return Mutable(this, implementation, removeAt = i)
+        fun remove(key: String): WithDependants {
+            return if (key !in dependants) {
+                this
+            } else {
+                WithDependants(
+                    implementation,
+                    dependants.remove(key)
+                )
             }
         }
     }
@@ -264,8 +186,6 @@ sealed class Context<R> {
         }
     }
 
-    protected abstract fun getImplementation(key: String): Any?
-
     protected inline fun <reified T> Any.castImplementation(): T {
         return if (this is WithDependants) {
             implementation as T
@@ -284,7 +204,6 @@ sealed class Context<R> {
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? = null
         override fun getFunction(key: Key.Call): Function? = null
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? = null
-        override fun getImplementation(key: String): Any? = null
 
         fun builder() = Builder.from(this, TemplateLoaderImpl.Empty)
     }
@@ -316,11 +235,10 @@ sealed class Context<R> {
             }
 
             private fun importContext(ctx: Context<*>) = when (ctx) {
-                Context.Companion -> MutableContext(ctx)
+                Context.Companion -> MutableContext()
                 is ReadOnlyContext<*> -> ctx.toMutableContext()
                 is MutableContext -> ctx.copy()
                 is Builder -> ctx.scope.copy()
-                is StaticContext -> ctx.toMutableContext()
 
                 else -> throw IllegalArgumentException()
             }
@@ -828,69 +746,29 @@ sealed class Context<R> {
         fun build(): Context<R> {
             return scope.build(result)
         }
-
-        override fun getImplementation(key: String): Any? {
-            return scope.getImplementation(key)
-        }
-    }
-
-    private class StaticContext(
-        private val scope: Map<String, Any?>,
-    ) : Context<Unit>() {
-        override val result: Unit
-            get() = Unit
-
-        override fun getVar(name: String): Any? {
-            if (isVarName(name) && scope.containsKey(name)) {
-                return scope.getValue(name)
-            }
-            return Undefined("undefined variable: '$name'")
-        }
-        override fun getCommandTag(key: Key.Command): CommandTag? =
-            scope[key.value]?.castImplementation()
-        override fun getControlTag(key: Key.Control): ControlTag? =
-            scope[key.value]?.castImplementation()
-        override fun getOpFunction(key: Key.Unary): UnOpFunction? =
-            scope[key.value]?.castImplementation()
-        override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? =
-            scope[key.value]?.castImplementation()
-        override fun getFunction(key: Key.Call): Function? =
-            scope[key.value]?.castImplementation()
-        override fun <T: Method> getMethod(key: Key.Apply<T>): T? {
-            @Suppress("UNCHECKED_CAST")
-            return scope[key.value]
-                ?.let { it.castImplementation<Method>() as T }
-        }
-
-        override fun getImplementation(key: String): Any? = scope[key]
-
-        fun toMutableContext(): MutableContext = MutableContext(
-            rootContext = this,
-        )
     }
 
     private class MutableContext(
-        val rootContext: Context<*>,
         scope: Map<String, Any?> = emptyMap(),
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
         filterString: FilterMethod? = null,
     ) : Context<Unit>() {
 
-        private val scope: MutableMap<String, Any?> = HashMap(scope.size)
+        private val scope: PersistentMap.Builder<String, Any?> =
+            if (scope is PersistentMap<String, Any?>) {
+                scope.builder()
+            } else {
+                val builder = persistentHashMapOf<String, Any?>().builder()
+                builder.putAll(scope)
+                builder
+            }
 
         override var filterGet: FilterMethod
         override var filterSlice: FilterMethod
         override var filterString: FilterMethod
 
         init {
-            for ((k, v) in scope) {
-                if (v is WithDependants.Mutable) {
-                    this.scope[k] = v.copy()
-                } else {
-                    this.scope[k] = v
-                }
-            }
             this.filterGet = filterGet ?: resolveFilter(FilterGet.KEY)
             this.filterSlice = filterSlice ?: resolveFilter(FilterSlice.KEY)
             this.filterString = filterString ?: resolveFilter(FilterString.KEY)
@@ -903,7 +781,7 @@ sealed class Context<R> {
             if (isVarName(name) && scope.containsKey(name)) {
                 return scope[name]
             }
-            return rootContext.getVar(name)
+            return Undefined("undefined variable: '$name'")
         }
 
         fun setVar(name: String, value: Any?) {
@@ -912,9 +790,7 @@ sealed class Context<R> {
         }
 
         override fun getCommandTag(key: Key.Command): CommandTag? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getCommandTag(key)
+            return scope[key.value]?.castImplementation()
         }
 
         fun defineCommandTag(
@@ -925,9 +801,7 @@ sealed class Context<R> {
         }
 
         override fun getControlTag(key: Key.Control): ControlTag? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getControlTag(key)
+            return scope[key.value]?.castImplementation()
         }
 
         fun defineControlTag(
@@ -938,9 +812,7 @@ sealed class Context<R> {
         }
 
         override fun getOpFunction(key: Key.Unary): UnOpFunction? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getOpFunction(key)
+            return scope[key.value]?.castImplementation()
         }
 
         fun defineOpFunction(
@@ -951,9 +823,7 @@ sealed class Context<R> {
         }
 
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getBinaryOpFunction(key)
+            return scope[key.value]?.castImplementation()
         }
 
         fun defineBinaryOpFunction(
@@ -964,9 +834,7 @@ sealed class Context<R> {
         }
 
         override fun getFunction(key: Key.Call): Function? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getFunction(key)
+            return scope[key.value]?.castImplementation()
         }
 
         fun defineFunction(
@@ -980,7 +848,6 @@ sealed class Context<R> {
             @Suppress("UNCHECKED_CAST")
             return scope[key.value]
                 ?.let { it.castImplementation<Method>() as T }
-                ?: rootContext.getMethod(key)
         }
 
         fun defineMethod(
@@ -1002,55 +869,22 @@ sealed class Context<R> {
         }
 
         fun copy(): MutableContext = MutableContext(
-            rootContext = rootContext,
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString
         )
 
-        fun <R> build(result: R): Context<R> {
-            return if (rootContext === Companion) {
-                ReadOnlyContext(
-                    rootContext = if (scope.isEmpty()) {
-                        Companion
-                    } else {
-                        StaticContext(buildScope())
-                    },
-                    scope = emptyMap(),
-                    result = result,
-                    filterGet = filterGet,
-                    filterSlice = filterSlice,
-                    filterString = filterString
-                )
-            } else {
-                ReadOnlyContext(
-                    rootContext = rootContext,
-                    scope = buildScope(),
-                    result = result,
-                    filterGet = filterGet,
-                    filterSlice = filterSlice,
-                    filterString = filterString
-                )
-            }
-        }
-
-        private fun buildScope() = buildMap(scope.size) {
-            for ((k, v) in scope) {
-                if (v is WithDependants.Mutable) {
-                    put(k, v.freeze())
-                } else {
-                    put(k, v)
-                }
-            }
-        }
-
-        public override fun getImplementation(key: String): Any? {
-            return scope[key] ?: rootContext.getImplementation(key)
-        }
+        fun <R> build(result: R): Context<R> = ReadOnlyContext(
+            scope = scope.build(),
+            result = result,
+            filterGet = filterGet,
+            filterSlice = filterSlice,
+            filterString = filterString
+        )
 
         private fun define(key: String, implementation: Any) {
-            val existing = getImplementation(key)
+            val existing = scope[key]
             val newDependencies: Set<String>
             val newImplementation: Any
             if (implementation is DependencyAware) {
@@ -1070,7 +904,7 @@ sealed class Context<R> {
                             scope[d] = newEntry
                         }
                     } else {
-                        scope[d] = WithDependants.Mutable(current, key)
+                        scope[d] = WithDependants(current, key)
                     }
                 }
                 newDependencies = dependencies
@@ -1080,15 +914,6 @@ sealed class Context<R> {
                 newImplementation = implementation
             }
             when (existing) {
-                is WithDependants.Mutable -> {
-                    updateDependencies(
-                        key,
-                        existing.implementation,
-                        newDependencies
-                    )
-                    existing.implementation = newImplementation
-                    updateDependants(existing)
-                }
                 is WithDependants -> {
                     updateDependencies(
                         key,
@@ -1096,7 +921,7 @@ sealed class Context<R> {
                         newDependencies
                     )
                     scope[key] = existing.update(newImplementation)
-                    updateDependants(existing)
+                    updateDependants(existing.dependants)
                 }
 
                 else -> {
@@ -1117,12 +942,12 @@ sealed class Context<R> {
                 )
                 for (d in oldDependencies) {
                     if (d !in newDependencies) {
-                        when (val current = getImplementation(d)) {
-                            is WithDependants.Mutable -> {
-                                current.remove(key)
-                            }
+                        when (val current = scope[d]) {
                             is WithDependants -> {
-                                scope[d] = current.remove(key)
+                                val newEntry = current.remove(key)
+                                if (newEntry !== current) {
+                                    scope[d] = newEntry
+                                }
                             }
                         }
                     }
@@ -1142,7 +967,7 @@ sealed class Context<R> {
                     error("cyclic dependency: $key")
                 }
                 visited.add(key)
-                val existing = getImplementation(key)
+                val existing = scope[key]
                 val dependencyAware: DependencyAware?
                 val withDependants: WithDependants?
                 if (existing is WithDependants) {
@@ -1166,12 +991,8 @@ sealed class Context<R> {
                 if (withDependants == null) {
                     scope[key] = withDependencies
                 } else {
-                    if (withDependants is WithDependants.Mutable) {
-                        withDependants.implementation = withDependencies
-                    } else {
-                        scope[key] = withDependants.update(withDependants)
-                    }
-                    updateDependants(withDependants, visited)
+                    scope[key] = withDependants.update(withDependencies)
+                    updateDependants(withDependants.dependants, visited)
                 }
             }
         }
@@ -1239,16 +1060,11 @@ sealed class Context<R> {
                     "cannot evaluate expressions on $this"
                 )
             }
-
-            override fun getImplementation(key: String): Any? {
-                return this@MutableContext.getImplementation(key)
-            }
         }
     }
 
     private class ReadOnlyContext<R>(
-        val rootContext: Context<*>,
-        private val scope: Map<String, Any?>,
+        private val scope: PersistentMap<String, Any?>,
         override val result: R,
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
@@ -1273,56 +1089,35 @@ sealed class Context<R> {
             if (isVarName(name) && scope.containsKey(name)) {
                 return scope[name]
             }
-            return rootContext.getVar(name)
+            return Undefined("undefined variable: '$name'")
         }
 
         override fun getCommandTag(key: Key.Command): CommandTag? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getCommandTag(key)
+            return scope[key.value]?.castImplementation()
         }
 
         override fun getControlTag(key: Key.Control): ControlTag? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getControlTag(key)
+            return scope[key.value]?.castImplementation()
         }
 
         override fun getOpFunction(key: Key.Unary): UnOpFunction? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getOpFunction(key)
+            return scope[key.value]?.castImplementation()
         }
 
         override fun getBinaryOpFunction(key: Key.Binary): BinOpFunction? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getBinaryOpFunction(key)
+            return scope[key.value]?.castImplementation()
         }
 
         override fun getFunction(key: Key.Call): Function? {
-            return scope[key.value]
-                ?.castImplementation()
-                ?: rootContext.getFunction(key)
+            return scope[key.value]?.castImplementation()
         }
 
         override fun <T: Method> getMethod(key: Key.Apply<T>): T? {
             @Suppress("UNCHECKED_CAST")
-            return scope[key.value]
-                ?.let { castImplementation<Method>() as T }
-                ?: rootContext.getMethod(key)
-        }
-
-        override fun getImplementation(key: String): Any? {
-            return if (scope.containsKey(key)) {
-                scope[key]
-            } else {
-                rootContext.getImplementation(key)
-            }
+            return scope[key.value]?.let { castImplementation<Method>() as T }
         }
 
         fun toMutableContext() = MutableContext(
-            rootContext = rootContext,
             scope = scope,
             filterGet = filterGet,
             filterSlice = filterSlice,
