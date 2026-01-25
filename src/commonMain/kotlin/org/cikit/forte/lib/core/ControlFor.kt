@@ -45,34 +45,34 @@ class ControlFor : ControlTag {
         }
         val size = finalList.size
         if (size > 0) {
-            val loop = Loop(
-                length = size,
-                index = 0,
-                nextItem = null,
-                prevItem = null
-            )
-            val outerScope = ctx.scope()
-                .setVar("loop", loop)
-                .defineMethod(Loop.KEY_CYCLE, loop)
+            var index = 0
             val listIt = finalList.iterator()
-            var lastItem = listIt.next()
+            var currentItem = listIt.next()
+            var prevItem: Any? = null
             while (true) {
                 val isLast = !listIt.hasNext()
-                if (isLast) {
-                    loop.nextItem = null
-                } else {
-                    loop.nextItem = listIt.next()
-                }
-                outerScope
+                val loop = Loop(
+                    length = size,
+                    index = index,
+                    nextItem = if (isLast) {
+                        null
+                    } else {
+                        listIt.next()
+                    },
+                    prevItem = prevItem
+                )
+                ctx
                     .scope()
-                    .setVars(*unpackList(varNames, lastItem))
+                    .setVar("loop", loop)
+                    .defineMethod(Loop.KEY_CYCLE, loop)
+                    .setVars(*unpackList(varNames, currentItem))
                     .evalNodes(template, cmd.body)
                 if (isLast) {
                     break
                 }
-                loop.prevItem = lastItem
-                lastItem = loop.nextItem
-                loop.index++
+                prevItem = currentItem
+                currentItem = loop.nextItem
+                index++
             }
         } else {
             val cmdElse = branches.getOrNull(1) ?: return
@@ -85,17 +85,47 @@ class ControlFor : ControlTag {
 
     private class Loop(
         val length: Int,
-        var index: Int,
-        var nextItem: Any?,
-        var prevItem: Any?,
+        val index: Int,
+        val nextItem: Any?,
+        val prevItem: Any?,
     ) : Method, Map<String, Any?> {
         companion object {
             val KEY_CYCLE = Key.Apply.create("cycle", Method.OPERATOR)
-            val attributes = setOf(
-                "length", "index", "index0", "revindex", "revindex0",
-                "first", "last", "depth", "depth0", "nextitem", "previtem"
+            val attributes: Map<String, (Loop) -> Any?> = mapOf(
+                "length" to Loop::length,
+                "index" to Loop::index1,
+                "index0" to Loop::index,
+                "revindex" to Loop::revIndex,
+                "revindex0" to Loop::revIndex0,
+                "first" to Loop::isFirst,
+                "last" to Loop::isLast,
+                "depth" to Loop::depth,
+                "depth0" to Loop::depth0,
+                "nextitem" to Loop::nextItem,
+                "previtem" to Loop::prevItem,
             )
         }
+
+        private val index1: Int
+            get() = index + 1
+
+        private val revIndex: Int
+            get() = length - index
+
+        private val revIndex0: Int
+            get() = length - index - 1
+
+        private val isFirst: Boolean
+            get() = index == 0
+
+        private val isLast: Boolean
+            get() = index == length - 1
+
+        private val depth: Int
+            get() = depth0 + 1
+
+        private val depth0: Int
+            get() = 0
 
         override fun invoke(subject: Any?, args: NamedArgs): Any? {
             require(subject === this) {
@@ -109,16 +139,17 @@ class ControlFor : ControlTag {
             get() = attributes.size
 
         override val keys: Set<String>
-            get() = attributes
+            get() = attributes.keys
 
         override val values: Collection<Any?>
-            get() = listOf(
-                length, index + 1, index, length - index, length - index - 1,
-                index == 0, index == length - 1, 1, 0, nextItem, prevItem
-            )
+            get() = attributes.map { (_, v) -> v(this) }
 
         override val entries: Set<Map.Entry<String, Any?>>
-            get() = attributes.associateWith { this[it] }.entries
+            get() = buildSet {
+                for ((k, v) in attributes) {
+                    add(LoopMapEntry(k, v.invoke(this@Loop)))
+                }
+            }
 
         override fun isEmpty(): Boolean = false
 
@@ -126,27 +157,32 @@ class ControlFor : ControlTag {
 
         override fun containsValue(value: Any?): Boolean = value in values
 
-        override fun get(key: String): Any? = when (key) {
-            "index" -> index + 1
-            "index0" -> index
-            "revindex" -> length - index
-            "revindex0" -> length - index - 1
-            "first" -> index == 0
-            "last" -> index == length - 1
-            "depth" -> 1
-            "depth0" -> 0
-            "nextitem" -> if (index == length - 1) {
-                Undefined("key 'nextitem' is not defined")
-            } else {
-                nextItem
-            }
-            "previtem" -> if (index == 0) {
-                Undefined("key 'previtem' is not defined")
-            } else {
-                prevItem
-            }
+        override fun get(key: String): Any? = attributes[key]?.invoke(this)
+    }
 
-            else -> null
+    private class LoopMapEntry(
+        override val key: String,
+        override val value: Any?,
+    ): Map.Entry<String, Any?> {
+
+        override fun toString(): String {
+            return "$key=$value"
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || other !is Map.Entry<*, *>) return false
+
+            if (key != other.key) return false
+            if (value != other.value) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = key.hashCode()
+            result = 31 * result + (value?.hashCode() ?: 0)
+            return result
         }
     }
 }
