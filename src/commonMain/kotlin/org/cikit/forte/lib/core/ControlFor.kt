@@ -1,7 +1,6 @@
 package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
-import org.cikit.forte.core.Context.Key
 import org.cikit.forte.parser.ParsedTemplate
 
 class ControlFor : ControlTag {
@@ -45,6 +44,8 @@ class ControlFor : ControlTag {
         }
         val size = finalList.size
         if (size > 0) {
+            val outerScope = ctx.scope()
+                .defineMethod(ApplyCycle.KEY, ApplyCycle())
             var index = 0
             val listIt = finalList.iterator()
             var currentItem = listIt.next()
@@ -61,10 +62,9 @@ class ControlFor : ControlTag {
                     },
                     prevItem = prevItem
                 )
-                ctx
+                outerScope
                     .scope()
                     .setVar("loop", loop)
-                    .defineMethod(Loop.KEY_CYCLE, loop)
                     .setVars(*unpackList(varNames, currentItem))
                     .evalNodes(template, cmd.body)
                 if (isLast) {
@@ -83,14 +83,26 @@ class ControlFor : ControlTag {
         }
     }
 
+    private class ApplyCycle : Method {
+        companion object {
+            val KEY = Context.Key.Apply.create("cycle", Method.OPERATOR)
+        }
+
+        override fun invoke(subject: Any?, args: NamedArgs): Any? {
+            require(subject is Loop) {
+                "cannot call cycle on " + typeName(subject)
+            }
+            return args.values[subject.index % args.values.size]
+        }
+    }
+
     private class Loop(
         val length: Int,
         val index: Int,
         val nextItem: Any?,
         val prevItem: Any?,
-    ) : Method, Map<String, Any?> {
+    ) : Map<String, Any?> {
         companion object {
-            val KEY_CYCLE = Key.Apply.create("cycle", Method.OPERATOR)
             val attributes: Map<String, (Loop) -> Any?> = mapOf(
                 "length" to Loop::length,
                 "index" to Loop::index1,
@@ -126,14 +138,6 @@ class ControlFor : ControlTag {
 
         private val depth0: Int
             get() = 0
-
-        override fun invoke(subject: Any?, args: NamedArgs): Any? {
-            require(subject === this) {
-                "cannot call cycle on " +
-                        typeName(subject)
-            }
-            return args.values[index % args.values.size]
-        }
 
         override val size: Int
             get() = attributes.size
