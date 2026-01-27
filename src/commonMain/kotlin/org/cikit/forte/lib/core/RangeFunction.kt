@@ -24,7 +24,11 @@ class RangeFunction : Function, BinOpFunction {
                 step = optional("step") { 1 }
             }
         }
-        return range(start, end, step)
+        return if (step == 1) {
+            range(start, end)
+        } else {
+            range(start, end, step)
+        }
     }
 
     override fun invoke(left: Any?, right: Any?): Iterable<Int> {
