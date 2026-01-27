@@ -13,11 +13,12 @@ import org.cikit.forte.parser.Expression
 
 internal class EvaluatorStateImpl : EvaluatorState {
 
-    private val stack = ArrayDeque<Any?>()
+    private var stack = arrayOfNulls<Any?>(2)
+    private var stackSize = 0
     private var ip = 0
     private var isSuspended = false
 
-    override fun isEmpty(): Boolean = stack.isEmpty()
+    override fun isEmpty(): Boolean = stackSize == 0
 
     suspend fun evalExpression(
         ctx: Context.Builder<*>,
@@ -46,7 +47,7 @@ internal class EvaluatorStateImpl : EvaluatorState {
                 expression
             }
         eval(ctx, finalExpression.operations)
-        if (stack.lastOrNull() is CharSequence) {
+        if (stack[stackSize - 1] is CharSequence) {
             if (isSuspended) {
                 throw IllegalStateException("evaluation is suspended")
             }
@@ -76,7 +77,7 @@ internal class EvaluatorStateImpl : EvaluatorState {
                 "invalid jump to $ip"
             }
             if (isSuspended) {
-                val i = stack.size - 1
+                val i = stackSize - 1
                 val value = stack[i] as UndefinedResult
                 var result = try {
                     (value.value as Suspended).eval(ctx)
@@ -107,13 +108,16 @@ internal class EvaluatorStateImpl : EvaluatorState {
         if (isSuspended) {
             throw IllegalStateException("evaluation is suspended")
         }
+        if (stack.size == stackSize) {
+            stack = stack.copyOf(stackSize * 2)
+        }
         if (value is Undefined) {
             if (value is Suspended) {
                 isSuspended = true
             }
-            stack.addLast(UndefinedResult(expression, value))
+            stack[stackSize++] = UndefinedResult(expression, value)
         } else {
-            stack.addLast(value)
+            stack[stackSize++] = value
         }
     }
 
@@ -125,9 +129,9 @@ internal class EvaluatorStateImpl : EvaluatorState {
             if (value is Suspended) {
                 isSuspended = true
             }
-            stack[stack.size - 1] = UndefinedResult(expression, value)
+            stack[stackSize - 1] = UndefinedResult(expression, value)
         } else {
-            stack[stack.size - 1] = value
+            stack[stackSize - 1] = value
         }
     }
 
@@ -135,7 +139,8 @@ internal class EvaluatorStateImpl : EvaluatorState {
         if (isSuspended) {
             throw IllegalStateException("evaluation is suspended")
         }
-        val result = stack.removeLast()
+        val result = stack[--stackSize]
+        stack[stackSize] = null
         if (result is UndefinedResult) {
             throw EvalException(result.expression, result.value.message)
         }
@@ -146,7 +151,7 @@ internal class EvaluatorStateImpl : EvaluatorState {
         if (isSuspended) {
             throw IllegalStateException("evaluation is suspended")
         }
-        val result = stack.last()
+        val result = stack[stackSize - 1]
         if (result is UndefinedResult) {
             throw EvalException(result.expression, result.value.message)
         }
@@ -157,7 +162,7 @@ internal class EvaluatorStateImpl : EvaluatorState {
         if (isSuspended) {
             throw IllegalStateException("evaluation is suspended")
         }
-        val result = stack.last()
+        val result = stack[stackSize - 1]
         if (result is UndefinedResult) {
             return result.value
         }
@@ -172,7 +177,7 @@ internal class EvaluatorStateImpl : EvaluatorState {
         if (isSuspended) {
             throw IllegalStateException("evaluation is suspended")
         }
-        var value = stack.last()
+        var value = stack[stackSize - 1]
         if (value is UndefinedResult) {
             if (implementation.isRescue) {
                 value = value.value
@@ -186,9 +191,9 @@ internal class EvaluatorStateImpl : EvaluatorState {
                 if (result is Suspended) {
                     isSuspended = true
                 }
-                stack[stack.size - 1] = UndefinedResult(expression, result)
+                stack[stackSize - 1] = UndefinedResult(expression, result)
             } else {
-                stack[stack.size - 1] = result
+                stack[stackSize - 1] = result
             }
         }
     }
