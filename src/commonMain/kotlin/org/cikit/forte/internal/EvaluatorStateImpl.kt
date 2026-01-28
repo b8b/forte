@@ -47,11 +47,7 @@ internal class EvaluatorStateImpl : EvaluatorState {
                 expression
             }
         eval(ctx, finalExpression.operations)
-        if (stack[stackSize - 1] is CharSequence) {
-            if (isSuspended) {
-                throw IllegalStateException("evaluation is suspended")
-            }
-        } else {
+        if (isSuspended || rescueLast() !is CharSequence) {
             applyFilter(expression, ctx.filterString, NamedArgs.Empty)
         }
         val result = removeLast()
