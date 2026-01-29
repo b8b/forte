@@ -219,7 +219,7 @@ sealed class Context<R> {
     }
 
     class Builder<R> private constructor(
-        scope: Map<String, Any>,
+        scope: PersistentMap<String, Any>,
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
         filterString: FilterMethod? = null,
@@ -234,6 +234,9 @@ sealed class Context<R> {
             ): Builder<Unit> {
                 return Builder(
                     scope = importContext(ctx),
+                    filterGet = ctx.filterGet,
+                    filterSlice = ctx.filterSlice,
+                    filterString = ctx.filterString,
                     resultGetter = ::noop,
                     templateLoader = templateLoader,
                     resultBuilder = ResultBuilder.Discard
@@ -254,14 +257,7 @@ sealed class Context<R> {
         override val result: R
             get() = resultGetter()
 
-        private var scope: PersistentMap.Builder<String, Any> =
-            if (scope is PersistentMap<String, Any>) {
-                scope.builder()
-            } else {
-                persistentHashMapOf<String, Any>().builder().also {
-                    it.putAll(scope)
-                }
-            }
+        private var scope: PersistentMap.Builder<String, Any> = scope.builder()
 
         override var filterGet: FilterMethod = filterGet
             ?: resolveFilter(FilterGet.KEY)
@@ -509,15 +505,24 @@ sealed class Context<R> {
                 ?.let { it.invokableValue<Method>() as T }
         }
 
-        override fun withRootScope(): Builder<R> = Builder(
-            scope = importContext(templateLoader.rootContext),
-            resultGetter = resultGetter,
-            templateLoader = templateLoader,
-            resultBuilder = resultBuilder
-        )
+        override fun withRootScope(): Builder<R> {
+            val rootContext = templateLoader.rootContext
+            return Builder(
+                scope = importContext(rootContext),
+                filterGet = rootContext.filterGet,
+                filterSlice = rootContext.filterSlice,
+                filterString = rootContext.filterString,
+                resultGetter = resultGetter,
+                templateLoader = templateLoader,
+                resultBuilder = resultBuilder
+            )
+        }
 
         override fun withScope(ctx: Context<*>): Builder<R> = Builder(
             importContext(ctx),
+            filterGet = ctx.filterGet,
+            filterSlice = ctx.filterSlice,
+            filterString = ctx.filterString,
             resultGetter = resultGetter,
             templateLoader = templateLoader,
             resultBuilder = resultBuilder
@@ -534,7 +539,7 @@ sealed class Context<R> {
         )
 
         fun discard() = Builder(
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
@@ -544,7 +549,7 @@ sealed class Context<R> {
         )
 
         fun captureTo(target: (Any?) -> Unit) = Builder(
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
@@ -554,7 +559,7 @@ sealed class Context<R> {
         )
 
         fun captureTo(flowCollector: FlowCollector<Any?>) = Builder(
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
@@ -564,7 +569,7 @@ sealed class Context<R> {
         )
 
         fun captureTo(resultBuilder: ResultBuilder) = Builder(
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
@@ -576,7 +581,7 @@ sealed class Context<R> {
         fun captureToList(): Builder<List<Any?>> {
             val listBuilder = mutableListOf<Any?>()
             return Builder(
-                scope = scope,
+                scope = scope.build(),
                 filterGet = filterGet,
                 filterSlice = filterSlice,
                 filterString = filterString,
@@ -589,7 +594,7 @@ sealed class Context<R> {
         }
 
         fun renderTo(target: Appendable) = Builder(
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
@@ -605,7 +610,7 @@ sealed class Context<R> {
         )
 
         fun renderTo(flowCollector: FlowCollector<CharSequence>) = Builder(
-            scope = scope,
+            scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
             filterString = filterString,
@@ -617,7 +622,7 @@ sealed class Context<R> {
         fun renderToString(): Builder<String> {
             val stringBuilder = StringBuilder()
             return Builder(
-                scope = scope,
+                scope = scope.build(),
                 filterGet = filterGet,
                 filterSlice = filterSlice,
                 filterString = filterString,
