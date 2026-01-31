@@ -1,5 +1,6 @@
 package org.cikit.forte.core
 
+import org.cikit.forte.lib.core.ApplyInvoke
 import org.cikit.forte.lib.core.UnaryNot
 import org.cikit.forte.parser.Expression
 
@@ -199,6 +200,7 @@ private fun compileExpressionInternal(
             operations.add(Operation.CallFunction(
                 expression,
                 Context.Key.Call(expression.name),
+                expression.name,
                 expression.args.names)
             )
             Expression.FunctionCall(
@@ -226,6 +228,18 @@ private fun compileExpressionInternal(
             when (expression.left) {
                 is Expression.Access -> {
                     val leftLeft = compileExpressionInternal(operations, expression.left.left)
+                    val methodKey = Context.Key.Apply.create(
+                        expression.left.name,
+                        Method.OPERATOR
+                    )
+                    operations.add(
+                        Operation.GetMethod(
+                            expression.left,
+                            methodKey,
+                            expression.left.name,
+                            expression.args.names
+                        )
+                    )
                     operations.add(Operation.InitArray(expression, expression.args.values.size))
                     val args = ArrayList<Expression>(expression.args.values.size)
                     var index = 0
@@ -235,8 +249,9 @@ private fun compileExpressionInternal(
                     }
                     operations.add(
                         Operation.CallMethod(
-                            expression.left,
-                            Context.Key.Apply.create(expression.left.name, Method.OPERATOR),
+                            expression,
+                            methodKey,
+                            expression.left.name,
                             expression.args.names
                         )
                     )
@@ -264,9 +279,10 @@ private fun compileExpressionInternal(
                         operations.add(Operation.AddArrayElement(arg, index++))
                     }
                     operations.add(
-                        Operation.CallMethod(
+                        Operation.CallInvoke(
                             expression,
-                            Context.Key.Apply.create("invoke", Method.OPERATOR),
+                            ApplyInvoke.KEY,
+                            "invoke",
                             expression.args.names
                         )
                     )

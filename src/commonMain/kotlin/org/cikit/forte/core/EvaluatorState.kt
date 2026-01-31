@@ -11,4 +11,5 @@ interface EvaluatorState {
     fun removeLast(): Any?
     fun last(): Any?
     fun rescueLast(): Any?
+    fun rescueAndRemoveLast(): Any?
 }

@@ -15,7 +15,7 @@ import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.Node
 import org.cikit.forte.parser.ParsedTemplate
 
-sealed class Context<R> {
+sealed class Context<R> : TemplateObject {
 
     sealed class Key(val value: String) {
         class Command(name: String): Key("$name!") {
@@ -119,6 +119,12 @@ sealed class Context<R> {
             override fun getVar(name: String): Any? = null
         }
 
+        class CallableValue(val value: Function) : Value() {
+            override fun getVar(name: String): Function {
+                return value
+            }
+        }
+
         class Invokable private constructor(
             val value: Any,
             val dependants: PersistentSet<String>
@@ -166,8 +172,6 @@ sealed class Context<R> {
 
     open val filterSlice: FilterMethod
         get() = resolveFilter(FilterSlice.KEY)
-
-    abstract fun getVar(name: String): Any?
 
     open fun getCommandTag(name: String) = getCommandTag(Key.Command(name))
     open fun getControlTag(name: String) = getControlTag(Key.Control(name))
@@ -271,7 +275,12 @@ sealed class Context<R> {
         private val evaluator = EvaluatorStateImpl()
 
         fun setVar(name: String, value: Any?): Builder<R> {
-            scope[name] = value ?: Value.Null
+            scope[name] = when (value) {
+                null -> Value.Null
+                is Function -> Value.CallableValue(value)
+
+                else -> value
+            }
             return this
         }
 

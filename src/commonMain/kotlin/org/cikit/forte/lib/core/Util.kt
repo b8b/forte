@@ -45,11 +45,12 @@ fun <R> Context.Builder<R>.defineCoreExtensions(): Context.Builder<R> {
 
     defineCommandTag("include", CommandInclude())
     defineCommandTag("from", CommandFrom())
+    defineCommandTag("import", CommandImport())
     defineControlTag("extends", ControlExtends())
     defineControlTag(ControlBlock.KEY, ControlBlock())
 
     defineMethod(FilterDefault.KEY, FilterDefault())
-    defineMethod(FilterGet.KEY, FilterGet())
+    defineMethod(FilterGet.KEY, FilterGet.Hidden)
     defineMethod(FilterSlice.KEY, FilterSlice())
     defineMethod(FilterComparable.KEY, FilterComparable())
     defineMethod(FilterNumber.KEY, FilterNumber())

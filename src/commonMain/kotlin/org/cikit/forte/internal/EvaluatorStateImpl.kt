@@ -165,6 +165,18 @@ internal class EvaluatorStateImpl : EvaluatorState {
         return result
     }
 
+    override fun rescueAndRemoveLast(): Any? {
+        if (isSuspended) {
+            throw IllegalStateException("evaluation is suspended")
+        }
+        val result = stack[--stackSize]
+        stack[stackSize] = null
+        if (result is UndefinedResult) {
+            return result.value
+        }
+        return result
+    }
+
     private fun applyFilter(
         expression: Expression,
         implementation: FilterMethod,

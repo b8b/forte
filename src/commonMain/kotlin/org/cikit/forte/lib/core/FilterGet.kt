@@ -2,7 +2,7 @@ package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
 
-class FilterGet : FilterMethod {
+sealed class FilterGet : FilterMethod {
 
     companion object {
         val KEY = Context.Key.Apply.create("get", FilterMethod.OPERATOR)
@@ -12,13 +12,7 @@ class FilterGet : FilterMethod {
     override val isRescue: Boolean
         get() = true
 
-    override val isHidden: Boolean
-        get() = true
-
     override fun invoke(subject: Any?, args: NamedArgs): Any? {
-        if (subject is Undefined) {
-            return subject
-        }
         val key: Any?
         if (args.names === singleArg && args.values.size == 1) {
             key = args.values[0]
@@ -26,6 +20,14 @@ class FilterGet : FilterMethod {
             args.use { key = requireAny("key") }
         }
         return when (subject) {
+            is Undefined -> subject
+            is TemplateObject -> when (key) {
+                is CharSequence -> subject.getVar(key.concatToString())
+
+                else -> Undefined(
+                    "invalid key '$key' of type '${typeName(key)}' for " +
+                        " TemplateObject of type '${typeName(subject)}'")
+            }
             is Map<*, *> -> {
                 if (!subject.containsKey(key)) {
                     Undefined("key '$key' of type '${typeName(key)}' " +
@@ -65,5 +67,10 @@ class FilterGet : FilterMethod {
                         "key '$key' of type '${typeName(key)}'"
             )
         }
+    }
+
+    object Hidden : FilterGet() {
+        override val isHidden: Boolean
+            get() = true
     }
 }

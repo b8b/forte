@@ -51,7 +51,7 @@ import org.cikit.forte.parser.Declarations
 // * `**` (pow)    parsed right associative (use strict jinja compat to revert)
 
 fun <R> Context.Builder<R>.defineJinjaExtensions(): Context.Builder<R> {
-    defineMethod("attr", FilterAttr(this))
+    defineMethod("attr", FilterAttr())
 
     defineMethod("escaped", IsEscapedTest())
     defineMethod("even", IsEvenTest(this))

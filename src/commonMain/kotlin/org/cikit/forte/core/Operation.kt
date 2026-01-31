@@ -207,6 +207,7 @@ sealed class Operation {
     class CallFunction(
         override val expression: Expression.FunctionCall,
         val key: Context.Key.Call,
+        val name: String,
         val argNames: List<String>,
         val allowHidden: Boolean = false
     ) : Operation() {
@@ -215,11 +216,18 @@ sealed class Operation {
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            val function = ctx.getFunction(key)
-                ?: throw EvalException(
+            val function = when (val callable = ctx.getVar(name)) {
+                is Undefined -> ctx.getFunction(key) ?: throw EvalException(
                     expression,
                     "function '$key' not defined"
                 )
+                is Function -> callable
+
+                else -> throw EvalException(
+                    expression, "var '$name' " +
+                            "of type '${typeName(callable)}' is not callable"
+                )
+            }
             if (!allowHidden && function.isHidden) {
                 throw EvalException(
                     expression,
@@ -238,32 +246,125 @@ sealed class Operation {
         }
     }
 
-    class CallMethod(
+    class GetMethod(
         override val expression: Expression,
-        val method: Context.Key.Apply<*>,
+        val methodKey: Context.Key.Apply<*>,
+        val methodName: String,
         val argNames: List<String>,
         val allowHidden: Boolean = false
     ) : Operation() {
         override fun toString(): String {
-            return "CallMethod($method)"
+            return "GetMethod($methodName)"
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            val function: Method = ctx.getMethod(method)
-                ?: throw EvalException(
-                    expression,
-                    "method '$method' not defined"
-                )
-            if (!allowHidden && function.isHidden) {
-                throw EvalException(
-                    expression,
-                    "method '$method' is hidden"
-                )
+            val value = state.rescueLast()
+            val filterGet = ctx.filterGet
+            if (filterGet.isRescue || value !is Undefined) {
+                val getArgs = NamedArgs(listOf(methodName), FilterGet.singleArg)
+                val result = filterGet(value, getArgs)
+                state.addLast(expression, result)
+            } else {
+                // value is Undefined and |get() cannot rescue it
+                // -> simply put the Undefined value as resolved method
+                state.addLast(expression, value)
             }
+        }
+    }
+
+    class CallMethod(
+        override val expression: Expression,
+        val methodKey: Context.Key.Apply<*>,
+        val methodName: String,
+        val argNames: List<String>,
+        val allowHidden: Boolean = false
+    ) : Operation() {
+        override fun toString(): String {
+            return "CallMethod($methodName)"
+        }
+
+        override fun invoke(ctx: Context<*>, state: EvaluatorState) {
             val args = NamedArgs(
                 (state.removeLast() as Array<*>).toList(),
                 argNames
             )
+            when (val resolvedFunction = state.rescueAndRemoveLast()) {
+                is Function -> {
+                    val subject = state.last()
+                    if (!allowHidden && resolvedFunction.isHidden) {
+                        throw EvalException(
+                            expression,
+                            "method '$methodName' is hidden"
+                        )
+                    }
+                    val result = try {
+                        resolvedFunction.invoke(args)
+                    } catch (ex: EvalException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        throw EvalException(expression, ex.toString(), ex)
+                    }
+                    if (result !== subject) {
+                        state.setLast(expression, result)
+                    }
+                }
+                is Undefined -> {
+                    val function = ctx.getMethod(methodKey)
+                        ?: throw EvalException(
+                            expression,
+                            "method '$methodName' not defined"
+                        )
+                    val subject = if (function.isRescue) {
+                        state.rescueLast()
+                    } else {
+                        state.last()
+                    }
+                    if (!allowHidden && function.isHidden) {
+                        throw EvalException(
+                            expression,
+                            "method '$methodName' is hidden"
+                        )
+                    }
+                    val result = try {
+                        function.invoke(subject, args)
+                    } catch (ex: EvalException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        throw EvalException(expression, ex.toString(), ex)
+                    }
+                    if (result !== subject) {
+                        state.setLast(expression, result)
+                    }
+                }
+
+                else -> throw EvalException(
+                    expression, "operand of type " +
+                            "'${typeName(resolvedFunction)}' is not callable"
+                )
+            }
+        }
+    }
+
+    class CallInvoke(
+        override val expression: Expression,
+        val methodKey: Context.Key.Apply<*>,
+        val methodName: String,
+        val argNames: List<String>
+     ) : Operation() {
+        override fun toString(): String {
+            return "CallInvoke()"
+        }
+
+        override fun invoke(ctx: Context<*>, state: EvaluatorState) {
+            val args = NamedArgs(
+                (state.removeLast() as Array<*>).toList(),
+                argNames
+            )
+            val function = ctx.getMethod(methodKey)
+                ?: throw EvalException(
+                    expression,
+                    "method '$methodName' not defined"
+                )
             val subject = if (function.isRescue) {
                 state.rescueLast()
             } else {

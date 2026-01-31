@@ -19,11 +19,11 @@ class CommandFrom : CommandTag {
             .evalExpression(args.getValue("functionName")) as String
         val path = UPath(file.concatToString(), DecodeUrlPath)
         ctx.importTemplate(listOf(path), template.path) { _, importedTemplate ->
-            val exportedFunction = importedTemplate.getFunction(functionName)
+            val exportedFunction = importedTemplate.getVar(functionName)
             require(exportedFunction != null) {
                 "function $functionName not defined in $file"
             }
-            ctx.defineFunction(functionName, exportedFunction)
+            ctx.setVar(functionName, exportedFunction)
         }
     }
 }

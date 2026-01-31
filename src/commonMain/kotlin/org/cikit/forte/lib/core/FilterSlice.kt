@@ -18,8 +18,8 @@ class FilterSlice : FilterMethod {
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         return when (subject) {
             is CharSequence -> sliceString(subject, args)
-            is Char -> sliceString(subject.toString(), args)
             is List<*> -> sliceList(subject, args)
+            is Char -> sliceString(subject.toString(), args)
 
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"

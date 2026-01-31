@@ -32,7 +32,7 @@ class ControlMacro : ControlTag {
 
         val defCtx = ctx.build()
 
-        ctx.defineFunction(
+        ctx.setVar(
             functionName,
             MacroFunction(
                 defCtx,

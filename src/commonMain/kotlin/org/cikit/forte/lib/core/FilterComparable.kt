@@ -86,13 +86,12 @@ class FilterComparable(
         originalValue: Any? = subject,
         ignoreCase: Boolean = false
     ): ComparableValue? {
-        val subject = if (subject is NumericValue) {
-            subject.value
-        } else {
-            subject
-        }
         return when (subject) {
             null -> null
+            is ComparableValue -> subject
+            is NumericValue -> subject.value?.let { value ->
+                types[value::class]?.invoke(originalValue, value, ignoreCase)
+            }
             is CharSequence -> StringComparableValue(
                 originalValue,
                 subject.concatToString(),

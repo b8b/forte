@@ -1,6 +1,12 @@
 package org.cikit.forte.lib.core
 
-import org.cikit.forte.core.*
+import org.cikit.forte.core.Branch
+import org.cikit.forte.core.Context
+import org.cikit.forte.core.ControlTag
+import org.cikit.forte.core.Function
+import org.cikit.forte.core.NamedArgs
+import org.cikit.forte.core.TemplateObject
+import org.cikit.forte.core.typeName
 import org.cikit.forte.parser.ParsedTemplate
 
 class ControlFor : ControlTag {
@@ -17,8 +23,8 @@ class ControlFor : ControlTag {
         val varNames = ctx.evalExpression(varNamesExpr) as List<*>
         val list = ctx.evalExpression(listValue)
         if (recursive != null &&
-            ctx.evalExpression(recursive) == true)
-        {
+            ctx.evalExpression(recursive) == true
+        ) {
             throw IllegalArgumentException(
                 "recursive in for loop is not implemented"
             )
@@ -31,6 +37,7 @@ class ControlFor : ControlTag {
                             "expected 'Iterable<*>'"
                 )
             }
+
             condition != null -> {
                 val scope = ctx.scope()
                 list.filter { item ->
@@ -39,13 +46,12 @@ class ControlFor : ControlTag {
                         .evalExpression(condition) == true
                 }
             }
+
             list is Collection<*> -> list
             else -> list.toList()
         }
         val size = finalList.size
         if (size > 0) {
-            val outerScope = ctx.scope()
-                .defineMethod(ApplyCycle.KEY, ApplyCycle())
             var index = 0
             val listIt = finalList.iterator()
             var currentItem = listIt.next()
@@ -62,7 +68,7 @@ class ControlFor : ControlTag {
                     },
                     prevItem = prevItem
                 )
-                outerScope
+                ctx
                     .scope()
                     .setVar("loop", loop)
                     .setVars(*unpackList(varNames, currentItem))
@@ -83,25 +89,12 @@ class ControlFor : ControlTag {
         }
     }
 
-    private class ApplyCycle : Method {
-        companion object {
-            val KEY = Context.Key.Apply.create("cycle", Method.OPERATOR)
-        }
-
-        override fun invoke(subject: Any?, args: NamedArgs): Any? {
-            require(subject is Loop) {
-                "cannot call cycle on " + typeName(subject)
-            }
-            return args.values[subject.index % args.values.size]
-        }
-    }
-
     private class Loop(
         val length: Int,
         val index: Int,
         val nextItem: Any?,
         val prevItem: Any?,
-    ) : Map<String, Any?> {
+    ) : TemplateObject {
         companion object {
             val attributes: Map<String, (Loop) -> Any?> = mapOf(
                 "length" to Loop::length,
@@ -115,6 +108,7 @@ class ControlFor : ControlTag {
                 "depth0" to Loop::depth0,
                 "nextitem" to Loop::nextItem,
                 "previtem" to Loop::prevItem,
+                "cycle" to Loop::cycle
             )
         }
 
@@ -139,54 +133,18 @@ class ControlFor : ControlTag {
         private val depth0: Int
             get() = 0
 
-        override val size: Int
-            get() = attributes.size
+        private val cycle by lazy(::CycleFunction)
 
-        override val keys: Set<String>
-            get() = attributes.keys
+        override fun getVar(name: String): Any? = attributes[name]?.invoke(this)
 
-        override val values: Collection<Any?>
-            get() = attributes.map { (_, v) -> v(this) }
-
-        override val entries: Set<Map.Entry<String, Any?>>
-            get() = buildSet {
-                for ((k, v) in attributes) {
-                    add(LoopMapEntry(k, v.invoke(this@Loop)))
+        private inner class CycleFunction : Function {
+            override fun invoke(args: NamedArgs): Any? {
+                val size = args.values.size
+                require(size > 0) {
+                    "missing required arg(s)"
                 }
+                return args.values[this@Loop.index % size]
             }
-
-        override fun isEmpty(): Boolean = false
-
-        override fun containsKey(key: String): Boolean = key in attributes
-
-        override fun containsValue(value: Any?): Boolean = value in values
-
-        override fun get(key: String): Any? = attributes[key]?.invoke(this)
-    }
-
-    private class LoopMapEntry(
-        override val key: String,
-        override val value: Any?,
-    ): Map.Entry<String, Any?> {
-
-        override fun toString(): String {
-            return "$key=$value"
-        }
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other == null || other !is Map.Entry<*, *>) return false
-
-            if (key != other.key) return false
-            if (value != other.value) return false
-
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = key.hashCode()
-            result = 31 * result + (value?.hashCode() ?: 0)
-            return result
         }
     }
 }
