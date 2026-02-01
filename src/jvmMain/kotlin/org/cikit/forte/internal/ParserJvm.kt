@@ -5,6 +5,5 @@ import java.math.BigInteger
 
 actual fun parseInt(input: CharSequence): Number {
     val inputStr = input.concatToString()
-    return inputStr.toIntOrNull()
-        ?: BigInteger(inputStr)
+    return inputStr.toIntOrNull() ?: BigInteger(inputStr)
 }

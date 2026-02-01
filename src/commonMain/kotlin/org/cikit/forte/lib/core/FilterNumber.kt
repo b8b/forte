@@ -5,30 +5,30 @@ import kotlin.math.pow
 import kotlin.reflect.KClass
 
 class FilterNumber(
-    val types: Map<KClass<*>, (Any?, Any) -> NumericValue> = hashMapOf(
-        Byte::class to { orig, value ->
+    val types: Map<KClass<*>, (Any) -> NumericValue> = hashMapOf(
+        Byte::class to { value ->
             value as Byte
-            IntNumericValue(orig, value.toInt())
+            IntNumericValue(value.toInt())
         },
-        Short::class to { orig, value ->
+        Short::class to { value ->
             value as Short
-            IntNumericValue(orig, value.toInt())
+            IntNumericValue(value.toInt())
         },
-        Int::class to { orig, value ->
+        Int::class to { value ->
             value as Int
-            IntNumericValue(orig, value)
+            IntNumericValue(value)
         },
-        Long::class to { orig, value ->
+        Long::class to { value ->
             value as Long
-            LongNumericValue(orig, value)
+            LongNumericValue(value)
         },
-        Float::class to { orig, value ->
+        Float::class to { value ->
             value as Float
-            FloatNumericValue(orig, value.toDouble())
+            FloatNumericValue(value.toDouble())
         },
-        Double::class to { orig, value ->
+        Double::class to { value ->
             value as Double
-            FloatNumericValue(orig, value)
+            FloatNumericValue(value)
         },
     )
 ) : FilterMethod {
@@ -50,17 +50,16 @@ class FilterNumber(
         return when (subject) {
             null -> null
             is NumericValue -> subject
-            else -> types[subject::class]?.invoke(
-                subject,
-                subject,
-            )
+            else -> types[subject::class]?.invoke(subject)
         } ?: error("operand of type ${typeName(subject)} is not a number")
     }
 
     private class IntNumericValue(
-        override val value: Any?,
-        val converted: Int
+        val value: Int
     ): Number(), NumericValue {
+
+        override val result: Int
+            get() = value
 
         override val isInt: Boolean
             get() = true
@@ -73,20 +72,18 @@ class FilterNumber(
 
         override fun plus(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted + other.converted
-                //FIXME check for overflow
-                IntNumericValue(newValue, newValue)
+                val newValue = value + other.value
+                IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted + other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value.toLong() + other.value
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = other.converted.plus(converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() + other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -97,20 +94,18 @@ class FilterNumber(
 
         override fun minus(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted - other.converted
-                //FIXME check for overflow
-                IntNumericValue(newValue, newValue)
+                val newValue = value - other.value
+                IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.toLong() - other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value.toLong() - other.value
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble() - other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() - other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -121,20 +116,18 @@ class FilterNumber(
 
         override fun mul(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted * other.converted
-                //FIXME check for overflow
-                IntNumericValue(newValue, newValue)
+                val newValue = value * other.value
+                IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.toLong() * other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value.toLong() * other.value
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted * other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() * other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -145,30 +138,30 @@ class FilterNumber(
 
         override fun div(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted / other.converted
-                if (newValue * other.converted == converted) {
-                    IntNumericValue(newValue, newValue)
+                val newValue = value / other.value
+                if (newValue * other.value == value) {
+                    IntNumericValue(newValue)
                 } else {
-                    val newFloat = converted.toDouble() / other.converted
-                    FloatNumericValue(newFloat, newFloat)
+                    val newFloat = value.toDouble() / other.value
+                    FloatNumericValue(newFloat)
                 }
             }
 
             is LongNumericValue -> {
-                val big = converted.toLong()
-                val newValue = big.div(other.converted)
-                if (newValue * other.converted == big) {
-                    LongNumericValue(newValue, newValue)
+                val big = value.toLong()
+                val newValue = big / other.value
+                if (newValue * other.value == big) {
+                    LongNumericValue(newValue)
                 } else {
-                    val newFloat = converted.toDouble() /
-                            other.converted.toDouble()
-                    FloatNumericValue(newFloat, newFloat)
+                    val newFloat = value.toDouble() /
+                            other.value.toDouble()
+                    FloatNumericValue(newFloat)
                 }
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble() / other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() / other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -179,14 +172,13 @@ class FilterNumber(
 
         override fun tdiv(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted / other.converted
-                return IntNumericValue(newValue, newValue)
+                val newValue = value / other.value
+                return IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val big = converted.toLong()
-                val newValue = big.div(other.converted)
-                return LongNumericValue(newValue, newValue)
+                val newValue = value.toLong() / other.value
+                return LongNumericValue(newValue)
             }
 
             else -> error(
@@ -197,18 +189,18 @@ class FilterNumber(
 
         override fun rem(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted.rem(other.converted)
-                IntNumericValue(newValue, newValue)
+                val newValue = value.rem(other.value)
+                IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.rem(other.converted)
-                LongNumericValue(newValue, newValue)
+                val newValue = value.toLong().rem(other.value)
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.rem(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble().rem(other.value)
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -217,22 +209,22 @@ class FilterNumber(
             )
         }
 
-        override fun pow(other: NumericValue): NumericValue = when (other){
+        override fun pow(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted.toDouble().pow(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble().pow(other.value).toInt()
+                IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.toDouble().pow(
-                    other.converted.toDouble()
-                )
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble()
+                    .pow(other.value.toDouble())
+                    .toLong()
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble().pow(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble().pow(other.value)
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -241,25 +233,29 @@ class FilterNumber(
             )
         }
 
+        override fun toComparableValue(originalValue: Any?): ComparableValue {
+            return FilterComparable.FloatComparableValue(this, value.toDouble())
+        }
+
         override fun toIntValue(): NumericValue = this
 
         override fun toFloatValue(): NumericValue {
-            return FloatNumericValue(value, converted.toDouble())
+            return FloatNumericValue(value.toDouble())
         }
 
-        override fun toStringValue(): CharSequence = converted.toString()
+        override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toDouble(): Double = converted.toDouble()
+        override fun toDouble(): Double = value.toDouble()
 
-        override fun toFloat(): Float = converted.toFloat()
+        override fun toFloat(): Float = value.toFloat()
 
-        override fun toLong(): Long = converted.toLong()
+        override fun toLong(): Long = value.toLong()
 
-        override fun toInt(): Int = converted
+        override fun toInt(): Int = value
 
-        override fun toShort(): Short = converted.toShort()
+        override fun toShort(): Short = value.toShort()
 
-        override fun toByte(): Byte = converted.toByte()
+        override fun toByte(): Byte = value.toByte()
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -267,22 +263,24 @@ class FilterNumber(
 
             other as IntNumericValue
 
-            return converted == other.converted
+            return value == other.value
         }
 
         override fun hashCode(): Int {
-            return converted
+            return value
         }
 
         override fun toString(): String {
-            return "IntNumericValue($converted)"
+            return "IntNumericValue($value)"
         }
     }
 
     private class LongNumericValue(
-        override val value: Any?,
-        val converted: Long
+        val value: Long
     ): Number(), NumericValue {
+
+        override val result: Long
+            get() = value
 
         override val isInt: Boolean
             get() = true
@@ -295,20 +293,18 @@ class FilterNumber(
 
         override fun plus(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted + other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value + other.value.toLong()
+                LongNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted + other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value + other.value
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = other.converted.plus(converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() + other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -319,20 +315,18 @@ class FilterNumber(
 
         override fun minus(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted - other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value - other.value.toLong()
+                LongNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted - other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value - other.value
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble() - other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() - other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -343,20 +337,18 @@ class FilterNumber(
 
         override fun mul(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted * other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value * other.value.toLong()
+                LongNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted * other.converted
-                //FIXME check for overflow
-                LongNumericValue(newValue, newValue)
+                val newValue = value * other.value
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble() * other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() * other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -367,30 +359,30 @@ class FilterNumber(
 
         override fun div(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val otherBig = other.converted.toLong()
-                val newValue = converted / otherBig
-                if (newValue * otherBig == converted) {
-                    LongNumericValue(newValue, newValue)
+                val otherBig = other.value.toLong()
+                val newValue = value / otherBig
+                if (newValue * otherBig == value) {
+                    LongNumericValue(newValue)
                 } else {
-                    val newFloat = converted.toDouble() / other.converted
-                    FloatNumericValue(newFloat, newFloat)
+                    val newFloat = value.toDouble() / other.value
+                    FloatNumericValue(newFloat)
                 }
             }
 
             is LongNumericValue -> {
-                val newValue = converted / other.converted
-                if (newValue * other.converted == converted) {
-                    LongNumericValue(newValue, newValue)
+                val newValue = value / other.value
+                if (newValue * other.value == value) {
+                    LongNumericValue(newValue)
                 } else {
-                    val newFloat = converted.toDouble() /
-                            other.converted.toDouble()
-                    FloatNumericValue(newFloat, newFloat)
+                    val newFloat = value.toDouble() /
+                            other.value.toDouble()
+                    FloatNumericValue(newFloat)
                 }
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble() / other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble() / other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -401,13 +393,13 @@ class FilterNumber(
 
         override fun tdiv(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted / other.converted
-                return LongNumericValue(newValue, newValue)
+                val newValue = value / other.value.toLong()
+                return LongNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted / other.converted
-                return LongNumericValue(newValue, newValue)
+                val newValue = value / other.value
+                return LongNumericValue(newValue)
             }
 
             else -> error(
@@ -418,18 +410,18 @@ class FilterNumber(
 
         override fun rem(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted.rem(other.converted)
-                LongNumericValue(newValue, newValue)
+                val newValue = value.rem(other.value.toLong())
+                LongNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.rem(other.converted)
-                LongNumericValue(newValue, newValue)
+                val newValue = value.rem(other.value)
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.rem(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble().rem(other.value)
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -440,20 +432,20 @@ class FilterNumber(
 
         override fun pow(other: NumericValue): NumericValue = when (other){
             is IntNumericValue -> {
-                val newValue = converted.toDouble().pow(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble().pow(other.value).toInt()
+                IntNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.toDouble().pow(
-                    other.converted.toDouble()
-                )
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble()
+                    .pow(other.value.toDouble())
+                    .toLong()
+                LongNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.toDouble().pow(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.toDouble().pow(other.value)
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -462,25 +454,29 @@ class FilterNumber(
             )
         }
 
+        override fun toComparableValue(originalValue: Any?): ComparableValue {
+            return FilterComparable.LongComparableValue(this, value)
+        }
+
         override fun toIntValue(): NumericValue = this
 
         override fun toFloatValue(): NumericValue {
-            return FloatNumericValue(value, converted.toDouble())
+            return FloatNumericValue(value.toDouble())
         }
 
-        override fun toStringValue(): CharSequence = converted.toString()
+        override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toDouble(): Double = converted.toDouble()
+        override fun toDouble(): Double = value.toDouble()
 
-        override fun toFloat(): Float = converted.toFloat()
+        override fun toFloat(): Float = value.toFloat()
 
-        override fun toLong(): Long = converted
+        override fun toLong(): Long = value
 
-        override fun toInt(): Int = converted.toInt()
+        override fun toInt(): Int = value.toInt()
 
-        override fun toShort(): Short = converted.toInt().toShort()
+        override fun toShort(): Short = value.toInt().toShort()
 
-        override fun toByte(): Byte = converted.toInt().toByte()
+        override fun toByte(): Byte = value.toInt().toByte()
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -488,22 +484,24 @@ class FilterNumber(
 
             other as LongNumericValue
 
-            return converted == other.converted
+            return value == other.value
         }
 
         override fun hashCode(): Int {
-            return converted.hashCode()
+            return value.hashCode()
         }
 
         override fun toString(): String {
-            return "LongNumericValue($converted)"
+            return "LongNumericValue($value)"
         }
     }
 
     private class FloatNumericValue(
-        override val value: Any?,
-        val converted: Double
+        val value: Double
     ): Number(), NumericValue {
+
+        override val result: Double
+            get() = value
 
         override val isInt: Boolean
             get() = false
@@ -512,22 +510,22 @@ class FilterNumber(
             get() = true
 
         override val hasDecimalPart: Boolean
-            get() = converted % 1 != 0.0
+            get() = value % 1 != 0.0
 
         override fun plus(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted + other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value + other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted + other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value + other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted + other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value + other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -538,18 +536,18 @@ class FilterNumber(
 
         override fun minus(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted - other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value - other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted - other.converted.toDouble()
-                FloatNumericValue(newValue, newValue)
+                val newValue = value - other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted - other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value - other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -560,18 +558,18 @@ class FilterNumber(
 
         override fun mul(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted * other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value * other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted * other.converted.toDouble()
-                FloatNumericValue(newValue, newValue)
+                val newValue = value * other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = other.converted * converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = other.value * value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -582,18 +580,18 @@ class FilterNumber(
 
         override fun div(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted / other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value / other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newFloat = converted / other.converted.toDouble()
-                FloatNumericValue(newFloat, newFloat)
+                val newFloat = value / other.value.toDouble()
+                FloatNumericValue(newFloat)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted / other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value / other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -611,18 +609,18 @@ class FilterNumber(
 
         override fun rem(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted % other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value % other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted % other.converted.toDouble()
-                FloatNumericValue(newValue, newValue)
+                val newValue = value % other.value.toDouble()
+                FloatNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted % other.converted
-                FloatNumericValue(newValue, newValue)
+                val newValue = value % other.value
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -633,18 +631,18 @@ class FilterNumber(
 
         override fun pow(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
-                val newValue = converted.pow(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.pow(other.value.toDouble())
+                FloatNumericValue(newValue)
             }
 
             is LongNumericValue -> {
-                val newValue = converted.pow(other.converted.toDouble())
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.pow(other.value.toDouble())
+                FloatNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = converted.pow(other.converted)
-                FloatNumericValue(newValue, newValue)
+                val newValue = value.pow(other.value)
+                FloatNumericValue(newValue)
             }
 
             else -> error(
@@ -653,25 +651,29 @@ class FilterNumber(
             )
         }
 
+        override fun toComparableValue(originalValue: Any?): ComparableValue {
+            return FilterComparable.FloatComparableValue(this, value)
+        }
+
         override fun toIntValue(): NumericValue {
-            return LongNumericValue(value, converted.toLong())
+            return LongNumericValue(value.toLong())
         }
 
         override fun toFloatValue(): NumericValue = this
 
-        override fun toStringValue(): CharSequence = converted.toString()
+        override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toDouble(): Double = converted
+        override fun toDouble(): Double = value
 
-        override fun toFloat(): Float = converted.toFloat()
+        override fun toFloat(): Float = value.toFloat()
 
-        override fun toLong(): Long = converted.toLong()
+        override fun toLong(): Long = value.toLong()
 
-        override fun toInt(): Int = converted.toInt()
+        override fun toInt(): Int = value.toInt()
 
-        override fun toShort(): Short = converted.toInt().toShort()
+        override fun toShort(): Short = value.toInt().toShort()
 
-        override fun toByte(): Byte = converted.toInt().toByte()
+        override fun toByte(): Byte = value.toInt().toByte()
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -679,15 +681,15 @@ class FilterNumber(
 
             other as FloatNumericValue
 
-            return converted == other.converted
+            return value == other.value
         }
 
         override fun hashCode(): Int {
-            return converted.hashCode()
+            return value.hashCode()
         }
 
         override fun toString(): String {
-            return "FloatNumericValue($converted)"
+            return "FloatNumericValue($value)"
         }
     }
 }

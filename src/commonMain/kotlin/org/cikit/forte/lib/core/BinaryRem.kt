@@ -20,6 +20,6 @@ class BinaryRem private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).rem(number(right)).value
+        return number(left).rem(number(right)).result
     }
 }

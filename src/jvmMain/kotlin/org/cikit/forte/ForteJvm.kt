@@ -5,7 +5,9 @@ import org.cikit.forte.core.Context
 import org.cikit.forte.core.NumericValue
 import org.cikit.forte.lib.core.FilterComparable
 import org.cikit.forte.lib.core.FilterNumber
+import org.cikit.forte.lib.jvm.BigComparableValue
 import org.cikit.forte.lib.jvm.BigNumericValue
+import org.cikit.forte.lib.jvm.FloatComparableValue
 import org.cikit.forte.lib.jvm.FloatNumericValue
 import org.cikit.forte.lib.jvm.IntNumericValue
 import java.math.BigInteger
@@ -22,37 +24,37 @@ actual fun <R>
                 (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
         Byte::class to { orig, value, _: Boolean ->
             value as Byte
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Short::class to { orig, value, _: Boolean ->
             value as Short
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Int::class to { orig, value, _: Boolean ->
             value as Int
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Long::class to { orig, value, _: Boolean ->
             value as Long
             if (value == 0L ||
                 64 - value.absoluteValue.countLeadingZeroBits() <= 53)
             {
-                FloatNumericValue(orig, value.toDouble())
+                FloatComparableValue(orig, value.toDouble())
             } else {
-                BigNumericValue(orig, BigInteger.valueOf(value))
+                BigComparableValue(orig, BigInteger.valueOf(value))
             }
         },
         Float::class to { orig, value, _: Boolean ->
             value as Float
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Double::class to { orig, value, _: Boolean ->
             value as Double
-            FloatNumericValue(orig, value)
+            FloatComparableValue(orig, value)
         },
         BigInteger::class to { orig, value, _: Boolean ->
             value as BigInteger
-            BigNumericValue(orig, value)
+            BigComparableValue(orig, value)
         },
     )
     defineMethod(
@@ -60,34 +62,34 @@ actual fun <R>
         FilterComparable(comparableTypes + jvmComparableTypes)
     )
     val jvmNumericTypes: Map<KClass<*>,
-                (Any?, Any) -> NumericValue> = hashMapOf(
-        Byte::class to { orig, value ->
+                (Any) -> NumericValue> = hashMapOf(
+        Byte::class to { value ->
             value as Byte
-            IntNumericValue(orig, value.toInt())
+            IntNumericValue(value.toInt())
         },
-        Short::class to { orig, value ->
+        Short::class to { value ->
             value as Short
-            IntNumericValue(orig, value.toInt())
+            IntNumericValue(value.toInt())
         },
-        Int::class to { orig, value ->
+        Int::class to { value ->
             value as Int
-            IntNumericValue(orig, value)
+            IntNumericValue(value)
         },
-        Long::class to { orig, value ->
+        Long::class to { value ->
             value as Long
-            BigNumericValue(orig, BigInteger.valueOf(value))
+            BigNumericValue(BigInteger.valueOf(value))
         },
-        Float::class to { orig, value ->
+        Float::class to { value ->
             value as Float
-            FloatNumericValue(orig, value.toDouble())
+            FloatNumericValue(value.toDouble())
         },
-        Double::class to { orig, value ->
+        Double::class to { value ->
             value as Double
-            FloatNumericValue(orig, value)
+            FloatNumericValue(value)
         },
-        BigInteger::class to { orig, value ->
+        BigInteger::class to { value ->
             value as BigInteger
-            BigNumericValue(orig, value)
+            BigNumericValue(value)
         },
     )
     defineMethod(

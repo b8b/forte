@@ -20,7 +20,7 @@ class BinaryPlus private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).plus(number(right)).value
+        return number(left).plus(number(right)).result
     }
 }
 

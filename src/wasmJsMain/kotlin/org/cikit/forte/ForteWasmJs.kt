@@ -8,6 +8,7 @@ import org.cikit.forte.lib.core.FilterComparable
 import org.cikit.forte.lib.core.FilterNumber
 import org.cikit.forte.lib.wasmjs.BigComparableValue
 import org.cikit.forte.lib.wasmjs.BigNumericValue
+import org.cikit.forte.lib.wasmjs.FloatComparableValue
 import org.cikit.forte.lib.wasmjs.FloatNumericValue
 import org.cikit.forte.lib.wasmjs.IntNumericValue
 import kotlin.math.absoluteValue
@@ -23,40 +24,36 @@ actual fun <R>
                 (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
         Byte::class to { orig, value, _: Boolean ->
             value as Byte
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Short::class to { orig, value, _: Boolean ->
             value as Short
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Int::class to { orig, value, _: Boolean ->
             value as Int
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Long::class to { orig, value, _: Boolean ->
             value as Long
             if (value == 0L ||
                 64 - value.absoluteValue.countLeadingZeroBits() <= 53)
             {
-                FloatNumericValue(orig, value.toDouble())
+                FloatComparableValue(orig, value.toDouble())
             } else {
                 BigComparableValue(orig, BigInteger.fromLong(value))
             }
         },
         Float::class to { orig, value, _: Boolean ->
             value as Float
-            FloatNumericValue(orig, value.toDouble())
+            FloatComparableValue(orig, value.toDouble())
         },
         Double::class to { orig, value, _: Boolean ->
             value as Double
-            FloatNumericValue(orig, value)
+            FloatComparableValue(orig, value)
         },
         BigInteger::class to { orig, value, _: Boolean ->
             BigComparableValue(orig, value as BigInteger)
-        },
-        BigNumericValue::class to { orig, value, _: Boolean ->
-            value as BigNumericValue
-            BigComparableValue(orig, value.converted)
         },
     )
     defineMethod(
@@ -64,33 +61,34 @@ actual fun <R>
         FilterComparable(comparableTypes + wasmJsComparableTypes)
     )
     val wasmJsNumericTypes: Map<KClass<*>,
-                (Any?, Any) -> NumericValue> = hashMapOf(
-        Byte::class to { orig, value ->
+                (Any) -> NumericValue> = hashMapOf(
+        Byte::class to { value ->
             value as Byte
-            IntNumericValue(orig, value.toInt())
+            IntNumericValue(value.toInt())
         },
-        Short::class to { orig, value ->
+        Short::class to { value ->
             value as Short
-            IntNumericValue(orig, value.toInt())
+            IntNumericValue(value.toInt())
         },
-        Int::class to { orig, value ->
+        Int::class to { value ->
             value as Int
-            IntNumericValue(orig, value)
+            IntNumericValue(value)
         },
-        Long::class to { _, value ->
+        Long::class to { value ->
             value as Long
             BigNumericValue(BigInteger.fromLong(value))
         },
-        Float::class to { orig, value ->
+        Float::class to { value ->
             value as Float
-            FloatNumericValue(orig, value.toDouble())
+            FloatNumericValue(value.toDouble())
         },
-        Double::class to { orig, value ->
+        Double::class to { value ->
             value as Double
-            FloatNumericValue(orig, value)
+            FloatNumericValue(value)
         },
-        BigInteger::class to { _, value ->
-            BigNumericValue(value as BigInteger)
+        BigInteger::class to { value ->
+            value as BigInteger
+            BigNumericValue(value)
         },
     )
     defineMethod(

@@ -32,6 +32,6 @@ class FilterSum private constructor(
         for (item in subject) {
             sum = sum.plus(number(item))
         }
-        return sum.value
+        return sum.result
     }
 }

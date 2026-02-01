@@ -88,11 +88,14 @@ interface ComparableValue : Comparable<ComparableValue> {
 }
 
 interface NumericValue {
-    val value: Any?
+    val result: Any?
 
     val isInt: Boolean
     val isFloat: Boolean
     val hasDecimalPart: Boolean
+
+    val maxBitLength: Int
+        get() = 8192
 
     fun plus(other: NumericValue): NumericValue
     fun minus(other: NumericValue): NumericValue
@@ -102,6 +105,7 @@ interface NumericValue {
     fun rem(other: NumericValue): NumericValue
     fun pow(other: NumericValue): NumericValue
 
+    fun toComparableValue(originalValue: Any?): ComparableValue
     fun toIntValue(): NumericValue
     fun toFloatValue(): NumericValue
     fun toStringValue(): CharSequence

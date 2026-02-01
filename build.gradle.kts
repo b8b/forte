@@ -69,7 +69,6 @@ kotlin {
         jvmTest {}
         jsMain {
             dependencies {
-                implementation("com.ionspin.kotlin:bignum:0.3.10")
                 implementation("dev.erikchristensen.javamath2kmp:javamath2kmp:1.1")
             }
         }

@@ -69,7 +69,12 @@ class FilterComparable(
         args.use {
             caseSensitive = optional("case_sensitive") { false }
         }
-        return invoke(subject, subject, ignoreCase = !caseSensitive)
+        return when (subject) {
+            is ComparableValue -> subject
+            is NumericValue -> subject.toComparableValue(subject)
+
+            else -> invoke(subject, subject, ignoreCase = !caseSensitive)
+        }
     }
 
     operator fun invoke(
@@ -88,10 +93,6 @@ class FilterComparable(
     ): ComparableValue? {
         return when (subject) {
             null -> null
-            is ComparableValue -> subject
-            is NumericValue -> subject.value?.let { value ->
-                types[value::class]?.invoke(originalValue, value, ignoreCase)
-            }
             is CharSequence -> StringComparableValue(
                 originalValue,
                 subject.concatToString(),
@@ -110,7 +111,7 @@ class FilterComparable(
         }
     }
 
-    private class ListComparableValue(
+    class ListComparableValue(
         override val value: Any?,
         val converted: Iterable<ComparableValue>
     ) : ComparableValue {
@@ -149,7 +150,7 @@ class FilterComparable(
         }
     }
 
-    private class StringComparableValue(
+    class StringComparableValue(
         override val value: Any?,
         val converted: String,
         val ignoreCase: Boolean = false
@@ -163,7 +164,7 @@ class FilterComparable(
         }
     }
 
-    private class LongComparableValue(
+    class LongComparableValue(
         override val value: Any?,
         val converted: Long
     ) : ComparableValue {
@@ -179,7 +180,7 @@ class FilterComparable(
         }
     }
 
-    private class FloatComparableValue(
+    class FloatComparableValue(
         override val value: Any?,
         val converted: Double
     ) : ComparableValue {
@@ -195,7 +196,7 @@ class FilterComparable(
         }
     }
 
-    private class GenericComparableValue(
+    class GenericComparableValue(
         override val value: Any?,
         val converted: Comparable<Any>
     ) : ComparableValue {

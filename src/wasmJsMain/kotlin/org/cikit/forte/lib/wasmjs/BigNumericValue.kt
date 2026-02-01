@@ -1,15 +1,17 @@
 package org.cikit.forte.lib.wasmjs
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import dev.erikchristensen.javamath2kmp.timesExact
+import org.cikit.forte.core.ComparableValue
 import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.typeName
 import kotlin.math.pow
 
 class BigNumericValue(
-    val converted: BigInteger
+    val value: BigInteger,
 ) : Number(), NumericValue {
 
-    override val value: Any
+    override val result: BigNumericValue
         get() = this
 
     override val isInt: Boolean
@@ -23,18 +25,18 @@ class BigNumericValue(
 
     override fun plus(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val newValue = converted.plus(other.converted)
+            val newValue = value.plus(other.value)
             BigNumericValue(newValue)
         }
 
         is BigNumericValue -> {
-            val newValue = converted.plus(other.converted)
+            val newValue = value.plus(other.value)
             BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = converted.doubleValue().plus(other.converted)
-            FloatNumericValue(newValue, newValue)
+            val newValue = value.doubleValue().plus(other.value)
+            FloatNumericValue(newValue)
         }
 
         else -> error(
@@ -45,18 +47,18 @@ class BigNumericValue(
 
     override fun minus(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val newValue = converted.minus(other.converted)
+            val newValue = value.minus(other.value)
             BigNumericValue(newValue)
         }
 
         is BigNumericValue -> {
-            val newValue = converted.minus(other.converted)
+            val newValue = value.minus(other.value)
             BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = converted.doubleValue() - other.converted
-            FloatNumericValue(newValue, newValue)
+            val newValue = value.doubleValue() - other.value
+            FloatNumericValue(newValue)
         }
 
         else -> error(
@@ -67,19 +69,19 @@ class BigNumericValue(
 
     override fun mul(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val otherBig = BigInteger.fromInt(other.converted)
-            val newValue = converted.multiply(otherBig)
+            val otherBig = BigInteger.fromInt(other.value)
+            val newValue = value.multiply(otherBig)
             BigNumericValue(newValue)
         }
 
         is BigNumericValue -> {
-            val newValue = converted.multiply(other.converted)
+            val newValue = value.multiply(other.value)
             BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = converted.doubleValue() * other.converted
-            FloatNumericValue(newValue, newValue)
+            val newValue = value.doubleValue() * other.value
+            FloatNumericValue(newValue)
         }
 
         else -> error(
@@ -90,30 +92,30 @@ class BigNumericValue(
 
     override fun div(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val otherBig = BigInteger.fromInt(other.converted)
-            val newValue = converted.div(otherBig)
-            if (newValue.multiply(otherBig) == converted) {
+            val otherBig = BigInteger.fromInt(other.value)
+            val newValue = value.div(otherBig)
+            if (newValue.multiply(otherBig) == value) {
                 BigNumericValue(newValue)
             } else {
-                val newFloat = converted.doubleValue() / other.converted
-                FloatNumericValue(newFloat, newFloat)
+                val newValue = value.doubleValue() / other.value
+                FloatNumericValue(newValue)
             }
         }
 
         is BigNumericValue -> {
-            val newValue = converted.div(other.converted)
-            if (newValue.multiply(other.converted) == converted) {
+            val newValue = value.div(other.value)
+            if (newValue.multiply(other.value) == value) {
                 BigNumericValue(newValue)
             } else {
-                val newFloat = converted.doubleValue() /
-                        other.converted.doubleValue()
-                FloatNumericValue(newFloat, newFloat)
+                val newValue = value.doubleValue() /
+                        other.value.doubleValue()
+                FloatNumericValue(newValue)
             }
         }
 
         is FloatNumericValue -> {
-            val newValue = converted.doubleValue() / other.converted
-            FloatNumericValue(newValue, newValue)
+            val newValue = value.doubleValue() / other.value
+            FloatNumericValue(newValue)
         }
 
         else -> error(
@@ -124,12 +126,12 @@ class BigNumericValue(
 
     override fun tdiv(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val newValue = converted.div(other.converted)
+            val newValue = value.div(other.value)
             return BigNumericValue(newValue)
         }
 
         is BigNumericValue -> {
-            val newValue = converted.div(other.converted)
+            val newValue = value.div(other.value)
             return BigNumericValue(newValue)
         }
 
@@ -141,18 +143,18 @@ class BigNumericValue(
 
     override fun rem(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val newValue = converted.rem(other.converted)
+            val newValue = value.rem(other.value)
             return BigNumericValue(newValue)
         }
 
         is BigNumericValue -> {
-            val newValue = converted.rem(other.converted)
+            val newValue = value.rem(other.value)
             return BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = converted.doubleValue().rem(other.converted)
-            FloatNumericValue(newValue, newValue)
+            val newValue = value.doubleValue().rem(other.value)
+            FloatNumericValue(newValue)
         }
 
         else -> error(
@@ -161,49 +163,65 @@ class BigNumericValue(
         )
     }
 
-    override fun pow(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
-            val newValue = converted.pow(other.converted)
-            BigNumericValue(newValue)
-        }
+    override fun pow(other: NumericValue): NumericValue {
+        val bitLength = value.bitLength()
+        return when (other) {
+            is IntNumericValue -> {
+                val bitLength = bitLength.timesExact(other.value)
+                if (bitLength > maxBitLength) {
+                    throw ArithmeticException("exponent too high")
+                }
+                val newValue = value.pow(other.value)
+                BigNumericValue(newValue)
+            }
 
-        is BigNumericValue -> {
-            val newValue = converted.pow(other.converted)
-            BigNumericValue(newValue)
-        }
+            is BigNumericValue -> {
+                val exp = other.value.intValue(true)
+                val bitLength = bitLength.timesExact(exp)
+                if (bitLength > maxBitLength) {
+                    throw ArithmeticException("exponent too high")
+                }
+                val newValue = value.pow(exp)
+                BigNumericValue(newValue)
+            }
 
-        is FloatNumericValue -> {
-            val newValue = converted.doubleValue().pow(other.converted)
-            FloatNumericValue(newValue, newValue)
-        }
+            is FloatNumericValue -> {
+                val newValue = value.doubleValue().pow(other.value)
+                FloatNumericValue(newValue)
+            }
 
-        else -> error(
-            "binary operator pow is undefined for operands of type " +
-                    "'${typeName(this)}' and '${typeName(other)}'"
-        )
+            else -> error(
+                "binary operator pow is undefined for operands of type " +
+                        "'${typeName(this)}' and '${typeName(other)}'"
+            )
+        }
+    }
+
+    override fun toComparableValue(originalValue: Any?): ComparableValue {
+        return BigComparableValue(originalValue, value)
     }
 
     override fun toIntValue(): NumericValue = this
 
     override fun toFloatValue(): NumericValue {
-        return FloatNumericValue(value, converted.doubleValue())
+        return FloatNumericValue(value.doubleValue())
     }
 
     override fun toStringValue(): CharSequence {
-        return converted.toString(10)
+        return value.toString(10)
     }
 
-    override fun toDouble(): Double = converted.doubleValue()
+    override fun toDouble(): Double = value.doubleValue()
 
-    override fun toFloat(): Float = converted.floatValue()
+    override fun toFloat(): Float = value.floatValue()
 
-    override fun toLong(): Long = converted.longValue()
+    override fun toLong(): Long = value.longValue()
 
-    override fun toInt(): Int = converted.intValue()
+    override fun toInt(): Int = value.intValue()
 
-    override fun toShort(): Short = converted.shortValue()
+    override fun toShort(): Short = value.shortValue()
 
-    override fun toByte(): Byte = converted.byteValue()
+    override fun toByte(): Byte = value.byteValue()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -211,14 +229,14 @@ class BigNumericValue(
 
         other as BigNumericValue
 
-        return converted == other.converted
+        return value == other.value
     }
 
     override fun hashCode(): Int {
-        return converted.hashCode()
+        return value.hashCode()
     }
 
     override fun toString(): String {
-        return "BigNumericValue($converted)"
+        return "BigNumericValue($value)"
     }
 }

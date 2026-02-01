@@ -20,6 +20,6 @@ class BinaryPow private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).pow(number(right)).value
+        return number(left).pow(number(right)).result
     }
 }

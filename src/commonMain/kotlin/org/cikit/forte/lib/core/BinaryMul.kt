@@ -20,6 +20,6 @@ class BinaryMul private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).mul(number(right)).value
+        return number(left).mul(number(right)).result
     }
 }
