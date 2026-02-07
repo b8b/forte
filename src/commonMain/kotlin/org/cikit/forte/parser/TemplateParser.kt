@@ -587,7 +587,9 @@ private class ExpressionParserImpl(
                             rhs.first.first,
                             rhs.first.last
                         )
-                        if (source != "nan" || rhs.first != rhs.last) {
+                        if (!source.first().isLetter() ||
+                            rhs.first != rhs.last)
+                        {
                             throw ParseException(
                                 tokenizer,
                                 rhs,
@@ -862,6 +864,7 @@ private class ExpressionParserImpl(
                         "-infinity" -> Expression.NumericLiteral(
                             t, t, Double.NEGATIVE_INFINITY
                         )
+                        "infinity",
                         "+infinity" -> Expression.NumericLiteral(
                             t, t, Double.POSITIVE_INFINITY
                         )
@@ -922,12 +925,20 @@ private class ExpressionParserImpl(
                         )
                     }
                     val t2 = tokenizer.peekAfter(t, skipSpace = true)
-                    if (t2 !is Token.Identifier) {
-                        // maybe operator
-                        break
+                    val name = when (t2) {
+                        is Token.Identifier -> {
+                            input.substring(t2.first .. t2.last)
+                        }
+                        is Token.Const if input[t2.first].isLetter() -> {
+                            input.substring(t2.first .. t2.last)
+                        }
+
+                        else -> {
+                            // maybe operator
+                            break
+                        }
                     }
                     tokenizer.consume(t2)
-                    val name = input.substring(t2.first .. t2.last)
                     primary = Expression.Access(t, t2, primary, name)
                 }
                 is Token.LBracket -> {
