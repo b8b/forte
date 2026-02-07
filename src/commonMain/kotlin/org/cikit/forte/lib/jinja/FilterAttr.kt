@@ -9,6 +9,6 @@ class FilterAttr : FilterMethod {
             name = require<String>("name")
         }
         return Undefined("operand of type '${typeName(subject)}' " +
-                "has not attribute '$name'")
+                "has no attribute '$name'")
     }
 }
