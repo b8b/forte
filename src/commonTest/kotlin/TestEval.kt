@@ -265,13 +265,9 @@ class TestEval {
             .setVars("a" to mapOf("x" to 1))
             .evalExpression(Forte.parseExpression("a.keys()"))
         assertEquals(listOf("x"), (result as Iterable<*>).toList())
-        val result2 = Forte {
-            context.defineMethod("invoke") { subject, args ->
-                args.requireEmpty()
-                subject
-            }
-        }.scope().evalExpression(Forte.parseExpression("'test'()"))
-        assertEquals("test", result2)
+        assertFailsWith<EvalException> {
+            Forte.scope().evalExpression(Forte.parseExpression("'test'()"))
+        }
     }
 
     @Test

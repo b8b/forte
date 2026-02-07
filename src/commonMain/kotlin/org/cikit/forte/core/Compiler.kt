@@ -1,6 +1,5 @@
 package org.cikit.forte.core
 
-import org.cikit.forte.lib.core.ApplyInvoke
 import org.cikit.forte.lib.core.UnaryNot
 import org.cikit.forte.parser.Expression
 
@@ -99,7 +98,9 @@ private fun compileExpressionInternal(
                 operations.add(Operation.Const(expression, emptyList<Any?>()))
                 expression.children
             } else {
-                operations.add(Operation.InitArray(expression, expression.children.size))
+                operations.add(
+                    Operation.InitArray(expression, expression.children.size)
+                )
                 val children = ArrayList<Expression>(expression.children.size)
                 var index = 0
                 for (child in expression.children) {
@@ -118,11 +119,17 @@ private fun compileExpressionInternal(
         }
         is Expression.ObjectLiteral -> {
             val pairs = if (expression.pairs.isEmpty()) {
-                operations.add(Operation.Const(expression, emptyMap<String, Any?>()))
+                operations.add(
+                    Operation.Const(expression, emptyMap<String, Any?>())
+                )
                 expression.pairs
             } else {
-                operations.add(Operation.InitObject(expression, expression.pairs.size))
-                val pairs = ArrayList<Pair<Expression, Expression>>(expression.pairs.size)
+                operations.add(
+                    Operation.InitObject(expression, expression.pairs.size)
+                )
+                val pairs = ArrayList<Pair<Expression, Expression>>(
+                    expression.pairs.size
+                )
                 for ((k, v) in expression.pairs) {
                     pairs += Pair(
                         compileExpressionInternal(operations, k),
@@ -142,10 +149,8 @@ private fun compileExpressionInternal(
         }
         is Expression.CompAccess -> {
             val left = compileExpressionInternal(operations, expression.left)
-            operations.add(Operation.InitArray(expression, 1))
             val right = compileExpressionInternal(operations, expression.right)
-            operations.add(Operation.AddArrayElement(expression.right, 0))
-            operations.add(Operation.ApplyGet(expression))
+            operations.add(Operation.ComputedGet(expression))
             Expression.CompAccess(
                 expression.first,
                 left,
@@ -155,13 +160,11 @@ private fun compileExpressionInternal(
         }
         is Expression.SliceAccess -> {
             val left = compileExpressionInternal(operations, expression.left)
-            operations.add(Operation.InitArray(expression, expression.args.values.size))
-            val args = ArrayList<Expression>(expression.args.values.size)
-            var index = 0
-            for (arg in expression.args.values) {
-                args += compileExpressionInternal(operations, arg)
-                operations.add(Operation.AddArrayElement(arg, index++))
-            }
+            val compiledArgs = compileNamedArgs(
+                operations,
+                expression,
+                expression.args
+            )
             operations.add(
                 Operation.ApplySlice(
                     expression = expression,
@@ -171,16 +174,13 @@ private fun compileExpressionInternal(
             Expression.SliceAccess(
                 expression.first,
                 left,
-                Expression.NamedArgs(expression.args.names, args),
+                compiledArgs,
                 operations.opSubList(firstOperation, operations.size)
             )
         }
         is Expression.Access -> {
             val left = compileExpressionInternal(operations, expression.left)
-            operations.add(Operation.InitArray(expression, 1))
-            operations.add(Operation.Const(expression, expression.name))
-            operations.add(Operation.AddArrayElement(expression, 0))
-            operations.add(Operation.ApplyGet(expression))
+            operations.add(Operation.ConstGet(expression, expression.name))
             Expression.Access(
                 expression.first,
                 expression.last,
@@ -190,23 +190,20 @@ private fun compileExpressionInternal(
             )
         }
         is Expression.FunctionCall -> {
-            operations.add(Operation.InitArray(expression, expression.args.values.size))
-            val args = ArrayList<Expression>(expression.args.values.size)
-            var index = 0
-            for (arg in expression.args.values) {
-                args += compileExpressionInternal(operations, arg)
-                operations.add(Operation.AddArrayElement(arg, index++))
-            }
+            val compiledArgs = compileNamedArgs(
+                operations,
+                expression,
+                expression.args,
+            )
             operations.add(Operation.CallFunction(
                 expression,
                 Context.Key.Call(expression.name),
-                expression.name,
                 expression.args.names)
             )
             Expression.FunctionCall(
                 expression.first,
                 expression.name,
-                Expression.NamedArgs(expression.args.names, args),
+                compiledArgs,
                 operations.opSubList(firstOperation, operations.size)
             )
         }
@@ -227,31 +224,25 @@ private fun compileExpressionInternal(
         is Expression.InvokeOp -> {
             when (expression.left) {
                 is Expression.Access -> {
-                    val leftLeft = compileExpressionInternal(operations, expression.left.left)
+                    val leftLeft = compileExpressionInternal(
+                        operations,
+                        expression.left.left
+                    )
                     val methodKey = Context.Key.Apply.create(
                         expression.left.name,
                         Method.OPERATOR
                     )
+                    val functionKey = Context.Key.Call(expression.left.name)
+                    val compiledArgs = compileNamedArgs(
+                        operations,
+                        expression,
+                        expression.args
+                    )
                     operations.add(
-                        Operation.GetMethod(
+                        Operation.CallNamedMethod(
                             expression.left,
                             methodKey,
-                            expression.left.name,
-                            expression.args.names
-                        )
-                    )
-                    operations.add(Operation.InitArray(expression, expression.args.values.size))
-                    val args = ArrayList<Expression>(expression.args.values.size)
-                    var index = 0
-                    for (arg in expression.args.values) {
-                        args += compileExpressionInternal(operations, arg)
-                        operations.add(Operation.AddArrayElement(arg, index++))
-                    }
-                    operations.add(
-                        Operation.CallMethod(
-                            expression,
-                            methodKey,
-                            expression.left.name,
+                            functionKey,
                             expression.args.names
                         )
                     )
@@ -265,48 +256,63 @@ private fun compileExpressionInternal(
                             expression.left.name,
                             emptyList()
                         ),
-                        Expression.NamedArgs(expression.args.names, args),
+                        compiledArgs,
                         operations.opSubList(firstOperation, operations.size)
                     )
                 }
-                else -> {
-                    val left = compileExpressionInternal(operations, expression.left)
-                    operations.add(Operation.InitArray(expression, expression.args.values.size))
-                    val args = ArrayList<Expression>(expression.args.values.size)
-                    var index = 0
-                    for (arg in expression.args.values) {
-                        args += compileExpressionInternal(operations, arg)
-                        operations.add(Operation.AddArrayElement(arg, index++))
-                    }
+                is Expression.CompAccess -> {
+                    //subject
+                    val leftLeft = compileExpressionInternal(
+                        operations,
+                        expression.left.left
+                    )
+                    //method name
+                    val leftRight = compileExpressionInternal(
+                        operations,
+                        expression.left.right
+                    )
+                    val compiledLeft = Expression.CompAccess(
+                        expression.left.first,
+                        leftLeft,
+                        leftRight,
+                        operations.opSubList(firstOperation, operations.size)
+                    )
+                    //args
+                    val compiledArgs = compileNamedArgs(
+                        operations,
+                        expression,
+                        expression.args
+                    )
                     operations.add(
-                        Operation.CallInvoke(
+                        Operation.CallComputedMethod(
                             expression,
-                            ApplyInvoke.KEY,
-                            "invoke",
                             expression.args.names
                         )
                     )
                     Expression.InvokeOp(
                         expression.first,
                         expression.last,
-                        left,
-                        Expression.NamedArgs(expression.args.names, args),
+                        compiledLeft,
+                        compiledArgs,
                         operations.opSubList(firstOperation, operations.size)
                     )
                 }
+
+                else -> throw EvalException(
+                    expression,
+                    "illegal invoke() operation on ${expression.left}"
+                )
             }
         }
         is Expression.TransformOp -> {
             val method = expression.name
             val operator = expression.decl.negate?.name ?: expression.decl.name
             val left = compileExpressionInternal(operations, expression.left)
-            operations.add(Operation.InitArray(expression, expression.args.values.size))
-            val args = ArrayList<Expression>(expression.args.values.size)
-            var index = 0
-            for (arg in expression.args.values) {
-                args += compileExpressionInternal(operations, arg)
-                operations.add(Operation.AddArrayElement(arg, index++))
-            }
+            val compiledArgs = compileNamedArgs(
+                operations,
+                expression,
+                expression.args
+            )
             operations.add(
                 Operation.TransformOp(
                     expression,
@@ -329,7 +335,7 @@ private fun compileExpressionInternal(
                 expression.alias,
                 left,
                 expression.name,
-                Expression.NamedArgs(expression.args.names, args),
+                compiledArgs,
                 operations.opSubList(firstOperation, operations.size)
             )
         }
@@ -349,7 +355,9 @@ private fun compileExpressionInternal(
             val left = compileExpressionInternal(operations, leftExpr)
 
             val index1 = operations.size
-            operations.add(Operation.CondBinOp(expression, Context.Key.Binary(name), 0))
+            operations.add(
+                Operation.CondBinOp(expression, Context.Key.Binary(name), 0)
+            )
 
             val index2 = operations.size
             val right = compileExpressionInternal(operations, rightExpr)
@@ -382,6 +390,24 @@ private fun compileExpressionInternal(
             )
         }
     }
+}
+
+private fun compileNamedArgs(
+    operations: MutableList<Operation>,
+    expression: Expression,
+    args: Expression.NamedArgs
+): Expression.NamedArgs {
+    operations.add(
+        Operation.InitArray(expression, args.values.size)
+    )
+    val compiledArgs = buildList(capacity = args.values.size) {
+        var index = 0
+        for (arg in args.values) {
+            this += compileExpressionInternal(operations, arg)
+            operations.add(Operation.AddArrayElement(arg, index++))
+        }
+    }
+    return Expression.NamedArgs(args.names, compiledArgs)
 }
 
 private fun List<Operation>.opSubList(start: Int, endExclusive: Int) =

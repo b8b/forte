@@ -184,7 +184,6 @@ sealed class Context<R> : TemplateObject {
     abstract fun getControlTag(key: Key.Control): ControlTag?
     abstract fun getOpFunction(key: Key.Unary): UnOpFunction?
     abstract fun getBinaryOpFunction(key: Key.Binary): BinOpFunction?
-    abstract fun getFunction(key: Key.Call): Function?
     abstract fun <T: Method> getMethod(key: Key.Apply<T>): T?
 
     open suspend fun evalExpression(expression: Expression): Any? {

@@ -96,6 +96,8 @@ class ControlFor : ControlTag {
         val prevItem: Any?,
     ) : TemplateObject {
         companion object {
+            val CYCLE_KEY = Context.Key.Call("cycle")
+
             val attributes: Map<String, (Loop) -> Any?> = mapOf(
                 "length" to Loop::length,
                 "index" to Loop::index1,
@@ -107,8 +109,7 @@ class ControlFor : ControlTag {
                 "depth" to Loop::depth,
                 "depth0" to Loop::depth0,
                 "nextitem" to Loop::nextItem,
-                "previtem" to Loop::prevItem,
-                "cycle" to Loop::cycle
+                "previtem" to Loop::prevItem
             )
         }
 
@@ -136,6 +137,13 @@ class ControlFor : ControlTag {
         private val cycle by lazy(::CycleFunction)
 
         override fun getVar(name: String): Any? = attributes[name]?.invoke(this)
+
+        override fun getFunction(key: Context.Key.Call): Function? {
+            if (key == CYCLE_KEY) {
+                return cycle
+            }
+            return null
+        }
 
         private inner class CycleFunction : Function {
             override fun invoke(args: NamedArgs): Any? {
