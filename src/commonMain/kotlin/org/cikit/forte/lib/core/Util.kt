@@ -94,6 +94,7 @@ fun <R> Context.Builder<R>.defineCoreExtensions(): Context.Builder<R> {
     defineMethod("int", FilterInt(this))
     defineMethod("float", FilterFloat(this))
     defineMethod("string", FilterString())
+    defineMethod("dict", FilterDict())
 
     defineMethod("invoke", ApplyInvoke())
 

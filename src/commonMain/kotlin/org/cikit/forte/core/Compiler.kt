@@ -137,9 +137,9 @@ private fun compileExpressionInternal(
                     )
                     operations.add(Operation.AddPairToObject(v))
                 }
-                operations.add(Operation.BuildObject(expression))
                 pairs
             }
+            operations.add(Operation.BuildObject(expression))
             Expression.ObjectLiteral(
                 expression.first,
                 expression.last,

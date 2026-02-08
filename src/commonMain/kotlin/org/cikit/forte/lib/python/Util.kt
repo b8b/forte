@@ -9,6 +9,7 @@ import org.cikit.forte.core.Context
 
 fun <R> Context.Builder<R>.definePythonExtensions(): Context.Builder<R> {
     defineMethod("keys", ApplyKeys())
+    defineMethod("get", ApplyGet())
 
     defineMethod("startswith", ApplyStartsWith())
     defineMethod("endswith", ApplyEndsWith())

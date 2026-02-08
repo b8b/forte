@@ -147,8 +147,8 @@ sealed class Operation {
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            val builder = state.last() as MutableMap<*, *>
-            state.setLast(expression, builder.toMap())
+            val builder = state.last() as Map<*, *>
+            state.setLast(expression, ctx.filterDict(builder, NamedArgs.Empty))
         }
     }
 
