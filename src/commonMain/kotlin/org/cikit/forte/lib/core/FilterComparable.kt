@@ -69,12 +69,7 @@ class FilterComparable(
         args.use {
             caseSensitive = optional("case_sensitive") { false }
         }
-        return when (subject) {
-            is ComparableValue -> subject
-            is NumericValue -> subject.toComparableValue(subject)
-
-            else -> invoke(subject, subject, ignoreCase = !caseSensitive)
-        }
+        return invoke(subject, subject, ignoreCase = !caseSensitive)
     }
 
     operator fun invoke(
@@ -93,6 +88,8 @@ class FilterComparable(
     ): ComparableValue? {
         return when (subject) {
             null -> null
+            is ComparableValue -> subject
+            is NumericValue -> subject.toComparableValue(subject)
             is CharSequence -> StringComparableValue(
                 originalValue,
                 subject.concatToString(),
