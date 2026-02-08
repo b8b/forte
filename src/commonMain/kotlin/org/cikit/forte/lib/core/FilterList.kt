@@ -9,6 +9,7 @@ class FilterList : FilterMethod {
             strings = optional("strings") { "codePoints" }
         }
         return when (subject) {
+            is List<*> -> subject
             is MaskedList -> subject.list
 
             is CharSequence -> {

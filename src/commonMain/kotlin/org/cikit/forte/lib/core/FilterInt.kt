@@ -1,6 +1,7 @@
 package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
+import org.cikit.forte.internal.parseInt
 
 class FilterInt private constructor(
     private val number: FilterNumber
@@ -17,12 +18,12 @@ class FilterInt private constructor(
         }
     }
 
-    override fun invoke(subject: Any?, args: NamedArgs): Any {
+    override fun invoke(subject: Any?, args: NamedArgs): Any? {
         args.requireEmpty()
         return when (subject) {
-            is Number -> number(subject).toIntValue()
+            is Number -> number(subject).toIntValue().result
             is Boolean -> if (subject) 1 else 0
-            is CharSequence -> subject.concatToString().toLong()
+            is CharSequence -> parseInt(subject)
             is Char -> subject.digitToInt()
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"
