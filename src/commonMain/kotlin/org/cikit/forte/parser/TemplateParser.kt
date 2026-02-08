@@ -876,9 +876,10 @@ private class ExpressionParserImpl(
                 is Token.Number -> {
                     tokenizer.consume(t)
                     val s = input.substring(t.first .. t.last)
-                    val v: Number = when {
-                        '.' in s -> s.toDouble()
-                        else -> parseInt(s)
+                    val v: Number = try {
+                        parseInt(s)
+                    } catch (_: NumberFormatException) {
+                        s.toDouble()
                     }
                     primary = Expression.NumericLiteral(t, t, v)
                     break

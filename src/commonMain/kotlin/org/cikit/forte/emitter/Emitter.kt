@@ -2,6 +2,7 @@ package org.cikit.forte.emitter
 
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.KSerializer
+import org.cikit.forte.core.typeName
 
 interface Emitter {
     fun emitNull()
@@ -43,7 +44,10 @@ interface Emitter {
             is Boolean -> emitScalar(value)
             is Number -> emitScalar(value)
             is CharSequence -> emitScalar(value)
-            else -> emitScalar(value.toString())
+
+            else -> error(
+                "cannot convert value of type '${typeName(value)}' to json"
+            )
         }
     }
 

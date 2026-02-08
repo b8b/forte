@@ -4,10 +4,13 @@ import kotlinx.io.bytestring.ByteStringBuilder
 import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.json.*
 import org.cikit.forte.Forte
+import org.cikit.forte.core.Branch
 import org.cikit.forte.core.Context
+import org.cikit.forte.core.ControlTag
+import org.cikit.forte.core.loadJson
 import org.cikit.forte.emitter.YamlEmitter
-import org.cikit.forte.eval.evalTemplate
 import org.cikit.forte.parser.Declarations
+import org.cikit.forte.parser.ParsedTemplate
 import kotlin.wasm.unsafe.Pointer
 import kotlin.wasm.unsafe.UnsafeWasmMemoryApi
 import kotlin.wasm.unsafe.withScopedMemoryAllocator
@@ -27,7 +30,7 @@ val forte = Forte {
             .result
         val data = Json.decodeFromString<JsonObject>(jsonText)
         for ((k, v) in data) {
-            ctx.setVar(k, v.toAny())
+            ctx.loadJson(k, v)
         }
     }
 }
@@ -84,17 +87,5 @@ fun main() {
         println("failed: $ex")
         ex.printStackTrace()
         throw ex
-    }
-}
-
-private fun JsonElement.toAny(): Any? = when (this) {
-    is JsonNull -> null
-    is JsonObject -> entries.associate { (k, v) -> k to v.toAny() }
-    is JsonArray -> map { v -> v.toAny() }
-    is JsonPrimitive -> {
-        booleanOrNull
-            ?: intOrNull ?: longOrNull
-            ?: floatOrNull ?: doubleOrNull
-            ?: content
     }
 }

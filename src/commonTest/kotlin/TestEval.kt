@@ -2,23 +2,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
+import org.cikit.forte.core.loadJson
 import org.cikit.forte.lib.jinja.strictJinjaCompat
 import org.cikit.forte.parser.Declarations
 import org.cikit.forte.parser.Expression
 import kotlin.test.*
 
 class TestEval {
-    private fun JsonElement.toAny(): Any? = when (this) {
-        is JsonNull -> null
-        is JsonPrimitive -> booleanOrNull
-            ?: longOrNull ?: intOrNull
-            ?: doubleOrNull ?: floatOrNull
-            ?: contentOrNull
-
-        is JsonArray -> map { it.toAny() }
-        is JsonObject -> map { (k, v) -> k to v.toAny() }.toMap()
-    }
-
     @Test
     fun testBasic() = Forte.runTests("basic.md")
 
@@ -161,7 +151,7 @@ class TestEval {
                 val varName = ctx.evalExpression(
                     branch.args.getValue("varName")
                 )
-                ctx.setVar(varName as String, result.toAny())
+                ctx.loadJson(varName as String, result)
             }
             declarations += Declarations.Command(
                 "debug",

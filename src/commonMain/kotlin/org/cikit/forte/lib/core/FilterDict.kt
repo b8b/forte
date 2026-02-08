@@ -13,11 +13,11 @@ class FilterDict : FilterMethod {
     override val isHidden: Boolean
         get() = true
 
-    override fun invoke(subject: Any?, args: NamedArgs): Any? {
+    override fun invoke(subject: Any?, args: NamedArgs): Any {
         args.requireEmpty()
         require(subject is Map<*, *>) {
             "invalid operand of type '${typeName(subject)}'"
         }
-        return subject.toMap()
+        return subject
     }
 }
