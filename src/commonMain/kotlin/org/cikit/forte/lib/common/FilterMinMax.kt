@@ -5,6 +5,34 @@ import org.cikit.forte.lib.core.FilterComparable
 import org.cikit.forte.lib.core.FilterGet
 import org.cikit.forte.lib.core.filterComparable
 
+/**
+ * jinja-filters.max(value: 't.Iterable[V]', case_sensitive: bool = False, attribute: str | int | NoneType = None) → 't.Union[V, Undefined]'
+ *
+ *     Return the largest item from the sequence.
+ *
+ *     {{ [1, 2, 3]|max }}
+ *         -> 3
+ *
+ *     Parameters:
+ *
+ *             case_sensitive – Treat upper and lower case strings as distinct.
+ *
+ *             attribute – Get the object with the max value of this attribute.
+ *
+ * jinja-filters.min(value: 't.Iterable[V]', case_sensitive: bool = False, attribute: str | int | NoneType = None) → 't.Union[V, Undefined]'
+ *
+ *     Return the smallest item from the sequence.
+ *
+ *     {{ [1, 2, 3]|min }}
+ *         -> 1
+ *
+ *     Parameters:
+ *
+ *             case_sensitive – Treat upper and lower case strings as distinct.
+ *
+ *             attribute – Get the object with the min value of this attribute.
+ *
+ */
 class FilterMinMax private constructor(
     private val comparable: FilterComparable,
     private val get: FilterMethod,
@@ -47,7 +75,7 @@ class FilterMinMax private constructor(
         }
         val itemIt = subject.iterator()
         if (!itemIt.hasNext()) {
-            return Undefined("empty list")
+            return Undefined("sequence is empty")
         }
         return Suspended { ctx ->
             var item0 = itemKey(ctx, itemIt.next(), getArgs, caseSensitive)

@@ -5,6 +5,15 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 import org.cikit.forte.core.*
 
+/**
+ * jinja-filters.tojson(value: Any, indent: int | None = None) → markupsafe.Markup
+ *
+ *     Serialize an object to a string of JSON.
+ *
+ *     Parameters:
+ *             value – The object to serialize to JSON.
+ *             indent – The indent parameter passed to dumps, for pretty-printing the value.
+ */
 class FilterToJson: FilterMethod {
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val indent: Int

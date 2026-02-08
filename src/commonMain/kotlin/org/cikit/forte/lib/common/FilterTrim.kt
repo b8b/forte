@@ -5,6 +5,11 @@ import org.cikit.forte.core.NamedArgs
 import org.cikit.forte.core.optional
 import org.cikit.forte.core.typeName
 
+/**
+ * jinja-filters.trim(value: str, chars: str | None = None) → str
+ *
+ *     Strip leading and trailing characters, by default whitespace.
+ */
 class FilterTrim : FilterMethod {
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val chars: CharSequence

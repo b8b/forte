@@ -13,7 +13,6 @@ class FilterLength : FilterMethod {
             is Collection<*> -> subject.size
             is CharSequence -> subject.length
             is ByteString -> subject.size
-            is Iterable<*> -> subject.count()
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"
             )

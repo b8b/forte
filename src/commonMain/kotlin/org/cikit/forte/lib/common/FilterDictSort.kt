@@ -10,6 +10,23 @@ import org.cikit.forte.core.typeName
 import org.cikit.forte.lib.core.FilterComparable
 import org.cikit.forte.lib.core.filterComparable
 
+/**
+ * jinja-filters.dictsort(value: Mapping[K, V], case_sensitive: bool = False, by: 'te.Literal["key", "value"]' = 'key', reverse: bool = False) → List[Tuple[K, V]]
+ *
+ *     Sort (key, value) items of a mapping.
+ *
+ *     {% for key, value in mydict|dictsort %}
+ *         sort the dict by key, case insensitive
+ *
+ *     {% for key, value in mydict|dictsort(reverse=true) %}
+ *         sort the dict by key, case insensitive, reverse order
+ *
+ *     {% for key, value in mydict|dictsort(true) %}
+ *         sort the dict by key, case sensitive
+ *
+ *     {% for key, value in mydict|dictsort(false, 'value') %}
+ *         sort the dict by value, case insensitive
+ */
 class FilterDictSort private constructor(
     private val comparable: FilterComparable
 ) : FilterMethod, DependencyAware {
@@ -50,14 +67,14 @@ class FilterDictSort private constructor(
         }
         buildList(subject.size) {
             for ((k, v) in subject.entries) {
-                val dictEntry = DictEntry(k, v)
+                val dictItem = DictItem(k, v)
                 val sortKey = when (by) {
                     DictSortBy.KEY -> k
                     DictSortBy.VALUE -> v
                 }
                 this += comparable(
                     sortKey,
-                    dictEntry,
+                    dictItem,
                     ignoreCase = !caseSensitive
                 )
             }
@@ -68,48 +85,5 @@ class FilterDictSort private constructor(
             }
             return map { it.value }
         }
-    }
-
-    private class DictEntry(
-        val key: Any?,
-        val value: Any?
-    ) : List<Any?> {
-        override val size: Int
-            get() = 2
-
-        override fun isEmpty() = false
-
-        override fun contains(element: Any?) = element == key || element == value
-
-        override fun iterator(): Iterator<Any?> = listOf(key, value).iterator()
-
-        override fun containsAll(elements: Collection<Any?>) =
-            elements.all(::contains)
-
-        override fun get(index: Int) = when (index) {
-            0 -> key
-            1 -> value
-            else -> throw IllegalArgumentException("index out of bounds: $index")
-        }
-
-        override fun indexOf(element: Any?) = when (element) {
-            key -> 0
-            value -> 1
-            else -> -1
-        }
-
-        override fun lastIndexOf(element: Any?) = when (element) {
-            value -> 1
-            key -> 0
-            else -> -1
-        }
-
-        override fun listIterator() = listOf(key, value).listIterator()
-
-        override fun listIterator(index: Int) = listOf(key, value)
-            .listIterator(index)
-
-        override fun subList(fromIndex: Int, toIndex: Int) = listOf(key, value)
-            .subList(fromIndex, toIndex)
     }
 }

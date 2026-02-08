@@ -208,3 +208,9 @@ open class Undefined(open val message: String) {
 class Suspended(
     val eval: suspend (Context.Evaluator<*>) -> Any?
 ) : Undefined("evaluation has been suspended")
+
+class MaskedList(val list: List<Any?>) : Iterable<Any?> {
+    override fun iterator(): Iterator<Any?> {
+        return list.iterator()
+    }
+}

@@ -9,6 +9,8 @@ class FilterList : FilterMethod {
             strings = optional("strings") { "codePoints" }
         }
         return when (subject) {
+            is MaskedList -> subject.list
+
             is CharSequence -> {
                 when (strings.concatToString()) {
                     "empty" -> emptyList<String>()

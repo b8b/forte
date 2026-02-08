@@ -51,7 +51,7 @@ OKa1OKb2OKa3
 ```twig
 {"a":11,"b":22}
 ~
-{{ {a: 11, b: 22, }|json }}
+{{ {a: 11, b: 22, }|tojson }}
 ```
 
 ## Arithmetic
@@ -82,8 +82,8 @@ hello {{ "yes " ~ true }}
 "* \b \t \f \n \r \\ \" ' *"
 "* \b \t \f \n \r \\ \" ' *"
 ~
-{{ '* \b \t \f \n \r \\ " \' *'|json }}
-{{ "* \b \t \f \n \r \\ \" ' *"|json }}
+{{ '* \b \t \f \n \r \\ " \' *'|tojson }}
+{{ "* \b \t \f \n \r \\ \" ' *"|tojson }}
 ```
 
 ## Undefined
@@ -149,8 +149,8 @@ true,xxc,abc
 ```twig
 [1,3],[2]
 ~
-{{- [1, 2, 3]|reject("==", 2)|json -}},
-{{- [1, 2, 3]|select("==", 2)|json -}}
+{{- [1, 2, 3]|reject("==", 2)|list|tojson -}},
+{{- [1, 2, 3]|select("==", 2)|list|tojson -}}
 ```
 
 ## ArrayAccess
@@ -174,20 +174,20 @@ hello {{ name }}
 
 ## Selectattr
 ```twig
-[{"a":false}]
+[]
 [{"a":false}]
 []
-[{"b":2}]
-[{"a":false}]
+[{"a":false},{"b":2}]
+[{"a":false},{"b":2}]
 [{"a":false},{"b":2}]
 ~
 {%- set input = [{"a": false}, {"b": 2}] -%}
-{{- input|selectattr("a")|json }}
-{{ input|selectattr("a", "eq", false)|json }}
-{{ input|selectattr("x", "eq", 1)|json }}
-{{ input|rejectattr("a")|json }}
-{{ input|rejectattr("b")|json }}
-{{ input|rejectattr("c", "eq", 15)|json }}
+{{- input|selectattr("a")|list|tojson }}
+{{ input|selectattr("a", "eq", false)|list|tojson }}
+{{ input|selectattr("x", "eq", 1)|list|tojson }}
+{{ input|rejectattr("a")|list|tojson }}
+{{ input|rejectattr("b")|list|tojson }}
+{{ input|rejectattr("c", "eq", 15)|list|tojson }}
 ```
 
 ## Map
@@ -195,8 +195,8 @@ hello {{ name }}
 ["10","2","3"]
 [2,3,10]
 ~
-{{ [2, "3", 10]|map("string")|sort|json }}
-{{ [10, 10.0, 2, 3]|unique|json }}
+{{ [2, "3", 10]|map("string")|sort|tojson }}
+{{ [10, 10.0, 2, 3]|unique|list|tojson }}
 ```
 
 ## In
@@ -219,7 +219,7 @@ a=2,z=1,
 ```twig
 ["BWYFiOpx","RcNbwutO","xCIexbxF"]
 ~
-{{ ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]|map("base64_decode")|sort|map("base64_encode")|json }}
+{{ ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]|map("base64_decode")|sort|map("base64_encode")|list|tojson }}
 ```
 
 ## Iterable compare

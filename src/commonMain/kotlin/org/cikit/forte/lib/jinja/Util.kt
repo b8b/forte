@@ -10,7 +10,6 @@ import org.cikit.forte.parser.Declarations
 // ---
 // * batch(value: 't.Iterable[V]', linecount: int, fill_with: 't.Optional[V]' = None) → 't.Iterator[t.List[V]]'
 // * groupby(value: 't.Iterable[V]', attribute: str | int, default: Any | None = None, case_sensitive: bool = False) → 't.List[_GroupTuple]'
-// * items(value: Mapping[K, V] | jinja2.runtime.Undefined) → Iterator[Tuple[K, V]]
 // * random(seq: 't.Sequence[V]') → 't.Union[V, Undefined]'
 // * reverse(value: str | Iterable[V]) → str | Iterable[V]
 // * slice(value: 't.Collection[V]', slices: int, fill_with: 't.Optional[V]' = None) → 't.Iterator[t.List[V]]'

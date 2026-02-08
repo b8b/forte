@@ -3,6 +3,26 @@ package org.cikit.forte.lib.common
 import org.cikit.forte.core.*
 import org.cikit.forte.lib.core.FilterGet
 
+/**
+ * jinja-filters.join(value: Iterable[Any], d: str = '', attribute: str | int | NoneType = None) → str
+ *
+ *     Return a string which is the concatenation of the strings in the sequence.
+ *     The separator between elements is an empty string per default,
+ *     you can define it with the optional parameter:
+ *
+ *     Attribute actually can be of any type which also seems to work in jinja2.
+ *
+ *     {{ [1, 2, 3]|join('|') }}
+ *         -> 1|2|3
+ *
+ *     {{ [1, 2, 3]|join }}
+ *         -> 123
+ *
+ *     It is also possible to join certain attributes of an object:
+ *
+ *     {{ users|join(', ', attribute='username') }}
+ *
+ */
 class FilterJoin: FilterMethod {
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val getArgs: NamedArgs?

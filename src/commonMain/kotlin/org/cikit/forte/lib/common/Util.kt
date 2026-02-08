@@ -7,6 +7,7 @@ fun <R> Context.Builder<R>.defineCommonExtensions(): Context.Builder<R> {
     defineMethod("last", FilterLast())
 
     defineMethod("dictsort", FilterDictSort(this))
+    defineMethod("items", FilterItems())
     defineMethod("sort", FilterSort(this, unique = false))
     defineMethod("unique", FilterSort(this, unique = true))
     defineMethod("sum", FilterSum(this))

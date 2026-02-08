@@ -59,7 +59,7 @@ class TestEvalSuspended {
         }
         val all = buildList {
             for (list in result as List<*>) {
-                for (item in list as List<*>) {
+                for (item in list as Iterable<*>) {
                     add(item as Int)
                 }
             }

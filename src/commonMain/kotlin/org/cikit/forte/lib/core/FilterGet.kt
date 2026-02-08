@@ -19,15 +19,47 @@ sealed class FilterGet : FilterMethod {
         } else {
             args.use { key = requireAny("key") }
         }
-        return when (subject) {
-            is Undefined -> subject
-            is TemplateObject -> when (key) {
-                is CharSequence -> subject.getVar(key.concatToString())
+        if (subject is Undefined) {
+            return subject
+        }
+        return when (key) {
+            is CharSequence -> when (subject) {
+                is TemplateObject -> {
+                    val finalKey = key.concatToString()
+                    val result = subject.getVar(finalKey)
+                    if (result is Undefined) {
+                        getFromMap(subject, finalKey)
+                    } else {
+                        result
+                    }
+                }
 
-                else -> Undefined(
-                    "invalid key '$key' of type '${typeName(key)}' for " +
-                        " TemplateObject of type '${typeName(subject)}'")
+                else -> getFromMap(subject, key.concatToString())
             }
+
+            is Int -> when (subject) {
+                is List<*> -> subject.getOrElse(key) {
+                    Undefined("index $key out of bounds for List operand " +
+                            "of type '${typeName(subject)}' " +
+                            "with size ${subject.size}")
+                }
+                is CharSequence -> if (key !in subject.indices) {
+                    Undefined("index $key out of bounds for String operand " +
+                            "of type '${typeName(subject)}' " +
+                            "with size ${subject.length}")
+                } else {
+                    subject[key]
+                }
+
+                else -> getFromMap(subject, key)
+            }
+
+            else -> getFromMap(subject, key)
+        }
+    }
+
+    protected fun getFromMap(subject: Any?, key: Any?): Any? {
+        return when (subject) {
             is Map<*, *> -> {
                 if (!subject.containsKey(key)) {
                     Undefined("key '$key' of type '${typeName(key)}' " +
@@ -37,30 +69,7 @@ sealed class FilterGet : FilterMethod {
                     subject[key]
                 }
             }
-            is List<*> -> when (key) {
-                is Int -> subject.getOrElse(key) {
-                    Undefined("index $key out of bounds for List operand " +
-                            "of type '${typeName(subject)}' " +
-                            "with size ${subject.size}")
-                }
-                else -> Undefined(
-                    "invalid key '$key' of type '${typeName(key)}' for " +
-                            " List operand of type '${typeName(subject)}'"
-                )
-            }
-            is CharSequence -> when (key) {
-                is Int -> if (key !in subject.indices) {
-                    Undefined("index $key out of bounds for String operand " +
-                            "of type '${typeName(subject)}' " +
-                            "with size ${subject.length}")
-                } else {
-                    subject[key]
-                }
-                else -> Undefined(
-                    "invalid key '$key' of type '${typeName(key)}' for " +
-                            " String operand of type '${typeName(subject)}'"
-                )
-            }
+
             else -> Undefined(
                 "invalid operand " +
                         "of type '${typeName(subject)}' with " +

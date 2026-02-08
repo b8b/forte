@@ -2,6 +2,19 @@ package org.cikit.forte.lib.common
 
 import org.cikit.forte.core.*
 
+/**
+ * jinja-filters.replace(s: str, old: str, new: str, count: int | None = None) → str
+ *
+ *     Return a copy of the value with all occurrences of a substring replaced with a new one.
+ *     The first argument is the substring that should be replaced, the second is the replacement string.
+ *     If the optional third argument count is given, only the first count occurrences are replaced:
+ *
+ *     {{ "Hello World"|replace("Hello", "Goodbye") }}
+ *         -> Goodbye World
+ *
+ *     {{ "aaaaargh"|replace("a", "d'oh, ", 2) }}
+ *         -> d'oh, d'oh, aaargh
+ */
 class FilterReplace : FilterMethod {
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val search: String

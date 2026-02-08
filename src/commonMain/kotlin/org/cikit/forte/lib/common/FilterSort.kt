@@ -5,6 +5,41 @@ import org.cikit.forte.lib.core.FilterComparable
 import org.cikit.forte.lib.core.FilterGet
 import org.cikit.forte.lib.core.filterComparable
 
+/**
+ * jinja-filters.sort(value: 't.Iterable[V]', reverse: bool = False, case_sensitive: bool = False, attribute: str | int | NoneType = None) → 't.List[V]'
+ *
+ *     Sort an iterable.
+ *
+ *     {% for city in cities|sort %}
+ *         ...
+ *     {% endfor %}
+ *
+ *     Parameters:
+ *             reverse – Sort descending instead of ascending.
+ *             case_sensitive – When sorting strings, sort upper and lower case separately.
+ *             attribute – When sorting objects or dicts, an attribute or key to sort by.
+ *
+ *     The sort is stable, it does not change the relative order of elements that compare equal.
+ *     This makes it is possible to chain sorts on different attributes and ordering.
+ *
+ *     {% for user in users|sort(attribute="name")
+ *         |sort(reverse=true, attribute="age") %}
+ *         ...
+ *     {% endfor %}
+ *
+ * jinja-filters.unique(value: 't.Iterable[V]', case_sensitive: bool = False, attribute: str | int | NoneType = None) → 't.Iterator[V]'
+ *
+ *     Returns a list of unique items from the given iterable.
+ *
+ *     {{ ['foo', 'bar', 'foobar', 'FooBar']|unique|list }}
+ *         -> ['foo', 'bar', 'foobar']
+ *
+ *     The unique items are yielded in the same order as their first occurrence in the iterable passed to the filter.
+ *
+ *     Parameters:
+ *             case_sensitive – Treat upper and lower case strings as distinct.
+ *             attribute – Filter objects with unique values for this attribute.
+ */
 class FilterSort private constructor(
     private val comparable: FilterComparable,
     val unique: Boolean
@@ -29,7 +64,11 @@ class FilterSort private constructor(
         val reverse: Boolean
         val caseSensitive: Boolean
         args.use {
-            reverse = optional("reverse") { false }
+            reverse = if (unique) {
+                false
+            } else {
+                optional("reverse") { false }
+            }
             caseSensitive = optional("case_sensitive") { false }
             getArgs = optionalNullable(
                 "attribute",
@@ -84,7 +123,7 @@ class FilterSort private constructor(
                     return@Suspended map { it.value }
                 }
             }
-            buildList {
+            val result = buildList {
                 add(sortedList[0].value)
                 for (i in 1 until sortedList.size) {
                     if (sortedList[i].compareTo(sortedList[i - 1]) != 0) {
@@ -92,6 +131,7 @@ class FilterSort private constructor(
                     }
                 }
             }
+            Iterable { result.iterator() }
         }
     }
 }
