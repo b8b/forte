@@ -125,13 +125,13 @@ private suspend fun render(
         }
         return
     }
-    val buffer = StringBuilder()
-    var ctx = forte.renderTo(buffer)
     root.innerHTML = ""
+    var ctx = forte.scope()
     for (node in template.nodes) {
         if (node is Node.Text) {
-            ctx.evalNodes(template, listOf(node))
-            val output = buffer.toString(); buffer.clear()
+            val output = ctx.renderToString()
+                .evalNodes(template, listOf(node))
+                .result
             root.appendElement("p") {
                 innerHTML = formatMarkdown(output)
             }
@@ -148,8 +148,9 @@ private suspend fun render(
             }
             val backup = ctx.scope()
             try {
-                ctx.evalNodes(template, listOf(node))
-                val output = buffer.toString(); buffer.clear()
+                val output = ctx.renderToString()
+                    .evalNodes(template, listOf(node))
+                    .result
                 sourceElement.appendText(" \u2705")
                 root.appendElement("p") {
                     innerHTML = formatMarkdown(output)
