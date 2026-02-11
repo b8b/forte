@@ -166,7 +166,7 @@ private fun compileExpressionInternal(
                 expression.args
             )
             operations.add(
-                Operation.ApplySlice(
+                Operation.SliceGet(
                     expression = expression,
                     argNames = expression.args.names
                 )

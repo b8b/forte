@@ -59,7 +59,9 @@ actual fun <R>
     )
     defineMethod(
         FilterComparable.KEY,
-        FilterComparable(comparableTypes + jvmComparableTypes)
+        FilterComparable.DefaultFilterComparable(
+            comparableTypes + jvmComparableTypes
+        )
     )
     val jvmNumericTypes: Map<KClass<*>,
                 (Any) -> NumericValue> = hashMapOf(
@@ -94,7 +96,7 @@ actual fun <R>
     )
     defineMethod(
         FilterNumber.KEY,
-        FilterNumber(jvmNumericTypes)
+        FilterNumber.DefaultFilterNumber(jvmNumericTypes)
     )
     return this
 }

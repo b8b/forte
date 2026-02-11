@@ -12,57 +12,14 @@ import org.cikit.forte.core.typeName
 import kotlin.math.absoluteValue
 import kotlin.reflect.KClass
 
-class FilterComparable(
-    val types: Map<KClass<*>,
-                (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
-        Byte::class to { orig, value, _: Boolean ->
-            value as Byte
-            FloatComparableValue(orig, value.toDouble())
-        },
-        Short::class to { orig, value, _: Boolean ->
-            value as Short
-            FloatComparableValue(orig, value.toDouble())
-        },
-        Int::class to { orig, value, _: Boolean ->
-            value as Int
-            FloatComparableValue(orig, value.toDouble())
-        },
-        Long::class to { orig, value, _: Boolean ->
-            value as Long
-            if (value == 0L ||
-                64 - value.absoluteValue.countLeadingZeroBits() <= 53)
-            {
-                FloatComparableValue(orig, value.toDouble())
-            } else {
-                LongComparableValue(orig, value)
-            }
-        },
-        Float::class to { orig, value, _: Boolean ->
-            value as Float
-            FloatComparableValue(orig, value.toDouble())
-        },
-        Double::class to { orig, value, _: Boolean ->
-            value as Double
-            FloatComparableValue(orig, value)
-        },
-        Char::class to { orig, value, ignoreCase ->
-            value as Char
-            StringComparableValue(orig, value.toString(), ignoreCase)
-        },
-        ByteString::class to { orig, value, _: Boolean ->
-            @Suppress("UNCHECKED_CAST")
-            GenericComparableValue(orig, value as Comparable<Any>)
-        },
-    )
-) : FilterMethod {
+interface FilterComparable : FilterMethod {
 
     companion object {
         val KEY: Context.Key.Apply<FilterComparable> =
             Context.Key.Apply.create("comparable", FilterMethod.OPERATOR)
     }
 
-    override val isHidden: Boolean
-        get() = true
+    val types: Map<KClass<*>, (Any?, Any, Boolean) -> ComparableValue>
 
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val caseSensitive: Boolean
@@ -85,26 +42,81 @@ class FilterComparable(
         subject: Any?,
         originalValue: Any? = subject,
         ignoreCase: Boolean = false
-    ): ComparableValue? {
-        return when (subject) {
-            null -> null
-            is ComparableValue -> subject
-            is NumericValue -> subject.toComparableValue(subject)
-            is CharSequence -> StringComparableValue(
-                originalValue,
-                subject.concatToString(),
-                ignoreCase
-            )
-            is Iterable<*> -> ListComparableValue(
-                originalValue,
-                subject.map { invoke(it, it, ignoreCase) }
-            )
+    ): ComparableValue?
 
-            else -> types[subject::class]?.invoke(
-                originalValue,
-                subject,
-                ignoreCase
-            )
+    class DefaultFilterComparable(
+        override val types: Map<KClass<*>,
+                    (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
+            Byte::class to { orig, value, _: Boolean ->
+                value as Byte
+                FloatComparableValue(orig, value.toDouble())
+            },
+            Short::class to { orig, value, _: Boolean ->
+                value as Short
+                FloatComparableValue(orig, value.toDouble())
+            },
+            Int::class to { orig, value, _: Boolean ->
+                value as Int
+                FloatComparableValue(orig, value.toDouble())
+            },
+            Long::class to { orig, value, _: Boolean ->
+                value as Long
+                if (value == 0L ||
+                    64 - value.absoluteValue.countLeadingZeroBits() <= 53)
+                {
+                    FloatComparableValue(orig, value.toDouble())
+                } else {
+                    LongComparableValue(orig, value)
+                }
+            },
+            Float::class to { orig, value, _: Boolean ->
+                value as Float
+                FloatComparableValue(orig, value.toDouble())
+            },
+            Double::class to { orig, value, _: Boolean ->
+                value as Double
+                FloatComparableValue(orig, value)
+            },
+            Char::class to { orig, value, ignoreCase ->
+                value as Char
+                StringComparableValue(orig, value.toString(), ignoreCase)
+            },
+            ByteString::class to { orig, value, _: Boolean ->
+                @Suppress("UNCHECKED_CAST")
+                GenericComparableValue(orig, value as Comparable<Any>)
+            },
+        )
+    ) : FilterComparable {
+
+        override val isHidden: Boolean
+            get() = true
+
+        override fun test(
+            subject: Any?,
+            originalValue: Any?,
+            ignoreCase: Boolean
+        ): ComparableValue? {
+            return when (subject) {
+                null -> null
+                is ComparableValue -> subject
+                is NumericValue -> subject.toComparableValue(subject)
+                is CharSequence -> StringComparableValue(
+                    originalValue,
+                    subject.concatToString(),
+                    ignoreCase
+                )
+
+                is Iterable<*> -> ListComparableValue(
+                    originalValue,
+                    subject.map { invoke(it, it, ignoreCase) }
+                )
+
+                else -> types[subject::class]?.invoke(
+                    originalValue,
+                    subject,
+                    ignoreCase
+                )
+            }
         }
     }
 

@@ -19,6 +19,7 @@
     {% assert_that "abcdefghijk"[199:9:-1]  is eq('k') %}
     {% assert_that "abcdefghijk"[-1:-2:-1]  is eq('k') %}
     {% assert_that "abcdefghijk"[-10:-2:-1] is eq('') %}
+    {% assert_that "abcdefghijk"[::]        is eq('abcdefghijk') %}
 
 ## startswith
 

@@ -51,11 +51,13 @@ fun <R> Context.Builder<R>.defineCoreExtensions(): Context.Builder<R> {
 
     defineMethod(FilterDefault.KEY, FilterDefault())
     defineMethod(FilterGet.KEY, FilterGet.Hidden)
-    defineMethod(FilterSlice.KEY, FilterSlice())
-    defineMethod(FilterComparable.KEY, FilterComparable())
-    defineMethod(FilterNumber.KEY, FilterNumber())
+    defineMethod(
+        FilterComparable.KEY,
+        FilterComparable.DefaultFilterComparable()
+    )
+    defineMethod(FilterNumber.KEY, FilterNumber.DefaultFilterNumber())
 
-    defineMethod(IsInTest.KEY, IsInTest(this))
+    defineMethod(IsInTest.KEY, IsInTest.DefaultIsInTest(this))
 
     defineFunction("range", RangeFunction() as Function)
 

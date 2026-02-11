@@ -40,7 +40,9 @@ actual fun <R>
     )
     defineMethod(
         FilterComparable.KEY,
-        FilterComparable(comparableTypes + jsComparableTypes)
+        FilterComparable.DefaultFilterComparable(
+            comparableTypes + jsComparableTypes
+        )
     )
     val jsNumericTypes: Map<KClass<*>,
                 (Any) -> NumericValue> = hashMapOf(
@@ -67,7 +69,7 @@ actual fun <R>
     )
     defineMethod(
         FilterNumber.KEY,
-        FilterNumber(jsNumericTypes)
+        FilterNumber.DefaultFilterNumber(jsNumericTypes)
     )
     return this
 }

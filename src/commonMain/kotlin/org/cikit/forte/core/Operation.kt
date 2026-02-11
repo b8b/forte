@@ -1,6 +1,5 @@
 package org.cikit.forte.core
 
-import org.cikit.forte.lib.core.FilterGet
 import org.cikit.forte.parser.Expression
 
 sealed class Operation {
@@ -497,59 +496,56 @@ sealed class Operation {
         }
     }
 
-    sealed class Get(
+    class ConstGet(
         override val expression: Expression,
+        val identifier: String
     ) : Operation() {
         override fun toString(): String {
-            return "Get()"
+            return "Get($identifier)"
         }
 
-        protected fun applyGet(
-            ctx: Context<*>,
-            state: EvaluatorState,
-            key: Any?
-        ) {
-            val getArgs = NamedArgs(listOf(key), FilterGet.singleArg)
+        override fun invoke(ctx: Context<*>, state: EvaluatorState) {
             val filterGet = ctx.filterGet
             val value = if (filterGet.isRescue) {
                 state.rescueLast()
             } else {
                 state.last()
             }
-            val result = filterGet(value, getArgs)
+            val result = filterGet.getConst(value, identifier)
             if (result !== value) {
                 state.setLast(expression, result)
             }
         }
     }
 
-    class ConstGet(expression: Expression, val key: Any) : Get(expression) {
-        override fun toString(): String {
-            return "Get($key)"
-        }
-
-        override fun invoke(ctx: Context<*>, state: EvaluatorState) {
-            return applyGet(ctx, state, key)
-        }
-    }
-
-    class ComputedGet(expression: Expression) : Get(expression) {
+    class ComputedGet(
+        override val expression: Expression
+    ) : Operation() {
         override fun toString(): String {
             return "ComputedGet()"
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
             val key = state.removeLast()
-            applyGet(ctx, state, key)
+            val filterGet = ctx.filterGet
+            val value = if (filterGet.isRescue) {
+                state.rescueLast()
+            } else {
+                state.last()
+            }
+            val result = filterGet.getComputed(value, key)
+            if (result !== value) {
+                state.setLast(expression, result)
+            }
         }
     }
 
-    class ApplySlice(
+    class SliceGet(
         override val expression: Expression,
         val argNames: List<String>,
     ) : Operation() {
         override fun toString(): String {
-            return "Slice()"
+            return "SliceGet($argNames)"
         }
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
@@ -557,13 +553,13 @@ sealed class Operation {
                 (state.removeLast() as Array<*>).toList(),
                 argNames
             )
-            val filterSlice = ctx.filterSlice
-            val value = if (filterSlice.isRescue) {
+            val filterGet = ctx.filterGet
+            val value = if (filterGet.isRescue) {
                 state.rescueLast()
             } else {
                 state.last()
             }
-            val result = filterSlice(value, args)
+            val result = filterGet.getSlice(value, args)
             if (result !== value) {
                 state.setLast(expression, result)
             }

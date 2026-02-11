@@ -4,59 +4,65 @@ import org.cikit.forte.core.*
 import kotlin.math.pow
 import kotlin.reflect.KClass
 
-class FilterNumber(
-    val types: Map<KClass<*>, (Any) -> NumericValue> = hashMapOf(
-        Byte::class to { value ->
-            value as Byte
-            IntNumericValue(value.toInt())
-        },
-        Short::class to { value ->
-            value as Short
-            IntNumericValue(value.toInt())
-        },
-        Int::class to { value ->
-            value as Int
-            IntNumericValue(value)
-        },
-        Long::class to { value ->
-            value as Long
-            LongNumericValue(value)
-        },
-        Float::class to { value ->
-            value as Float
-            FloatNumericValue(value.toDouble())
-        },
-        Double::class to { value ->
-            value as Double
-            FloatNumericValue(value)
-        },
-    )
-) : FilterMethod {
+interface FilterNumber : FilterMethod {
 
     companion object {
         val KEY: Context.Key.Apply<FilterNumber> =
             Context.Key.Apply.create("number", FilterMethod.OPERATOR)
     }
 
-    override val isHidden: Boolean
-        get() = true
+    val types: Map<KClass<*>, (Any) -> NumericValue>
 
     override fun invoke(subject: Any?, args: NamedArgs): NumericValue {
         args.requireEmpty()
         return invoke(subject)
     }
 
-    operator fun invoke(subject: Any?): NumericValue {
-        return when (subject) {
-            null -> null
-            is NumericValue -> subject
-            else -> types[subject::class]?.invoke(subject)
-        } ?: error("operand of type ${typeName(subject)} is not a number")
-    }
+    operator fun invoke(subject: Any?): NumericValue
 
+    class DefaultFilterNumber(
+        override val types: Map<KClass<*>, (Any) -> NumericValue> = hashMapOf(
+            Byte::class to { value ->
+                value as Byte
+                IntNumericValue(value.toInt())
+            },
+            Short::class to { value ->
+                value as Short
+                IntNumericValue(value.toInt())
+            },
+            Int::class to { value ->
+                value as Int
+                IntNumericValue(value)
+            },
+            Long::class to { value ->
+                value as Long
+                LongNumericValue(value)
+            },
+            Float::class to { value ->
+                value as Float
+                FloatNumericValue(value.toDouble())
+            },
+            Double::class to { value ->
+                value as Double
+                FloatNumericValue(value)
+            },
+        )
+    ) : FilterNumber {
+
+        override val isHidden: Boolean
+            get() = true
+
+        override operator fun invoke(subject: Any?): NumericValue {
+            return when (subject) {
+                null -> null
+                is NumericValue -> subject
+                else -> types[subject::class]?.invoke(subject)
+            } ?: error("operand of type ${typeName(subject)} is not a number")
+        }
+    }
     private class IntNumericValue(
         val value: Int
-    ): Number(), NumericValue {
+    ) : Number(), NumericValue {
 
         override val result: Int
             get() = value
@@ -277,7 +283,7 @@ class FilterNumber(
 
     private class LongNumericValue(
         val value: Long
-    ): Number(), NumericValue {
+    ) : Number(), NumericValue {
 
         override val result: Long
             get() = value
@@ -430,7 +436,7 @@ class FilterNumber(
             )
         }
 
-        override fun pow(other: NumericValue): NumericValue = when (other){
+        override fun pow(other: NumericValue): NumericValue = when (other) {
             is IntNumericValue -> {
                 val newValue = value.toDouble().pow(other.value).toInt()
                 IntNumericValue(newValue)
@@ -498,7 +504,7 @@ class FilterNumber(
 
     private class FloatNumericValue(
         val value: Double
-    ): Number(), NumericValue {
+    ) : Number(), NumericValue {
 
         override val result: Double
             get() = value

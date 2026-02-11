@@ -10,7 +10,6 @@ import org.cikit.forte.internal.EvaluatorStateImpl
 import org.cikit.forte.internal.TemplateLoaderImpl
 import org.cikit.forte.lib.core.DictFunction
 import org.cikit.forte.lib.core.FilterGet
-import org.cikit.forte.lib.core.FilterSlice
 import org.cikit.forte.lib.core.FilterString
 import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.Node
@@ -165,17 +164,14 @@ sealed class Context<R> : TemplateObject {
 
     abstract val result: R
 
-    open val filterGet: FilterMethod
-        get() = resolveFilter(FilterGet.KEY)
+    open val filterGet: FilterGet
+        get() = resolveFilterGet(FilterGet.KEY)
 
     open val dictFunction: Function
         get() = resolveFunction(DictFunction.KEY)
 
     open val filterString: FilterMethod
         get() = resolveFilter(FilterString.KEY)
-
-    open val filterSlice: FilterMethod
-        get() = resolveFilter(FilterSlice.KEY)
 
     open fun getCommandTag(name: String) = getCommandTag(Key.Command(name))
     open fun getControlTag(name: String) = getControlTag(Key.Control(name))
@@ -200,6 +196,10 @@ sealed class Context<R> : TemplateObject {
                 error("$key is not defined")
             }
         }
+    }
+
+    protected fun resolveFilterGet(key: Key.Apply<FilterGet>): FilterGet {
+        return getMethod(key) ?: FilterGet.NoImplementation
     }
 
     protected fun resolveFunction(key: Key.Call): Function {
@@ -235,8 +235,7 @@ sealed class Context<R> : TemplateObject {
 
     class Builder<R> private constructor(
         private var scope: PersistentMap.Builder<String, Any>,
-        filterGet: FilterMethod? = null,
-        filterSlice: FilterMethod? = null,
+        filterGet: FilterGet? = null,
         dictFunction: Function? = null,
         filterString: FilterMethod? = null,
         private val resultGetter: () -> R,
@@ -251,7 +250,6 @@ sealed class Context<R> : TemplateObject {
                 return Builder(
                     scope = importContext(ctx).builder(),
                     filterGet = ctx.filterGet,
-                    filterSlice = ctx.filterSlice,
                     dictFunction = ctx.dictFunction,
                     filterString = ctx.filterString,
                     resultGetter = ::noop,
@@ -274,11 +272,8 @@ sealed class Context<R> : TemplateObject {
         override val result: R
             get() = resultGetter()
 
-        override var filterGet: FilterMethod = filterGet
-            ?: resolveFilter(FilterGet.KEY)
-
-        override var filterSlice: FilterMethod = filterSlice
-            ?: resolveFilter(FilterSlice.KEY)
+        override var filterGet: FilterGet = filterGet
+            ?: resolveFilterGet(FilterGet.KEY)
 
         override var dictFunction: Function = dictFunction
             ?: resolveFunction(DictFunction.KEY)
@@ -513,10 +508,7 @@ sealed class Context<R> : TemplateObject {
             define(key.value, implementation)
             when (key.value) {
                 FilterGet.KEY.value -> {
-                    filterGet = resolveFilter(FilterGet.KEY)
-                }
-                FilterSlice.KEY.value -> {
-                    filterSlice = resolveFilter(FilterSlice.KEY)
+                    filterGet = resolveFilterGet(FilterGet.KEY)
                 }
                 FilterString.KEY.value -> {
                     filterString = resolveFilter(FilterString.KEY)
@@ -536,7 +528,6 @@ sealed class Context<R> : TemplateObject {
             return Builder(
                 scope = importContext(rootContext).builder(),
                 filterGet = rootContext.filterGet,
-                filterSlice = rootContext.filterSlice,
                 dictFunction = rootContext.dictFunction,
                 filterString = rootContext.filterString,
                 resultGetter = resultGetter,
@@ -548,7 +539,6 @@ sealed class Context<R> : TemplateObject {
         override fun withScope(ctx: Context<*>): Builder<R> = Builder(
             importContext(ctx).builder(),
             filterGet = ctx.filterGet,
-            filterSlice = ctx.filterSlice,
             dictFunction = ctx.dictFunction,
             filterString = ctx.filterString,
             resultGetter = resultGetter,
@@ -559,7 +549,6 @@ sealed class Context<R> : TemplateObject {
         override fun scope(): Builder<R> = Builder(
             scope.build().builder(),
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = resultGetter,
@@ -570,7 +559,6 @@ sealed class Context<R> : TemplateObject {
         fun discard() = Builder(
             scope = scope,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
@@ -581,7 +569,6 @@ sealed class Context<R> : TemplateObject {
         fun captureTo(target: (Any?) -> Unit) = Builder(
             scope = scope,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
@@ -592,7 +579,6 @@ sealed class Context<R> : TemplateObject {
         fun captureTo(flowCollector: FlowCollector<Any?>) = Builder(
             scope = scope,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
@@ -603,7 +589,6 @@ sealed class Context<R> : TemplateObject {
         fun captureTo(resultBuilder: ResultBuilder) = Builder(
             scope = scope,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
@@ -616,7 +601,6 @@ sealed class Context<R> : TemplateObject {
             return Builder(
                 scope = scope,
                 filterGet = filterGet,
-                filterSlice = filterSlice,
                 dictFunction = dictFunction,
                 filterString = filterString,
                 resultGetter = listBuilder::toList,
@@ -630,7 +614,6 @@ sealed class Context<R> : TemplateObject {
         fun renderTo(target: Appendable) = Builder(
             scope = scope,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
@@ -647,7 +630,6 @@ sealed class Context<R> : TemplateObject {
         fun renderTo(flowCollector: FlowCollector<CharSequence>) = Builder(
             scope = scope,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
@@ -660,7 +642,6 @@ sealed class Context<R> : TemplateObject {
             return Builder(
                 scope = scope,
                 filterGet = filterGet,
-                filterSlice = filterSlice,
                 dictFunction = dictFunction,
                 filterString = filterString,
                 resultGetter = stringBuilder::toString,
@@ -852,7 +833,6 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             result = result,
             filterGet = filterGet,
-            filterSlice = filterSlice,
             dictFunction = dictFunction,
             filterString = filterString
         )
@@ -982,16 +962,10 @@ sealed class Context<R> : TemplateObject {
             override val result: Unit
                 get() = Unit
 
-            override val filterGet: FilterMethod
+            override val filterGet: FilterGet
                 get() {
                     dependencies.add(FilterGet.KEY.value)
                     return super.filterGet
-                }
-
-            override val filterSlice: FilterMethod
-                get() {
-                    dependencies.add(FilterSlice.KEY.value)
-                    return super.filterSlice
                 }
 
             override val dictFunction: Function
@@ -1051,15 +1025,11 @@ sealed class Context<R> : TemplateObject {
     private class ReadOnlyContext<R>(
         val scope: PersistentMap<String, Any>,
         override val result: R,
-        filterGet: FilterMethod? = null,
-        filterSlice: FilterMethod? = null,
+        filterGet: FilterGet? = null,
         dictFunction: Function? = null,
         filterString: FilterMethod? = null,
     ) : Context<R>() {
-        override var filterGet: FilterMethod
-            private set
-
-        override var filterSlice: FilterMethod
+        override var filterGet: FilterGet
             private set
 
         override var dictFunction: Function
@@ -1069,8 +1039,7 @@ sealed class Context<R> : TemplateObject {
             private set
 
         init {
-            this.filterGet = filterGet ?: resolveFilter(FilterGet.KEY)
-            this.filterSlice = filterSlice ?: resolveFilter(FilterSlice.KEY)
+            this.filterGet = filterGet ?: resolveFilterGet(FilterGet.KEY)
             this.dictFunction = dictFunction
                 ?: resolveFunction(DictFunction.KEY)
             this.filterString = filterString ?: resolveFilter(FilterString.KEY)

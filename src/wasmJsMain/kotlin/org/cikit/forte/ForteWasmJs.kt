@@ -58,7 +58,9 @@ actual fun <R>
     )
     defineMethod(
         FilterComparable.KEY,
-        FilterComparable(comparableTypes + wasmJsComparableTypes)
+        FilterComparable.DefaultFilterComparable(
+            comparableTypes + wasmJsComparableTypes
+        )
     )
     val wasmJsNumericTypes: Map<KClass<*>,
                 (Any) -> NumericValue> = hashMapOf(
@@ -93,7 +95,7 @@ actual fun <R>
     )
     defineMethod(
         FilterNumber.KEY,
-        FilterNumber(wasmJsNumericTypes)
+        FilterNumber.DefaultFilterNumber(wasmJsNumericTypes)
     )
     return this
 }
