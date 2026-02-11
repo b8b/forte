@@ -3,13 +3,13 @@ package org.cikit.forte.lib.core
 import org.cikit.forte.core.Branch
 import org.cikit.forte.core.Context
 import org.cikit.forte.core.ControlTag
+import org.cikit.forte.core.EvalException
 import org.cikit.forte.core.FilterMethod
 import org.cikit.forte.core.NamedArgs
 import org.cikit.forte.core.Suspended
 import org.cikit.forte.core.Undefined
 import org.cikit.forte.core.concatToString
 import org.cikit.forte.core.typeName
-import org.cikit.forte.parser.Expression
 import org.cikit.forte.parser.ParsedTemplate
 
 class ControlFilter : ControlTag {
@@ -26,23 +26,22 @@ class ControlFilter : ControlTag {
         val argNames = buildList {
             val items = ctx.evalExpression(argNamesExpr) as List<*>
             for (item in items) {
-                this += ctx.evalExpression(item as Expression) as String
+                this += (item as CharSequence).concatToString()
             }
         }
-        val argValues = buildList {
-            val items = ctx.evalExpression(argValuesExpr) as List<*>
-            for (item in items) {
-                this += ctx.evalExpression(item as Expression)
-            }
-        }
+        val argValues = ctx.evalExpression(argValuesExpr) as List<*>
         require(name is CharSequence) {
             "invalid type '${typeName(name)}' for filter name"
         }
         val filter = ctx.getMethod(
-            Context.Key.Apply(name.concatToString(), "pipe")
+            Context.Key.Apply.create(
+                name.concatToString(),
+                FilterMethod.OPERATOR
+            )
+        ) ?: throw EvalException(
+            nameExpr,
+            "filter '$name' is not defined"
         )
-            ?.let { it as FilterMethod }
-            ?: error("filter '$name' is not defined")
         val filterArgs = NamedArgs(
             values = argValues,
             names = argNames
