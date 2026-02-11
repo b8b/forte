@@ -571,7 +571,7 @@ private class ExpressionParserImpl(
                         op1,
                         alias,
                         mutLhs,
-                        input.substring(rhs.token.first, rhs.token.last),
+                        input.substring(rhs.token.first .. rhs.token.last),
                         Expression.NamedArgs()
                     )
                     is Expression.NullLiteral -> Expression.TransformOp(
@@ -579,13 +579,12 @@ private class ExpressionParserImpl(
                         op1,
                         alias,
                         mutLhs,
-                        input.substring(rhs.token.first, rhs.token.last),
+                        input.substring(rhs.token.first .. rhs.token.last),
                         Expression.NamedArgs()
                     )
                     is Expression.NumericLiteral -> {
                         val source = input.substring(
-                            rhs.first.first,
-                            rhs.first.last
+                            rhs.first.first ..rhs.first.last
                         )
                         if (!source.first().isLetter() ||
                             rhs.first != rhs.last)
