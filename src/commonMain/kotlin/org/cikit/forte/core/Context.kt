@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import org.cikit.forte.Forte
 import org.cikit.forte.internal.EvaluatorStateImpl
 import org.cikit.forte.internal.TemplateLoaderImpl
-import org.cikit.forte.lib.core.FilterDict
+import org.cikit.forte.lib.core.DictFunction
 import org.cikit.forte.lib.core.FilterGet
 import org.cikit.forte.lib.core.FilterSlice
 import org.cikit.forte.lib.core.FilterString
@@ -168,8 +168,8 @@ sealed class Context<R> : TemplateObject {
     open val filterGet: FilterMethod
         get() = resolveFilter(FilterGet.KEY)
 
-    open val filterDict: FilterMethod
-        get() = resolveFilter(FilterDict.KEY)
+    open val dictFunction: Function
+        get() = resolveFunction(DictFunction.KEY)
 
     open val filterString: FilterMethod
         get() = resolveFilter(FilterString.KEY)
@@ -202,6 +202,14 @@ sealed class Context<R> : TemplateObject {
         }
     }
 
+    protected fun resolveFunction(key: Key.Call): Function {
+        return getFunction(key) ?: object : Function {
+            override fun invoke(args: NamedArgs): Any? {
+                error("$key is not defined")
+            }
+        }
+    }
+
     protected inline fun <reified T> Any.invokableValue(): T? =
         (this as? Value.Invokable)?.let { it.value as T }
 
@@ -229,7 +237,7 @@ sealed class Context<R> : TemplateObject {
         scope: PersistentMap<String, Any>,
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
-        filterDict: FilterMethod? = null,
+        dictFunction: Function? = null,
         filterString: FilterMethod? = null,
         private val resultGetter: () -> R,
         private val templateLoader: TemplateLoaderImpl,
@@ -244,7 +252,7 @@ sealed class Context<R> : TemplateObject {
                     scope = importContext(ctx),
                     filterGet = ctx.filterGet,
                     filterSlice = ctx.filterSlice,
-                    filterDict = ctx.filterDict,
+                    dictFunction = ctx.dictFunction,
                     filterString = ctx.filterString,
                     resultGetter = ::noop,
                     templateLoader = templateLoader,
@@ -274,8 +282,8 @@ sealed class Context<R> : TemplateObject {
         override var filterSlice: FilterMethod = filterSlice
             ?: resolveFilter(FilterSlice.KEY)
 
-        override var filterDict: FilterMethod = filterDict
-            ?: resolveFilter(FilterDict.KEY)
+        override var dictFunction: Function = dictFunction
+            ?: resolveFunction(DictFunction.KEY)
 
         override var filterString: FilterMethod = filterString
             ?: resolveFilter(FilterString.KEY)
@@ -467,6 +475,9 @@ sealed class Context<R> : TemplateObject {
             implementation: Function
         ): Builder<R> {
             define(key.value, implementation)
+            if (key.value == DictFunction.KEY.value) {
+                this.dictFunction = resolveFunction(DictFunction.KEY)
+            }
             return this
         }
 
@@ -509,9 +520,6 @@ sealed class Context<R> : TemplateObject {
                 FilterSlice.KEY.value -> {
                     filterSlice = resolveFilter(FilterSlice.KEY)
                 }
-                FilterDict.KEY.value -> {
-                    filterDict = resolveFilter(FilterDict.KEY)
-                }
                 FilterString.KEY.value -> {
                     filterString = resolveFilter(FilterString.KEY)
                 }
@@ -531,7 +539,7 @@ sealed class Context<R> : TemplateObject {
                 scope = importContext(rootContext),
                 filterGet = rootContext.filterGet,
                 filterSlice = rootContext.filterSlice,
-                filterDict = rootContext.filterDict,
+                dictFunction = rootContext.dictFunction,
                 filterString = rootContext.filterString,
                 resultGetter = resultGetter,
                 templateLoader = templateLoader,
@@ -543,7 +551,7 @@ sealed class Context<R> : TemplateObject {
             importContext(ctx),
             filterGet = ctx.filterGet,
             filterSlice = ctx.filterSlice,
-            filterDict = ctx.filterDict,
+            dictFunction = ctx.dictFunction,
             filterString = ctx.filterString,
             resultGetter = resultGetter,
             templateLoader = templateLoader,
@@ -554,7 +562,7 @@ sealed class Context<R> : TemplateObject {
             scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = resultGetter,
             templateLoader = templateLoader,
@@ -565,7 +573,7 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
             templateLoader = templateLoader,
@@ -576,7 +584,7 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
             templateLoader = templateLoader,
@@ -587,7 +595,7 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
             templateLoader = templateLoader,
@@ -598,7 +606,7 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
             templateLoader = templateLoader,
@@ -611,7 +619,7 @@ sealed class Context<R> : TemplateObject {
                 scope = scope.build(),
                 filterGet = filterGet,
                 filterSlice = filterSlice,
-                filterDict = filterDict,
+                dictFunction = this@Builder.dictFunction,
                 filterString = filterString,
                 resultGetter = listBuilder::toList,
                 templateLoader = templateLoader,
@@ -625,7 +633,7 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
             templateLoader = templateLoader,
@@ -642,7 +650,7 @@ sealed class Context<R> : TemplateObject {
             scope = scope.build(),
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString,
             resultGetter = ::noop,
             templateLoader = templateLoader,
@@ -655,7 +663,7 @@ sealed class Context<R> : TemplateObject {
                 scope = scope.build(),
                 filterGet = filterGet,
                 filterSlice = filterSlice,
-                filterDict = filterDict,
+                dictFunction = this@Builder.dictFunction,
                 filterString = filterString,
                 resultGetter = stringBuilder::toString,
                 templateLoader = templateLoader,
@@ -847,7 +855,7 @@ sealed class Context<R> : TemplateObject {
             result = result,
             filterGet = filterGet,
             filterSlice = filterSlice,
-            filterDict = filterDict,
+            dictFunction = this@Builder.dictFunction,
             filterString = filterString
         )
 
@@ -988,10 +996,10 @@ sealed class Context<R> : TemplateObject {
                     return super.filterSlice
                 }
 
-            override val filterDict: FilterMethod
+            override val dictFunction: Function
                 get() {
-                    dependencies.add(FilterDict.KEY.value)
-                    return super.filterDict
+                    dependencies.add(DictFunction.KEY.value)
+                    return super.dictFunction
                 }
 
             override val filterString: FilterMethod
@@ -1047,7 +1055,7 @@ sealed class Context<R> : TemplateObject {
         override val result: R,
         filterGet: FilterMethod? = null,
         filterSlice: FilterMethod? = null,
-        filterDict: FilterMethod? = null,
+        dictFunction: Function? = null,
         filterString: FilterMethod? = null,
     ) : Context<R>() {
         override var filterGet: FilterMethod
@@ -1056,7 +1064,7 @@ sealed class Context<R> : TemplateObject {
         override var filterSlice: FilterMethod
             private set
 
-        override var filterDict: FilterMethod
+        override var dictFunction: Function
             private set
 
         override var filterString: FilterMethod
@@ -1065,7 +1073,8 @@ sealed class Context<R> : TemplateObject {
         init {
             this.filterGet = filterGet ?: resolveFilter(FilterGet.KEY)
             this.filterSlice = filterSlice ?: resolveFilter(FilterSlice.KEY)
-            this.filterDict = filterDict ?: resolveFilter(FilterDict.KEY)
+            this.dictFunction = dictFunction
+                ?: resolveFunction(DictFunction.KEY)
             this.filterString = filterString ?: resolveFilter(FilterString.KEY)
         }
 

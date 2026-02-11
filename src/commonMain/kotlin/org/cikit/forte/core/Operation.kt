@@ -150,7 +150,9 @@ sealed class Operation {
             val builder = state.last() as Map<*, *>
             state.setLast(
                 expression,
-                ctx.filterDict(builder.toMap(), NamedArgs.Empty)
+                ctx.dictFunction(
+                    NamedArgs(listOf(builder.toMap()), emptyList())
+                )
             )
         }
     }

@@ -108,7 +108,9 @@ private suspend fun convertJson(
         for ((k, v) in value) {
             result[k] = convertJson(ctx, v)
         }
-        val finalResult = ctx.filterDict(result.toMap(), NamedArgs.Empty)
+        val finalResult = ctx.dictFunction(
+            NamedArgs(listOf(result.toMap()), emptyList())
+        )
         if (finalResult is Suspended) {
             finalResult.eval(ctx)
         } else {
