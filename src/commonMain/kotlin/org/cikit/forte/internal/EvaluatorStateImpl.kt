@@ -30,10 +30,16 @@ internal class EvaluatorStateImpl : EvaluatorState {
             } else {
                 expression
             }
-        eval(ctx, finalExpression.operations)
-        val result = removeLast()
-        require(isEmpty())
-        return result
+        try {
+            eval(ctx, finalExpression.operations)
+            val result = removeLast()
+            require(isEmpty())
+            return result
+        } catch (ex: Throwable) {
+            stackSize = 0
+            stack.fill(null)
+            throw ex
+        }
     }
 
     suspend fun renderExpression(
@@ -46,14 +52,20 @@ internal class EvaluatorStateImpl : EvaluatorState {
             } else {
                 expression
             }
-        eval(ctx, finalExpression.operations)
-        if (isSuspended || rescueLast() !is CharSequence) {
-            applyFilter(expression, ctx.filterString, NamedArgs.Empty)
+        try {
+            eval(ctx, finalExpression.operations)
+            if (isSuspended || rescueLast() !is CharSequence) {
+                applyFilter(expression, ctx.filterString, NamedArgs.Empty)
+            }
+            val result = removeLast()
+            require(isEmpty())
+            require(result is CharSequence)
+            return result
+        } catch (ex: Throwable) {
+            stackSize = 0
+            stack.fill(null)
+            throw ex
         }
-        val result = removeLast()
-        require(isEmpty())
-        require(result is CharSequence)
-        return result
     }
 
     suspend fun eval(
