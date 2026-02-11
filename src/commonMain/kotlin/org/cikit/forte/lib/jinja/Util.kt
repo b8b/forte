@@ -44,9 +44,7 @@ import org.cikit.forte.parser.Declarations
 
 // unimplemented binary operators
 //
-// * `+`  (plus)   for Iterable
 // * `%`  (rem)    for string format
-// * `*`  (mul)    for string replicate
 // * `**` (pow)    parsed right associative (use strict jinja compat to revert)
 
 fun <R> Context.Builder<R>.defineJinjaExtensions(): Context.Builder<R> {

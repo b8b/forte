@@ -81,7 +81,7 @@ class RawString(
 
 fun CharSequence.concatToString() = this as? String
     ?: (this as? InlineString)?.toString()
-    ?: CharArray(length) { i -> get(i) }.concatToString()
+    ?: buildString(length) { append(this@concatToString) }
 
 interface ComparableValue : Comparable<ComparableValue> {
     val value: Any?

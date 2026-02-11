@@ -5,6 +5,7 @@ import org.cikit.forte.core.Context
 import org.cikit.forte.core.DependencyAware
 import org.cikit.forte.core.FilterMethod
 import org.cikit.forte.core.NamedArgs
+import org.cikit.forte.core.StringConcatenation
 import org.cikit.forte.core.Suspended
 import org.cikit.forte.core.Undefined
 
@@ -44,10 +45,7 @@ class BinaryConcat private constructor(
                 result as CharSequence
             }
         }
-        return buildString {
-            append(leftStr)
-            append(rightStr)
-        }
+        return StringConcatenation.concat(leftStr, rightStr)
     }
 
     private fun concatSuspended(
@@ -72,10 +70,7 @@ class BinaryConcat private constructor(
                 result as CharSequence
             }
         }
-        buildString {
-            append(leftStr)
-            append(rightStr)
-        }
+        StringConcatenation.concat(leftStr, rightStr)
     }
 
     private fun concatSuspended(
@@ -87,9 +82,6 @@ class BinaryConcat private constructor(
             return@Suspended rightStr
         }
         rightStr as CharSequence
-        buildString {
-            append(leftStr)
-            append(rightStr)
-        }
+        StringConcatenation.concat(leftStr, rightStr)
     }
 }

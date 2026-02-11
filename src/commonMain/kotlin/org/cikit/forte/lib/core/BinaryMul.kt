@@ -3,6 +3,7 @@ package org.cikit.forte.lib.core
 import org.cikit.forte.core.BinOpFunction
 import org.cikit.forte.core.Context
 import org.cikit.forte.core.DependencyAware
+import org.cikit.forte.core.StringConcatenation
 
 class BinaryMul private constructor(
     private val number: FilterNumber
@@ -20,6 +21,20 @@ class BinaryMul private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).mul(number(right)).result
+        val leftNumber = try {
+            number(left)
+        } catch (ex: Exception) {
+            return when (left) {
+                is CharSequence -> {
+                    if (right !is Int) {
+                        binOpTypeError("plus", left, right)
+                    }
+                    StringConcatenation.replicate(left, right)
+                }
+
+                else -> throw ex
+            }
+        }
+        return leftNumber.mul(number(right)).result
     }
 }
