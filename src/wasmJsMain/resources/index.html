@@ -49,7 +49,7 @@
             outline: none;
         }
 
-        button#eval {
+        button {
             background: linear-gradient(90deg, #4f8cff 0%, #38b2ac 100%);
             color: #fff;
             border: none;
@@ -63,7 +63,7 @@
             transition: background 0.2s;
         }
 
-        button#eval:hover {
+        button:hover {
             background: linear-gradient(90deg, #38b2ac 0%, #4f8cff 100%);
         }
 
@@ -108,19 +108,28 @@
 <body>
 <h1>Forte Playground</h1>
 <div class="row">
-    <textarea id="template" rows="12" style="width: 100%">{% load_json %}
+    <textarea id="template" rows="12" style="width: 100%">### Define variables by loading inline JSON
+
+{% load_json %}
 {
   "a": 1,
   "b": 2
 }
 {% endload -%}
 
-a + b = &lt;b&gt;{{ a + b }}&lt;/b&gt;</textarea>
+### Try a simple calculation
+
+{{ a + "b" }}
+
+use the correct syntax: {{ a + b }}
+</textarea>
 </div>
 <div class="row">
     <button id="eval">Render</button>
     <input id="autorender" type="checkbox" checked>
     <label for="autorender">autorender</label>
+    <input id="echo" type="checkbox" checked>
+    <label for="echo">echo</label>
 </div>
 <hr>
 <table style="width: 100%; height: 100%">

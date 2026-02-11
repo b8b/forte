@@ -65,6 +65,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.9.0")
+                implementation("org.jetbrains:markdown:0.7.3")
             }
         }
         jvmMain {}
@@ -80,6 +81,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-browser-wasm-js:0.5.0")
                 implementation("com.ionspin.kotlin:bignum:0.3.10")
                 implementation("dev.erikchristensen.javamath2kmp:javamath2kmp:1.1")
+                implementation("org.jetbrains:markdown:0.7.3")
             }
         }
         wasmJsTest {}

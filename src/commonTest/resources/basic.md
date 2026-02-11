@@ -1,281 +1,213 @@
-# basic tests
+# Basic Tests
 
 ## Raw Tag
 
-```twig
-{# no comment #}
-{% no command %}
-{{ no emit }}
-~
-{%- raw -%}
-{# no comment #}
-{% no command %}
-{{ no emit }}
-{%- endraw -%}
-```
+    {% assert eq("{# no comment #}") %}{% raw %}{# no comment #}{% endraw %}{% endassert %}
+    {% assert eq("{% no command %}") %}{% raw %}{% no command %}{% endraw %}{% endassert %}
+    {% assert eq("{{ no emit }}") %}{% raw %}{{ no emit }}{% endraw %}{% endassert %}
 
 ## Range
 
-```twig
-1, 2
-~
-{{ range(1, 3)|join(", ") }}
-```
+    {% assert eq("1, 2") %}{{ range(1, 3)|join(", ") }}{% endassert %}
 
 ## IfElse
 
-```twig
-OK
-~
-{% if true %}OK{% else %}BAD{% endif %}
-```
+    {% assert eq("OK") %}{% if true %}OK{% else %}BAD{% endif %}{% endassert %}
 
 ## ForElse
 
-```twig
-BAD
-OKOKOK
-OKa1OKb2OKa3
-~
-{% for x in [1, 2, 3] if x > 3 %}OK{% else %}BAD{% endfor %}
-{% for x in [1, 2, 3] %}OK{% endfor %}
-{% for x in [1, 2, 3] -%}
-  OK
-  {{- loop.cycle("a", "b") -}}
-  {{- loop.index -}}
-{% endfor %}
-```
+    {% assert eq("BAD") %}{% for x in [1, 2, 3] if x > 3 %}OK{% else %}BAD{% endfor %}{% endassert %}
+    {% assert eq("OKOKOK") %}{% for x in [1, 2, 3] %}OK{% endfor %}{% endassert %}
+    {% assert eq("OKa1OKb2OKa3") %}
+        {% for x in [1, 2, 3] -%}
+          OK
+          {{- loop.cycle("a", "b") -}}
+          {{- loop.index -}}
+        {% endfor %}
+    {% endassert %}
 
 ## ObjectLiteral
 
-```twig
-{"a":11,"b":22}
-~
-{{ {a: 11, b: 22, }|tojson }}
-```
+    {% assert eq('{"a":11,"b":22}') %}{{ {a: 11, b: 22, }|tojson }}{% endassert %}
+
 
 ## Arithmetic
 
-```twig
-2
-1208925819614629174706177
-1152921504606846976
-2147483648
-~
-{{ 1 + 1 }}
-{{ 1208925819614629174706176 + 1 }}
-{{ 2 ** 60 }}
-{{ 2147483647 + 1 }}
-```
+    {% assert eq("2") %}{{ 1 + 1 }}{% endassert %}
+    {% assert eq("1208925819614629174706177") %}{{ 1208925819614629174706176 + 1 }}{% endassert %}
+    {% assert eq("1152921504606846976") %}{{ 2 ** 60 }}{% endassert %}
+    {% assert eq("2147483648") %}{{ 2147483647 + 1 }}{% endassert %}
+
 
 ## StringConcat
-```twig
-hello yes true
-hello yes true
-~
-hello {{ "yes #{true}" }}
-hello {{ "yes " ~ true }}
-```
+
+    {% assert eq("hello yes true") %}hello {{ "yes #{true}" }}{% endassert %}
+    {% assert eq("hello yes true") %}hello {{ "yes " ~ true }}{% endassert %}
 
 ## String Escapes
-```twig
-"* \b \t \f \n \r \\ \" ' *"
-"* \b \t \f \n \r \\ \" ' *"
-~
-{{ '* \b \t \f \n \r \\ " \' *'|tojson }}
-{{ "* \b \t \f \n \r \\ \" ' *"|tojson }}
-```
+
+    {% set expect %}{% raw %}"* \b \t \f \n \r \\ \" ' *"{% endraw %}{% endset %}
+    {% assert eq(expect) %}{{ '* \b \t \f \n \r \\ " \' *'|tojson }}{% endassert %}
+    {% assert eq(expect) %}{{ "* \b \t \f \n \r \\ \" ' *"|tojson }}{% endassert %}
 
 ## Undefined
-```twig
-x: -1
-OK
-true
-~
-x: {{ x|default(-1) }}
-{% if x is not defined %}OK{% else %}BAD{% endif %}
-{{ jinja is not defined }}
-```
+
+    {% assert eq("x: -1") %}x: {{ x|default(-1) }}{% endassert %}
+    {% assert eq("OK") %}{% if x is not defined %}OK{% else %}BAD{% endif %}{% endassert %}
+    {% assert eq("true") %}{{ jinja is not defined }}{% endassert %}
 
 ## Filter
-```twig
-apply_int: 123
-~
-apply_int: {{ '123'|int }}
-```
+
+    {% assert eq("apply_int: 123") %}apply_int: {{ '123'|int }}{% endassert %}
 
 ## Macro
-```twig
-13
-~
-{% macro test1(a, b = 4 * 2) %}
-{{- a + b -}}
-{% endmacro %}{{ test1(a = 5) }}
-```
+
+    {% assert eq("13") %}
+        {% macro test1(a, b = 4 * 2) %}
+        {{- a + b -}}
+        {% endmacro %}{{ test1(a = 5) }}
+    {% endassert %}
+
 
 ## Nested Macro
-```twig
-13
-~
-{% macro test1(a, b = 4 * 2) %}
-{%- macro test2(x = a + b) -%}
-{{- x -}}
-{%- endmacro -%}
-{{- test2() -}}
-{% endmacro %}{{ test1(a = 5) }}
-```
+
+    {% assert eq("13") %}{% macro test1(a, b = 4 * 2) %}
+        {%- macro test2(x = a + b) -%}
+        {{- x -}}
+        {%- endmacro -%}
+        {{- test2() -}}
+        {% endmacro %}{{ test1(a = 5) }}
+    {% endassert %}
 
 ## Access vars from Macro
-```twig
-3
-~
-{%- set a = 1 -%}
-{%- set b = 2 -%}
-{% macro test1() %}
-{{- a + b -}}
-{% endmacro %}{{ test1() }}
-```
+
+    {% assert eq("3") %}
+        {%- set a = 1 -%}
+        {%- set b = 2 -%}
+        {% macro test1() %}
+        {{- a + b -}}
+        {% endmacro %}{{ test1() }}
+    {% endassert %}
 
 ## Regex
-```twig
-true,xxc,abc
-~
-{{- "abc"|matches_regex("[a-z]+") -}},
-{{- "abc"|regex_replace("[A-B]", "x") -}},
-{{- "abc"|regex_replace("[A-B]", "x", ignore_case = false) -}}
-```
+
+    {% assert eq("true") %}{{- "abc"|matches_regex("[a-z]+") -}}{% endassert %}
+    {% assert eq("xxc") %}{{- "abc"|regex_replace("[A-B]", "x") -}}{% endassert %}
+    {% assert eq("abc") %}{{- "abc"|regex_replace("[A-B]", "x", ignore_case = false) -}}{% endassert %}
 
 ## Reject
-```twig
-[1,3],[2]
-~
-{{- [1, 2, 3]|reject("==", 2)|list|tojson -}},
-{{- [1, 2, 3]|select("==", 2)|list|tojson -}}
-```
+
+    {% assert eq("[1,3]") %}{{- [1, 2, 3]|reject("==", 2)|list|tojson -}}{% endassert %}
+    {% assert eq("[2]") %}{{- [1, 2, 3]|select("==", 2)|list|tojson -}}{% endassert %}
 
 ## ArrayAccess
-```twig
-2,empty
-~
-{{- ([1, 2, 3, ])[1] -}},
-{{- ([])[0]|default("empty") -}}
-```
+
+    {% assert eq("2") %}{{- ([1, 2, 3, ])[1] -}}{% endassert %}
+    {% assert eq("empty") %}{{- ([])[0]|default("empty") -}}{% endassert %}
 
 ## Set Control
-```twig
-hello there
-~
-{%- set name = "there" -%}
-{%- set x -%}
-hello {{ name }}
-{%- endset -%}
-{{- x -}}
-```
+
+    {% assert eq("hello there") %}
+        {%- set name = "there" -%}
+        {%- set x -%}
+        hello {{ name }}
+        {%- endset -%}
+        {{- x -}}
+    {% endassert %}
 
 ## Selectattr
-```twig
-[]
-[{"a":false}]
-[]
-[{"a":false},{"b":2}]
-[{"a":false},{"b":2}]
-[{"a":false},{"b":2}]
-~
-{%- set input = [{"a": false}, {"b": 2}] -%}
-{{- input|selectattr("a")|list|tojson }}
-{{ input|selectattr("a", "eq", false)|list|tojson }}
-{{ input|selectattr("x", "eq", 1)|list|tojson }}
-{{ input|rejectattr("a")|list|tojson }}
-{{ input|rejectattr("b")|list|tojson }}
-{{ input|rejectattr("c", "eq", 15)|list|tojson }}
-```
+
+    {% set input = [{"a": false}, {"b": 2}] %}
+    {% assert eq('[]') %}{{- input|selectattr("a")|list|tojson }}{% endassert %}
+    {% assert eq('[{"a":false}]') %}{{ input|selectattr("a", "eq", false)|list|tojson }}{% endassert %}
+    {% assert eq('[]') %}{{ input|selectattr("x", "eq", 1)|list|tojson }}{% endassert %}
+    {% assert eq('[{"a":false},{"b":2}]') %}{{ input|rejectattr("a")|list|tojson }}{% endassert %}
+    {% assert eq('[{"a":false},{"b":2}]') %}{{ input|rejectattr("b")|list|tojson }}{% endassert %}
+    {% assert eq('[{"a":false},{"b":2}]') %}{{ input|rejectattr("c", "eq", 15)|list|tojson }}{% endassert %}
 
 ## Map
-```twig
-["10","2","3"]
-[2,3,10]
-~
-{{ [2, "3", 10]|map("string")|sort|tojson }}
-{{ [10, 10.0, 2, 3]|unique|list|tojson }}
-```
+
+    {% assert eq('["10","2","3"]') %}{{ [2, "3", 10]|map("string")|sort|tojson }}{% endassert %}
+    {% assert eq('[2,3,10]') %}{{ [10, 10.0, 2, 3]|unique|list|tojson }}{% endassert %}
+
 
 ## In
-```twig
-true
-~
-{{ 1.0 in [1, 2, 3] }}
-```
+
+    {% assert eq("true") %}{{ 1.0 in [1, 2, 3] }}{% endassert %}
+
 
 ## Dictsort
-```twig
-a=2,z=1,
-~
-{% for k, v in {z: 1, a: 2}|dictsort -%}
-{{ k }}={{ v }},
-{%- endfor %}
-```
+
+    {% assert eq("a=2,z=1,") %}
+        {% for k, v in {z: 1, a: 2}|dictsort -%}
+        {{ k }}={{ v }},
+        {%- endfor %}
+    {% endassert %}
 
 ## Generic sort
-```twig
-["BWYFiOpx","RcNbwutO","xCIexbxF"]
-~
-{{ ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]|map("base64_decode")|sort|map("base64_encode")|list|tojson }}
-```
+
+    {% assert eq('["BWYFiOpx","RcNbwutO","xCIexbxF"]') %}
+        {{ ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]
+           |map("base64_decode")
+           |sort
+           |map("base64_encode")
+           |list
+           |tojson 
+        }}
+    {% endassert %}
 
 ## Iterable compare
-```twig
-true
-~
-{{ [1, 2, 3] < [1, 2, 4] }}
-```
+
+    {% assert eq("true") %}{{ [1, 2, 3] < [1, 2, 4] }}{% endassert %}
 
 ## Filter call
-```twig
-BLAH
-~
-{% filter upper -%}
-blah
-{%- endfilter %}
-```
+
+    {% assert eq("BLAH") %}
+        {% filter upper -%}
+        blah
+        {%- endfilter %}
+    {% endassert %}
+
+    {% assert eq("Goodbye World") %}
+        {% filter replace("Hello", "Goodbye") %}
+        Hello World
+        {% endfilter %}
+    {% endassert %}
 
 ## Set multiple variables
-```twig
-1
-~
-{% set x, y = [1, 2] %}{{ x }}
-```
+
+    {% assert eq("1") %}{% set x, y = [1, 2] %}{{ x }}{% endassert %}
 
 ## Eq
-```twig
-false,true,true,false
-false,true,true,false
-~
-{% set a = null %}{% set b = "some" -%}
-{{ a != null }},{{ a == null }},{{ b != null }},{{ b == null }}
-{{ a is ne(null) }},{{ a is eq(null) }},{{ b is ne(null) }},{{ b is eq(null) }}
-```
+
+    {% set a = null %}{% set b = "some" %}
+    {% assert eq("false,true,true,false") %}{{ a != null }},{{ a == null }},{{ b != null }},{{ b == null }}{% endassert %}
+    {% assert_that (a is ne(null)) is false %}
+    {% assert_that (a is eq(null)) is true %}
+    {% assert_that (b is ne(null)) is true %}
+    {% assert_that (b is eq(null)) is false %}
 
 ## If expression
-```twig
-1
-4
-~
-{{ 1 if true else 2 }}
-{{ 3 if false else 4 }}
-```
+
+    {% assert eq("1") %}{{ 1 if true else 2 }}{% endassert %}
+    {% assert eq("4") %}{{ 3 if false else 4 }}{% endassert %}
 
 ## MinMax
-```twig
-1
-3
-~
-{{ [1,2,3]|min }}
-{{ [1,2,3]|max }}
-```
+
+    {% assert eq("1") %}{{ [1,2,3]|min }}{% endassert %}
+    {% assert eq("3") %}{{ [1,2,3]|max }}{% endassert %}
 
 ## Yaml
-```twig
-"a": 1
-~
-{{ {a: 1}|yaml }}
-```
+
+    {% assert eq('"a": 1') %}{{ {a: 1}|yaml }}{% endassert %}
+
+## Dict
+
+    {% assert eq('[["a",1],["b",2]]') %}{{ dict(a=1, b=2)|items|tojson }}{% endassert %}
+    {% assert eq('[["a",1],["b",2]]') %}{{ dict({}, a=1, b=2)|items|tojson }}{% endassert %}
+    {% assert eq('[["a",1],["b",2]]') %}{{ dict({"a": 5}, a=1, b=2)|items|tojson }}{% endassert %}
+    {% assert eq('[[1,2],[3,4]]') %}{{ dict([[1, 2], [3, 4]])|items|list|tojson }}{% endassert %}
+    {% assert eq('[]') %}{{ dict()|items|list|tojson }}{% endassert %}
+    {% assert eq('[["a",1],["b",3]]') %}
+        {{ dict({"a":1,"b":2}|items|list + {"b":3}|items|list)|items|list|tojson }}
+    {% endassert %}

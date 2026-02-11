@@ -1,38 +1,34 @@
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
 import org.cikit.forte.core.loadJson
+import org.cikit.forte.lib.funit.defineFUnitExtensions
+import org.cikit.forte.lib.funit.fUnitDeclarations
 import org.cikit.forte.lib.jinja.strictJinjaCompat
 import org.cikit.forte.parser.Declarations
 import org.cikit.forte.parser.Expression
 import kotlin.test.*
 
 class TestEval {
-    @Test
-    fun testBasic() = Forte.runTests("basic.md")
 
-    @Test
-    fun testTrim() = Forte.runTests("trim.md")
-
-    @Test
-    fun testPython() = Forte.runTests("python.md") { source ->
-        val newSource = buildString {
-            val linesIt = source.splitToSequence("\n").iterator()
-            while (linesIt.hasNext()) {
-                val line = linesIt.next()
-                appendLine(line)
-                if (line.startsWith(">>> ")) {
-                    appendLine("'{{ ${line.removePrefix(">>> ")} }}'")
-                    linesIt.next()
-                }
-            }
-        }
-        println("---")
-        println(newSource)
-        println("---")
-        "$source\n~\n$newSource"
+    val forte = Forte {
+        declarations.addAll(fUnitDeclarations)
+        context.defineFUnitExtensions()
     }
+
+    @Test
+    fun testBasic() = forte.runTests("basic.md")
+
+    @Test
+    fun testTrim() = forte.runTests("trim.md")
+
+    @Test
+    fun testPython() = forte.runTests("python.md")
+
+    @Test
+    fun testStringConcat() = forte.runTests("string_concat.md")
 
     @Test
     fun testJinjaCompat() = runTest {
@@ -119,6 +115,8 @@ class TestEval {
     @Test
     fun testCustomControl() {
         val forte = Forte {
+            declarations.addAll(fUnitDeclarations)
+            context.defineFUnitExtensions()
             declarations += Declarations.Command(
                 "load_json",
                 endAliases = setOf("endload"),
