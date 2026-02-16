@@ -62,6 +62,8 @@ fun <R> Context.Builder<R>.defineCoreExtensions(): Context.Builder<R> {
     defineFunction("range", RangeFunction() as Function)
 
     defineOpFunction("not", UnaryNot())
+    defineOpFunction("minus", UnaryMinus(this))
+    defineOpFunction("plus", UnaryPlus())
 
     defineBinaryOpFunction("eq", BinaryEq(this))
     defineBinaryOpFunction("ne", BinaryNe(this))

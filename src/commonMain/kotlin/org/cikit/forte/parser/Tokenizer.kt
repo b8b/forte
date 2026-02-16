@@ -16,9 +16,7 @@ private object Patterns {
 
     val space =          """\s+""".toRegex() to Token::Space
 
-    val const =          """null|[Tt]rue|[Ff]alse|NaN|[+-]Infinity"""
-        .toRegex() to Token::Const
-    val number =         """[+-]?(?:0|[1-9]\d*)(?:\.\d+)?(?:[Ee][+-]\d+)?"""
+    val number =         """(?:0|[1-9]\d*)(?:\.\d+)?(?:[Ee][+-]\d+)?"""
         .toRegex() to Token::Number
     val identifier =     """[A-Za-z_][A-Za-z0-9_]*"""
         .toRegex() to Token::Identifier
@@ -36,7 +34,7 @@ private object Patterns {
 
     val testSeq = arrayOf(
         endCommand, endEmit,
-        const, number,
+        number,
         operator, space,
         identifier
     )

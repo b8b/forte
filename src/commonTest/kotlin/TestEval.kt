@@ -31,6 +31,9 @@ class TestEval {
     fun testStringConcat() = forte.runTests("string_concat.md")
 
     @Test
+    fun testNumbers() = forte.runTests("numbers.md")
+
+    @Test
     fun testJinjaCompat() = runTest {
         val forte = Forte
         val jinja = Forte {

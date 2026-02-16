@@ -846,28 +846,18 @@ private class ExpressionParserImpl(
                 is Token.Identifier -> {
                     tokenizer.consume(t)
                     val name = input.substring(t.first .. t.last)
-                    primary = Expression.Variable(t, name)
-                    break
-                }
-
-                is Token.Const -> {
-                    tokenizer.consume(t)
-                    val s = input.substring(t.first..t.last)
-                    primary = when (s.lowercase()) {
+                    primary = when (name.lowercase()) {
                         "null" -> Expression.NullLiteral(t)
                         "true" -> Expression.BooleanLiteral(t, true)
                         "false" -> Expression.BooleanLiteral(t, false)
                         "nan" -> Expression.NumericLiteral(
                             t, t, Double.NaN
                         )
-                        "-infinity" -> Expression.NumericLiteral(
-                            t, t, Double.NEGATIVE_INFINITY
-                        )
-                        "infinity",
-                        "+infinity" -> Expression.NumericLiteral(
+                        "infinity" -> Expression.NumericLiteral(
                             t, t, Double.POSITIVE_INFINITY
                         )
-                        else -> Expression.Malformed(listOf(t))
+
+                        else -> Expression.Variable(t, name)
                     }
                     break
                 }
@@ -927,9 +917,6 @@ private class ExpressionParserImpl(
                     val t2 = tokenizer.peekAfter(t, skipSpace = true)
                     val name = when (t2) {
                         is Token.Identifier -> {
-                            input.substring(t2.first .. t2.last)
-                        }
-                        is Token.Const if input[t2.first].isLetter() -> {
                             input.substring(t2.first .. t2.last)
                         }
 

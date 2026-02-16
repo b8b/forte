@@ -75,10 +75,6 @@ sealed class Token(val first: Int, val last: Int) {
         override fun toString(): String = "TRBrace($first)"
     }
 
-    class Const(r: IntRange) : Token(r) {
-        override fun toString(): String = "TConst($first..$last)"
-    }
-
     class Number(r: IntRange) : Token(r) {
         override fun toString(): String = "TNumber($first..$last)"
     }
