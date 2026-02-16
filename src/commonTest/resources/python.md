@@ -1,6 +1,6 @@
 # Test Python Methods
 
-## Slice
+## slice
 
     {% assert_that "abcdefghijk"[1:3:-1]    is eq('') %}
     {% assert_that "abcdefghijk"[3:1:-1]    is eq('dc') %}
@@ -23,7 +23,8 @@
 
 ## startswith
 
-    {% assert_true "12345".startswith("") %}
+    {% assert_false "12345".startswith("123456") %}
+    {% assert_true "12345".startswith("12345") %}
     {% assert_true "12345".startswith("1234") %}
     {% assert_true "12345".startswith("123") %}
     {% assert_true "12345".startswith("12") %}
