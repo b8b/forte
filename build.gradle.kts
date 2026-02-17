@@ -25,6 +25,11 @@ kotlin {
     js {
         nodejs {
             binaries.executable()
+            testTask {
+                useMocha {
+                    timeout = "30s"
+                }
+            }
         }
     }
     wasmJs {
@@ -75,7 +80,11 @@ kotlin {
                 implementation("dev.erikchristensen.javamath2kmp:javamath2kmp:1.1")
             }
         }
-        jsTest {}
+        jsTest {
+            dependencies {
+                implementation(npm("pyodide", "0.29.3"))
+            }
+        }
         wasmJsMain {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-browser-wasm-js:0.5.0")

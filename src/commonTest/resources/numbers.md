@@ -21,3 +21,13 @@
     {% assert eq("-28") %}{{ - 10 - 18 }}{% endassert %}
     {% assert eq("0") %}{{ - - 10 - 18 + 8 }}{% endassert %}
     {% assert eq("-10") %}{{ - + - + -10 }}{% endassert %}
+
+## Division by zero
+
+    {% assert_fails as ex %}{{ 1 / 0 }}{% endassert %}
+    {% assert_that (1.0 / 0.0) is eq(Infinity) %}
+    {% assert_that (1.0 / -0.0) is eq(-Infinity) %}
+
+## Negative zero
+
+    {% assert eq("-0.0") %}{{ -0.0 }}{% endassert %}

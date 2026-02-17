@@ -1,8 +1,7 @@
-from jinja2 import Environment, nodes, UndefinedError, FileSystemLoader
+from jinja2 import Environment, nodes, UndefinedError, DictLoader
 from jinja2.ext import Extension
 from jinja2.parser import Parser
 from jinja2.runtime import Undefined
-from pathlib import Path
 
 class AssertExtension(Extension):
     """Extension for {% assert %} tag.
@@ -170,7 +169,7 @@ class AssertThatExtension(Extension):
 def create_test_environment():
     """Create a Jinja2 environment with test extensions."""
     env = Environment(
-        loader=FileSystemLoader('.'),
+        loader=DictLoader({template_name: template_src}),
         extensions=[
             AssertExtension,
             AssertFailsExtension,
@@ -192,11 +191,6 @@ def create_test_environment():
 
     return env
 
-
-# Example usage
-if __name__ == '__main__':
-    env = create_test_environment()
-
-    template = env.get_template('numbers.md')
-    output = template.render()
-    print(output)
+env = create_test_environment()
+template = env.get_template(template_name)
+template.render()
