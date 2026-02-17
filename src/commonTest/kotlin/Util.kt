@@ -168,7 +168,7 @@ private class ControlBlock : ControlTag {
         val innerCode = template.input.substring(sourceStart .. sourceEnd)
 
         try {
-            val rendered = ctx.renderToString()
+            val rendered = ctx.scope().renderToString()
                 .evalNodes(template, branch.body)
                 .result
             if (rendered.trimStart()
