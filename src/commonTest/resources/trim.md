@@ -3,7 +3,7 @@
 ## test1
 
 ```
-{% assert eq("line1\nline2\nline3") %}
+{% assert eq("\nline1\nline2\nline3\n") %}
 line1
 {# no trim #}line2
 line3
@@ -13,7 +13,7 @@ line3
 ## test2
 
 ```
-{% assert eq("line1\nline2\nline3") %}
+{% assert eq("\nline1\nline2\nline3\n") %}
 line1
    {#- trim before #}
 line2
@@ -24,7 +24,7 @@ line3
 ## test3
 
 ```
-{% assert eq("line1\nline2\nline3") %}
+{% assert eq("\nline1\nline2\nline3\n") %}
 line1
 {# trim after -#}
    line2
@@ -35,7 +35,7 @@ line3
 ## test4
 
 ```
-{% assert eq("line1\nline2\nline3") %}
+{% assert eq("\nline1\nline2\nline3\n") %}
 line1
    {#- trim both -#}
    {{ '\n' }}line2
@@ -46,7 +46,7 @@ line3
 ## test5
 
 ```
-{% assert eq("line1\nline2\nline3") %}
+{% assert eq("\nline1\nline2\nline3\n") %}
 line1
    {%- if false -%}
      {{ '\n' -}} not printed
@@ -55,5 +55,15 @@ line2
    {%- if true -%}
      {{ '\n' -}} line3
    {%- endif %}
+{% endassert %}
+```
+
+## test6
+
+```
+{% assert eq("OK") %}
+  {%- if true -%}
+    OK
+  {%- endif -%}
 {% endassert %}
 ```

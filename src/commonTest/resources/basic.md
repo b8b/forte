@@ -19,11 +19,11 @@
     {% assert eq("BAD") %}{% for x in [1, 2, 3] if x > 3 %}OK{% else %}BAD{% endfor %}{% endassert %}
     {% assert eq("OKOKOK") %}{% for x in [1, 2, 3] %}OK{% endfor %}{% endassert %}
     {% assert eq("OKa1OKb2OKa3") %}
-        {% for x in [1, 2, 3] -%}
+        {%- for x in [1, 2, 3] -%}
           OK
           {{- loop.cycle("a", "b") -}}
           {{- loop.index -}}
-        {% endfor %}
+        {%- endfor -%}
     {% endassert %}
 
 ## ObjectLiteral
@@ -63,20 +63,22 @@
 ## Macro
 
     {% assert eq("13") %}
-        {% macro test1(a, b = 4 * 2) %}
+        {%- macro test1(a, b = 4 * 2) -%}
         {{- a + b -}}
-        {% endmacro %}{{ test1(a = 5) }}
+        {%- endmacro -%}
+        {{- test1(a = 5) -}}
     {% endassert %}
-
 
 ## Nested Macro
 
-    {% assert eq("13") %}{% macro test1(a, b = 4 * 2) %}
-        {%- macro test2(x = a + b) -%}
-        {{- x -}}
+    {% assert eq("13") %}
+        {%- macro test1(a, b = 4 * 2) -%}
+            {%- macro test2(x = a + b) -%}
+            {{- x -}}
+            {%- endmacro -%}
+            {{- test2() -}}
         {%- endmacro -%}
-        {{- test2() -}}
-        {% endmacro %}{{ test1(a = 5) }}
+        {{- test1(a = 5) -}}
     {% endassert %}
 
 ## Access vars from Macro
@@ -84,9 +86,10 @@
     {% assert eq("3") %}
         {%- set a = 1 -%}
         {%- set b = 2 -%}
-        {% macro test1() %}
+        {%- macro test1() -%}
         {{- a + b -}}
-        {% endmacro %}{{ test1() }}
+        {%- endmacro -%}
+        {{- test1() -}}
     {% endassert %}
 
 ## Regex
@@ -139,21 +142,21 @@
 ## Dictsort
 
     {% assert eq("a=2,z=1,") %}
-        {% for k, v in {z: 1, a: 2}|dictsort -%}
-        {{ k }}={{ v }},
-        {%- endfor %}
+        {%- for k, v in {z: 1, a: 2}|dictsort -%}
+        {{- k }}={{ v -}},
+        {%- endfor -%}
     {% endassert %}
 
 ## Generic sort
 
     {% assert eq('["BWYFiOpx","RcNbwutO","xCIexbxF"]') %}
-        {{ ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]
+        {{- ["RcNbwutO", "xCIexbxF", "BWYFiOpx"]
            |map("base64_decode")
            |sort
            |map("base64_encode")
            |list
            |tojson 
-        }}
+        -}}
     {% endassert %}
 
 ## Iterable compare
@@ -163,15 +166,15 @@
 ## Filter call
 
     {% assert eq("BLAH") %}
-        {% filter upper -%}
+        {%- filter upper -%}
         blah
-        {%- endfilter %}
+        {%- endfilter -%}
     {% endassert %}
 
     {% assert eq("Goodbye World") %}
-        {% filter replace("Hello", "Goodbye") %}
+        {%- filter replace("Hello", "Goodbye") -%}
         Hello World
-        {% endfilter %}
+        {%- endfilter -%}
     {% endassert %}
 
 ## Set multiple variables
@@ -209,5 +212,5 @@
     {% assert eq('[[1,2],[3,4]]') %}{{ dict([[1, 2], [3, 4]])|items|list|tojson }}{% endassert %}
     {% assert eq('[]') %}{{ dict()|items|list|tojson }}{% endassert %}
     {% assert eq('[["a",1],["b",3]]') %}
-        {{ dict({"a":1,"b":2}|items|list + {"b":3}|items|list)|items|list|tojson }}
+        {{- dict({"a":1,"b":2}|items|list + {"b":3}|items|list)|items|list|tojson -}}
     {% endassert %}

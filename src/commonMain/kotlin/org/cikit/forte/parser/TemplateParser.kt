@@ -190,8 +190,12 @@ class TemplateParser private constructor(
         while (true) {
             val (txt, t) = tokenizer.tokenizeInitial()
             val lastToken = when (val n = nodes.lastOrNull()) {
+                null -> context?.last
                 is Node.Comment -> n.last
                 is Node.Command -> n.last
+                is Node.Control -> {
+                    (n.branches.lastOrNull() ?: n.first).last.last
+                }
                 is Node.Emit -> n.last
                 else -> null
             }

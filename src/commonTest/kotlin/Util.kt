@@ -152,7 +152,13 @@ private fun extractTestSource(testCase: String): String {
                         }
                         output.append(lineStr)
                         output.append(": ")
-                        output.appendLine(line.substring(indent))
+                        if (line.length <= indent) {
+                            require(line.isBlank())
+                            output.appendLine()
+                        } else {
+                            require(line.substring(0, indent).isBlank())
+                            output.appendLine(line.substring(indent))
+                        }
                     }
                 }
             }

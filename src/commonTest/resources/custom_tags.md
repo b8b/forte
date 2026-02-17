@@ -9,7 +9,8 @@ Command tag with single expression. No output.
 ## load_json
 
     {% assert eq("[1,2,3]") %}
-        {% load_json as x %}
+        {%- load_json as x -%}
         [1, 2, 3]
-        {% endload %}{{ x|json }}
+        {%- endload -%}
+        {{- x|json -}}
     {% endassert %}

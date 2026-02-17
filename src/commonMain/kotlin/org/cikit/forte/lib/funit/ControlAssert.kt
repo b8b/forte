@@ -40,7 +40,6 @@ class ControlAssert : ControlTag {
             .renderToString()
             .evalNodes(template, branch.body)
             .result
-            .normalize()
         var result = if (callInAsContains) {
             testFunction(
                 argValues.single(),
@@ -59,7 +58,4 @@ class ControlAssert : ControlTag {
             )
         }
     }
-
-    private fun String.normalize() =
-        trim().replace(Regex("""\n+""", RegexOption.MULTILINE), "\n")
 }
