@@ -39,6 +39,7 @@ fun Forte.runTests(fileName: String) = runTest {
     var total = 0
 
     var currentTestOffset = -1
+    var currentSrcTestOffset = -1
 
     val markdown = output.toString()
     output.clear()
@@ -49,9 +50,10 @@ fun Forte.runTests(fileName: String) = runTest {
         when (child.type) {
             // each second level heading is mapped to a test case
             MarkdownElementTypes.ATX_2 -> {
-                if (currentTestOffset >= 0) {
+                if (currentSrcTestOffset >= 0) {
                     val isFailed = processTestOutput(
                         output,
+                        currentSrcTestOffset .. child.startOffset,
                         currentTestOffset,
                         testResults
                     )
@@ -61,6 +63,7 @@ fun Forte.runTests(fileName: String) = runTest {
                 }
                 output.append(child.getTextInNode(markdown))
                 currentTestOffset = output.length
+                currentSrcTestOffset = child.endOffset
                 total++
             }
 
@@ -69,9 +72,10 @@ fun Forte.runTests(fileName: String) = runTest {
             }
         }
     }
-    if (currentTestOffset >= 0) {
+    if (currentSrcTestOffset >= 0) {
         val isFailed = processTestOutput(
             output,
+            currentSrcTestOffset .. Int.MAX_VALUE,
             currentTestOffset,
             testResults
         )
@@ -128,11 +132,12 @@ private fun wrapCodeBlocks(source: String): String {
 
 private fun processTestOutput(
     output: StringBuilder,
+    srcOffsetRange: IntRange,
     currentTestOffset: Int,
     testResults: List<Pair<Int, BlockResult>>,
 ): Boolean {
     val results = testResults.filter { tr ->
-        tr.first in currentTestOffset .. output.length
+        tr.first in srcOffsetRange
     }
     val isFailed = results.any { it.second.exception != null }
     val tmp = output.substring(currentTestOffset)
