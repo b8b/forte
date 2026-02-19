@@ -119,7 +119,7 @@ class TestParser {
             assertEquals("dictsort", op.name)
             op.left as Expression.ObjectLiteral
         }.let { o ->
-            assertEquals("k", (o.pairs.single().first as Expression.StringLiteral).value)
+            assertEquals("k", (o.pairs.single().first as Expression.Variable).name)
         }
     }
 

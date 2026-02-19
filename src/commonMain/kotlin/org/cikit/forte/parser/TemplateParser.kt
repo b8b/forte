@@ -1071,18 +1071,13 @@ private class ExpressionParserImpl(
         val result = mutableListOf<Pair<Expression, Expression>>()
         while (true) {
             val key = parseExpressionOrNull() ?: break
-            val finalKey = if (key is Expression.Variable) {
-                Expression.StringLiteral(key.first, key.first, key.name)
-            } else {
-                key
-            }
             val t = tokenizer.peek(true)
             if (t !is Token.Colon) {
                 throw ParseException(tokenizer, t, "expected colon")
             }
             tokenizer.consume(t)
             val value = parseExpression()
-            result += finalKey to value
+            result += key to value
             val t2 = tokenizer.peek(true)
             if (t2 !is Token.Comma) {
                 break
