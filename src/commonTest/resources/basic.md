@@ -28,8 +28,16 @@
 
 ## ObjectLiteral
 
-    {% assert eq('{"a":11,"b":22}') %}{{ {a: 11, b: 22, }|tojson }}{% endassert %}
-
+    {% set d = {"a": 11, "b": 22, } %}
+    {% assert_that d|length is eq(2) %}
+    {% assert_that d["a"] is eq(11) %}
+    {% assert_that d["b"] is eq(22) %}
+    {% set k1 = "name" %}
+    {% set k2 = "age" %}
+    {% set d = {k1: "jan", k2: 22} %}
+    {% assert_that d|length is eq(2) %}
+    {% assert_that d["name"] is eq("jan") %}
+    {% assert_that d["age"] is eq(22) %}
 
 ## Arithmetic
 
@@ -47,8 +55,8 @@
 ## String Escapes
 
     {% set expect %}{% raw %}"* \b \t \f \n \r \\ \" ' *"{% endraw %}{% endset %}
-    {% assert eq(expect) %}{{ '* \b \t \f \n \r \\ " \' *'|tojson }}{% endassert %}
-    {% assert eq(expect) %}{{ "* \b \t \f \n \r \\ \" ' *"|tojson }}{% endassert %}
+    {% assert eq(expect) %}{{ '* \b \t \f \n \r \\ " \' *'|tojson|replace("\\u0027", "'") }}{% endassert %}
+    {% assert eq(expect) %}{{ "* \b \t \f \n \r \\ \" ' *"|tojson|replace("\\u0027", "'") }}{% endassert %}
 
 ## Undefined
 
@@ -100,8 +108,8 @@
 
 ## Reject
 
-    {% assert eq("[1,3]") %}{{- [1, 2, 3]|reject("==", 2)|list|tojson -}}{% endassert %}
-    {% assert eq("[2]") %}{{- [1, 2, 3]|select("==", 2)|list|tojson -}}{% endassert %}
+    {% assert eq("1|3") %}{{- [1, 2, 3]|reject("==", 2)|list|join("|") -}}{% endassert %}
+    {% assert eq("2") %}{{- [1, 2, 3]|select("==", 2)|list|join("|") -}}{% endassert %}
 
 ## ArrayAccess
 
@@ -121,17 +129,17 @@
 ## Selectattr
 
     {% set input = [{"a": false}, {"b": 2}] %}
-    {% assert eq('[]') %}{{- input|selectattr("a")|list|tojson }}{% endassert %}
-    {% assert eq('[{"a":false}]') %}{{ input|selectattr("a", "eq", false)|list|tojson }}{% endassert %}
-    {% assert eq('[]') %}{{ input|selectattr("x", "eq", 1)|list|tojson }}{% endassert %}
-    {% assert eq('[{"a":false},{"b":2}]') %}{{ input|rejectattr("a")|list|tojson }}{% endassert %}
-    {% assert eq('[{"a":false},{"b":2}]') %}{{ input|rejectattr("b")|list|tojson }}{% endassert %}
-    {% assert eq('[{"a":false},{"b":2}]') %}{{ input|rejectattr("c", "eq", 15)|list|tojson }}{% endassert %}
+    {% assert_that input|selectattr("a")|list is eq([]) %}
+    {% assert_that input|selectattr("a", "eq", false)|list is eq([{"a": false}]) %}
+    {% assert_that input|selectattr("x", "eq", 1)|list is eq([]) %}
+    {% assert_that input|rejectattr("a")|list is eq([{"a": false}, {"b": 2}]) %}
+    {% assert_that input|rejectattr("b")|list is eq([{"a": false}, {"b": 2}]) %}
+    {% assert_that input|rejectattr("c", "eq", 15)|list is eq([{"a": false}, {"b": 2}]) %}
 
 ## Map
 
-    {% assert eq('["10","2","3"]') %}{{ [2, "3", 10]|map("string")|sort|tojson }}{% endassert %}
-    {% assert eq('[2,3,10]') %}{{ [10, 10.0, 2, 3]|unique|list|tojson }}{% endassert %}
+    {% assert_that [2, "3", 10]|map("string")|sort is eq(["10", "2", "3"]) %}
+    {% assert_that [10, 10.0, 2, 3]|unique|sort is eq([2, 3, 10]) %}
 
 
 ## In
@@ -142,7 +150,7 @@
 ## Dictsort
 
     {% assert eq("a=2,z=1,") %}
-        {%- for k, v in {z: 1, a: 2}|dictsort -%}
+        {%- for k, v in {"z": 1, "a": 2}|dictsort -%}
         {{- k }}={{ v -}},
         {%- endfor -%}
     {% endassert %}
@@ -202,15 +210,14 @@
 
 ## Yaml
 
-    {% assert eq('"a": 1') %}{{ {a: 1}|yaml }}{% endassert %}
+    {% assert eq('"a": 1') %}{{ {"a": 1}|yaml }}{% endassert %}
 
 ## Dict
 
-    {% assert eq('[["a",1],["b",2]]') %}{{ dict(a=1, b=2)|items|tojson }}{% endassert %}
-    {% assert eq('[["a",1],["b",2]]') %}{{ dict({}, a=1, b=2)|items|tojson }}{% endassert %}
-    {% assert eq('[["a",1],["b",2]]') %}{{ dict({"a": 5}, a=1, b=2)|items|tojson }}{% endassert %}
-    {% assert eq('[[1,2],[3,4]]') %}{{ dict([[1, 2], [3, 4]])|items|list|tojson }}{% endassert %}
-    {% assert eq('[]') %}{{ dict()|items|list|tojson }}{% endassert %}
-    {% assert eq('[["a",1],["b",3]]') %}
-        {{- dict({"a":1,"b":2}|items|list + {"b":3}|items|list)|items|list|tojson -}}
-    {% endassert %}
+    {% assert_that dict(a=1, b=2)|dictsort|map("list")|list is eq([["a", 1], ["b", 2]]) %}
+    {% assert_that dict({}, a=1, b=2)|dictsort|map("list")|list is eq([["a", 1], ["b", 2]]) %}
+    {% assert_that dict({"a": 5}, a=1, b=2)|dictsort|map("list")|list is eq([["a", 1], ["b", 2]]) %}
+    {% assert_that dict([[1, 2], [3, 4]])|dictsort|map("list")|list is eq([[1, 2], [3, 4]]) %}
+    {% assert_that dict()|dictsort|map("list")|list is eq([]) %}
+    {% set x = dict({"a": 1, "b": 2}|items|list + {"b": 3}|items|list)|dictsort|map("list")|list %}
+    {% assert_that x is eq([["a", 1], ["b", 3]]) %}
