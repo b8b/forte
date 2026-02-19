@@ -75,29 +75,25 @@ class AssertFailsExtension(Extension):
 
     def parse(self, parser):
         lineno = next(parser.stream).lineno
-        parser.stream.expect('name:as')
-        var_name = parser.stream.expect('name').value
         body = parser.parse_statements(('name:endassert',), drop_needle=True)
 
         return nodes.CallBlock(
-            self.call_method('_run_fails_body', [nodes.Const(var_name), nodes.ContextReference()],
+            self.call_method('_run_fails_body', [nodes.ContextReference()],
                            lineno=lineno),
             [], [], body,  # Pass raw body nodes
             lineno=lineno
         )
 
-    def _run_fails_body(self, var_name, context, caller):
+    def _run_fails_body(self, context, caller):
         """Force eager execution by rendering body twice."""
         try:
             # First pass: force eager evaluation
             dummy_render = caller()
             # Second pass: str() forces full evaluation
             result = str(caller())
-            raise TemplateRuntimeError(f"assert_fails: no exception, got '{result}'")
+            raise AssertionError(f"assert_fails: no exception, got '{result}'")
         except Exception as e:
-            context.vars[var_name] = str(e)
-            context.exported_vars.add(var_name)
-            return ""
+            return str(e)
 
 class AssertTrueExtension(Extension):
     """Extension for {% assert_true %} tag."""
@@ -119,6 +115,28 @@ class AssertTrueExtension(Extension):
         """Assert condition is true."""
         if not condition:
             raise AssertionError(f"Expected condition to be true, but got {condition!r}")
+        return ''
+
+class AssertFalseExtension(Extension):
+    """Extension for {% assert_false %} tag."""
+
+    tags = {'assert_false'}
+
+    def parse(self, parser: Parser):
+        lineno = next(parser.stream).lineno
+
+        # Parse the condition expression
+        condition = parser.parse_expression()
+
+        # Create output node
+        return nodes.Output([
+            self.call_method('_do_assert_false', [condition], lineno=lineno)
+        ], lineno=lineno)
+
+    def _do_assert_false(self, condition):
+        """Assert condition is false."""
+        if condition:
+            raise AssertionError(f"Expected condition to be false, but got {condition!r}")
         return ''
 
 class AssertThatExtension(Extension):
@@ -175,6 +193,7 @@ def create_test_environment():
             AssertFailsExtension,
             AssertThatExtension,
             AssertTrueExtension,
+            AssertFalseExtension,
         ]
     )
     

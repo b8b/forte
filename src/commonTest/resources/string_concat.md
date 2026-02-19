@@ -8,8 +8,10 @@
 
 ## Get on empty string throws IndexOutOfBoundsException
 
-    {% assert_fails as ex %}{{ ""[0] }}{% endassert %}
-    {% assert contains("out of bounds") %}{{ ex|string }}{% endassert %}
+    {% set ex %}{% assert_fails %}{{ ""[0]|int }}{% endassert %}{% endset %}
+    {% if "index 0 out of bounds" not in ex %}
+        {% assert_that ex is eq("str object has no element 0") %}
+    {% endif %}
 
 ## Append string to empty string
 

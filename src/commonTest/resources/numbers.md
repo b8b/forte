@@ -12,7 +12,7 @@
     {% assert eq("2") %}{{ +(1+1) }}{% endassert %}
     {% assert eq("2") %}{{ + +(1+1) }}{% endassert %}
     {% assert eq("2") %}{{ + + +(1+1) }}{% endassert %}
-    {% assert_fails as ex %}{{ +("1+1") }}{% endassert %}
+    {% set ex %}{% assert_fails %}{{ +("1+1") }}{% endassert %}{% endset %}
     {% assert contains("operand") %}{{ ex }}{% endassert %}
 
 ## Binary and unary operators combined
@@ -22,10 +22,16 @@
     {% assert eq("0") %}{{ - - 10 - 18 + 8 }}{% endassert %}
     {% assert eq("-10") %}{{ - + - + -10 }}{% endassert %}
 
-## Division by zero
+## Integer division by zero fails
 
-    {% assert_fails as ex %}{{ 1 / 0 }}{% endassert %}
+    {% set ex %}{% assert_fails %}{{ 1 / 0 }}{% endassert %}{% endset %}
+
+## Float division by positive zero returns Infinity
+
     {% assert_that (1.0 / 0.0) is eq(Infinity) %}
+
+## Float division by negative zero returns negative Infinity
+
     {% assert_that (1.0 / -0.0) is eq(-Infinity) %}
 
 ## Negative zero
