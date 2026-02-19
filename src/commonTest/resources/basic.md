@@ -41,8 +41,8 @@
 
 ## StringConcat
 
-    {% assert eq("hello yes true") %}hello {{ "yes #{true}" }}{% endassert %}
-    {% assert eq("hello yes true") %}hello {{ "yes " ~ true }}{% endassert %}
+    {% assert eq("hello yes True") %}hello {{ "yes " ~ true }}{% endassert %}
+    {% assert eq("hello yes True") %}hello {{ "yes #{true}" }}{% endassert %}
 
 ## String Escapes
 
@@ -54,7 +54,7 @@
 
     {% assert eq("x: -1") %}x: {{ x|default(-1) }}{% endassert %}
     {% assert eq("OK") %}{% if x is not defined %}OK{% else %}BAD{% endif %}{% endassert %}
-    {% assert eq("true") %}{{ jinja is not defined }}{% endassert %}
+    {% assert eq("True") %}{{ jinja is not defined }}{% endassert %}
 
 ## Filter
 
@@ -94,7 +94,7 @@
 
 ## Regex
 
-    {% assert eq("true") %}{{- "abc"|matches_regex("[a-z]+") -}}{% endassert %}
+    {% assert eq("True") %}{{- "abc"|matches_regex("[a-z]+") -}}{% endassert %}
     {% assert eq("xxc") %}{{- "abc"|regex_replace("[A-B]", "x") -}}{% endassert %}
     {% assert eq("abc") %}{{- "abc"|regex_replace("[A-B]", "x", ignore_case = false) -}}{% endassert %}
 
@@ -136,7 +136,7 @@
 
 ## In
 
-    {% assert eq("true") %}{{ 1.0 in [1, 2, 3] }}{% endassert %}
+    {% assert eq("True") %}{{ 1.0 in [1, 2, 3] }}{% endassert %}
 
 
 ## Dictsort
@@ -161,7 +161,7 @@
 
 ## Iterable compare
 
-    {% assert eq("true") %}{{ [1, 2, 3] < [1, 2, 4] }}{% endassert %}
+    {% assert eq("True") %}{{ [1, 2, 3] < [1, 2, 4] }}{% endassert %}
 
 ## Filter call
 
@@ -183,12 +183,12 @@
 
 ## Eq
 
-    {% set a = null %}{% set b = "some" %}
-    {% assert eq("false,true,true,false") %}{{ a != null }},{{ a == null }},{{ b != null }},{{ b == null }}{% endassert %}
-    {% assert_that (a is ne(null)) is false %}
-    {% assert_that (a is eq(null)) is true %}
-    {% assert_that (b is ne(null)) is true %}
-    {% assert_that (b is eq(null)) is false %}
+    {% set a = None %}{% set b = "some" %}
+    {% assert eq("False,True,True,False") %}{{ a != None }},{{ a == None }},{{ b != None }},{{ b == None }}{% endassert %}
+    {% assert_that (a is ne(None)) is false %}
+    {% assert_that (a is eq(None)) is true %}
+    {% assert_that (b is ne(None)) is true %}
+    {% assert_that (b is eq(None)) is false %}
 
 ## If expression
 

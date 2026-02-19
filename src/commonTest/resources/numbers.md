@@ -31,3 +31,12 @@
 ## Negative zero
 
     {% assert eq("-0.0") %}{{ -0.0 }}{% endassert %}
+
+## NaN and Infinity
+
+    {% assert eq("NaN") %}{{ NaN }}{% endassert %}
+    {% assert eq("NaN") %}{{ +NaN }}{% endassert %}
+    {% assert eq("NaN") %}{{ -NaN }}{% endassert %}
+    {% assert eq("Infinity") %}{{ Infinity }}{% endassert %}
+    {% assert eq("Infinity") %}{{ +Infinity }}{% endassert %}
+    {% assert eq("-Infinity") %}{{ -Infinity }}{% endassert %}

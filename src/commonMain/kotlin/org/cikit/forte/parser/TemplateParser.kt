@@ -850,14 +850,14 @@ private class ExpressionParserImpl(
                 is Token.Identifier -> {
                     tokenizer.consume(t)
                     val name = input.substring(t.first .. t.last)
-                    primary = when (name.lowercase()) {
-                        "null" -> Expression.NullLiteral(t)
-                        "true" -> Expression.BooleanLiteral(t, true)
-                        "false" -> Expression.BooleanLiteral(t, false)
-                        "nan" -> Expression.NumericLiteral(
+                    primary = when (name) {
+                        "None", "none" -> Expression.NullLiteral(t)
+                        "True", "true" -> Expression.BooleanLiteral(t, true)
+                        "False", "false" -> Expression.BooleanLiteral(t, false)
+                        "NaN" -> Expression.NumericLiteral(
                             t, t, Double.NaN
                         )
-                        "infinity" -> Expression.NumericLiteral(
+                        "Infinity" -> Expression.NumericLiteral(
                             t, t, Double.POSITIVE_INFINITY
                         )
 

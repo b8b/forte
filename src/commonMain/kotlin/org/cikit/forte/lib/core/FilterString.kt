@@ -20,8 +20,8 @@ class FilterString : FilterMethod {
             is Char -> subject.toString()
             is NumericValue -> subject.toStringValue()
             is Number -> /* FIXME avoid toString() */ subject.toString()
-            is Boolean -> if (subject) "true" else "false"
-            null -> "null"
+            is Boolean -> if (subject) "True" else "False"
+            null -> "None"
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"
             )
