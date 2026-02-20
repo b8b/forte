@@ -6,6 +6,9 @@ import org.cikit.forte.lib.wasmjs.BigNumericValue
 
 actual fun parseInt(input: CharSequence): Number {
     val inputStr = input.concatToString()
+    if (inputStr.any { !it.isDigit() && it != '+' && it != '-' }) {
+        throw NumberFormatException()
+    }
     val intResult = inputStr.toIntOrNull()
     if (intResult == null) {
         val newValue = BigInteger.parseString(inputStr, 10)
