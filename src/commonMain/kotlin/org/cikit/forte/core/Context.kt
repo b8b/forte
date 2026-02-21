@@ -407,6 +407,9 @@ sealed class Context<R> : TemplateObject {
             implementation: UnOpFunction
         ): Builder<R> {
             define(key.value, implementation)
+            dictFunction = resolveFunction(DictFunction.KEY)
+            filterGet = resolveFilterGet(FilterGet.KEY)
+            filterString = resolveFilter(FilterString.KEY)
             return this
         }
 
@@ -439,6 +442,9 @@ sealed class Context<R> : TemplateObject {
             implementation: BinOpFunction
         ): Builder<R> {
             define(key.value, implementation)
+            dictFunction = resolveFunction(DictFunction.KEY)
+            filterGet = resolveFilterGet(FilterGet.KEY)
+            filterString = resolveFilter(FilterString.KEY)
             return this
         }
 
@@ -468,9 +474,9 @@ sealed class Context<R> : TemplateObject {
             implementation: Function
         ): Builder<R> {
             define(key.value, implementation)
-            if (key.value == DictFunction.KEY.value) {
-                this.dictFunction = resolveFunction(DictFunction.KEY)
-            }
+            dictFunction = resolveFunction(DictFunction.KEY)
+            filterGet = resolveFilterGet(FilterGet.KEY)
+            filterString = resolveFilter(FilterString.KEY)
             return this
         }
 
@@ -506,14 +512,9 @@ sealed class Context<R> : TemplateObject {
             implementation: T
         ): Builder<R> {
             define(key.value, implementation)
-            when (key.value) {
-                FilterGet.KEY.value -> {
-                    filterGet = resolveFilterGet(FilterGet.KEY)
-                }
-                FilterString.KEY.value -> {
-                    filterString = resolveFilter(FilterString.KEY)
-                }
-            }
+            dictFunction = resolveFunction(DictFunction.KEY)
+            filterGet = resolveFilterGet(FilterGet.KEY)
+            filterString = resolveFilter(FilterString.KEY)
             return this
         }
 
