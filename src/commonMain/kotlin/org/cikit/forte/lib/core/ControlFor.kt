@@ -90,8 +90,8 @@ class ControlFor : ControlTag {
     }
 
     private class Loop(
-        val length: Int,
-        val index: Int,
+        length: Int,
+        index: Int,
         val nextItem: Any?,
         val prevItem: Any?,
     ) : TemplateObject {
@@ -113,25 +113,35 @@ class ControlFor : ControlTag {
             )
         }
 
-        private val index1: Int
+        private val _length = length
+
+        private val _index = index
+
+        private val length: Long
+            get() = _length.toLong()
+
+        private val index: Long
+            get() = _index.toLong()
+
+        private val index1: Long
             get() = index + 1
 
-        private val revIndex: Int
+        private val revIndex: Long
             get() = length - index
 
-        private val revIndex0: Int
+        private val revIndex0: Long
             get() = length - index - 1
 
         private val isFirst: Boolean
-            get() = index == 0
+            get() = index == 0L
 
         private val isLast: Boolean
             get() = index == length - 1
 
-        private val depth: Int
-            get() = depth0 + 1
+        private val depth: Long
+            get() = depth0 + 1L
 
-        private val depth0: Int
+        private val depth0: Long
             get() = 0
 
         private val cycle by lazy(::CycleFunction)
@@ -151,7 +161,7 @@ class ControlFor : ControlTag {
                 require(size > 0) {
                     "missing required arg(s)"
                 }
-                return args.values[this@Loop.index % size]
+                return args.values[this@Loop._index % size]
             }
         }
     }

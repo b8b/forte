@@ -11,8 +11,8 @@ fun <R> Context.Builder<R>.definePythonExtensions(): Context.Builder<R> {
     defineMethod("keys", ApplyKeys())
     defineMethod("get", ApplyGet())
 
-    defineMethod("startswith", ApplyStartsWith())
-    defineMethod("endswith", ApplyEndsWith())
+    defineMethod("startswith", ApplyStartsWith(this))
+    defineMethod("endswith", ApplyEndsWith(this))
 
     return this
 }

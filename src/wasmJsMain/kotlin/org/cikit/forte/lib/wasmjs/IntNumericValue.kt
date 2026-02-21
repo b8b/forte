@@ -11,7 +11,7 @@ import kotlin.math.pow
 
 class IntNumericValue(
     val value: Int,
-) : Number(), NumericValue {
+) : NumericValue {
 
     override val result: Int
         get() = value
@@ -230,6 +230,8 @@ class IntNumericValue(
         }
     }
 
+    override fun negate(): NumericValue = IntNumericValue(value * -1)
+
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return FloatComparableValue(originalValue, value.toDouble())
     }
@@ -244,17 +246,9 @@ class IntNumericValue(
         return value.toString()
     }
 
-    override fun toDouble(): Double = value.toDouble()
+    override fun toIntOrNull(): Int = value
 
-    override fun toFloat(): Float = value.toFloat()
-
-    override fun toLong(): Long = value.toLong()
-
-    override fun toInt(): Int = value
-
-    override fun toShort(): Short = value.toShort()
-
-    override fun toByte(): Byte = value.toByte()
+    override fun toDoubleOrNull(): Double? = null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

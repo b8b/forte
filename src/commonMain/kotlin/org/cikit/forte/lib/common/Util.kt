@@ -23,11 +23,11 @@ fun <R> Context.Builder<R>.defineCommonExtensions(): Context.Builder<R> {
     defineMethod("join", FilterJoin())
 
     defineMethod("lower", FilterLower())
-    defineMethod("replace", FilterReplace())
+    defineMethod("replace", FilterReplace(this))
     defineMethod("trim", FilterTrim())
     defineMethod("upper", FilterUpper())
 
-    defineMethod("tojson", FilterToJson())
+    defineMethod("tojson", FilterToJson(this))
 
     return this
 }

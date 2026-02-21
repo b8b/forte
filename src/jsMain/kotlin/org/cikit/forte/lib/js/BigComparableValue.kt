@@ -12,7 +12,7 @@ class BigComparableValue(
             is BigComparableValue ->
                 dynamicCompareTo(converted, other.converted)
             is FloatComparableValue ->
-                dynamicCompareTo(converted, toBigInt(other.converted))
+                dynamicCompareTo(converted, other.converted)
             else -> error(
                 "compareTo undefined for operands of type " +
                         "'${typeName(value)}' and '${typeName(other)}'"

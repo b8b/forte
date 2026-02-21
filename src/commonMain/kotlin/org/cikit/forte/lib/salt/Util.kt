@@ -23,8 +23,8 @@ fun <R> Context.Builder<R>.defineSaltExtensions(): Context.Builder<R> {
     defineMethod("matches_regex", FilterMatchesRegex())
     defineMethod("regex_replace", FilterRegexReplace())
 
-    defineMethod("json", FilterToJson())
-    defineMethod("to_json", FilterToJson())
+    defineMethod("json", FilterToJson(this))
+    defineMethod("to_json", FilterToJson(this))
 
     defineMethod("yaml", FilterToYaml())
     defineMethod("to_yaml", FilterToYaml())

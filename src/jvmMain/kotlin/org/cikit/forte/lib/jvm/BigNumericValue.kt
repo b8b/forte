@@ -8,7 +8,7 @@ import kotlin.math.pow
 
 class BigNumericValue(
     val value: BigInteger
-) : Number(), NumericValue {
+) : NumericValue {
 
     override val result: BigInteger
         get() = value
@@ -194,6 +194,11 @@ class BigNumericValue(
         }
     }
 
+    override fun negate(): NumericValue {
+        val newValue = value.times(BigInteger.valueOf(-1L))
+        return BigNumericValue(newValue)
+    }
+
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return BigComparableValue(originalValue, value)
     }
@@ -208,17 +213,13 @@ class BigNumericValue(
         return value.toString(10)
     }
 
-    override fun toDouble(): Double = value.toDouble()
+    override fun toIntOrNull(): Int? = try {
+        value.intValueExact()
+    } catch (_: ArithmeticException) {
+        null
+    }
 
-    override fun toFloat(): Float = value.toFloat()
-
-    override fun toLong(): Long = value.toLong()
-
-    override fun toInt(): Int = value.toInt()
-
-    override fun toShort(): Short = value.toShort()
-
-    override fun toByte(): Byte = value.toByte()
+    override fun toDoubleOrNull(): Double? = null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

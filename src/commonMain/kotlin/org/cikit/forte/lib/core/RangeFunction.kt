@@ -3,7 +3,20 @@ package org.cikit.forte.lib.core
 import org.cikit.forte.core.Function
 import org.cikit.forte.core.*
 
-class RangeFunction : Function, BinOpFunction {
+class RangeFunction(
+    private val number: FilterNumber
+) : Function, BinOpFunction, DependencyAware {
+
+    constructor(ctx: Context<*>) : this(ctx.filterNumber)
+
+    override fun withDependencies(ctx: Context<*>): DependencyAware {
+        val number = ctx.filterNumber
+        if (number === this.number) {
+            return this
+        }
+        return RangeFunction(number)
+    }
+
     override val isHidden: Boolean
         get() = false
 
@@ -14,14 +27,25 @@ class RangeFunction : Function, BinOpFunction {
         if (args.values.size == 1) {
             args.use {
                 start = 0
-                end = require("stop")
+                end = number(require<Number>("stop")).toIntOrNull()
+                    ?: error("cannot convert argument 'end' to int")
                 step = 1
             }
         } else {
             args.use {
-                start = require("start")
-                end = require("stop")
-                step = optional("step") { 1 }
+                start = number(require<Number>("start")).toIntOrNull()
+                    ?: error("cannot convert argument 'start' to int")
+                end = number(require<Number>("stop")).toIntOrNull()
+                    ?: error("cannot convert argument 'end' to int")
+                step = optional(
+                    "step",
+                    convertValue = { v ->
+                        number(v).toIntOrNull() ?: error(
+                            "cannot convert argument 'step' to int"
+                        )
+                    },
+                    defaultValue = { 1 }
+                )
             }
         }
         return if (step == 1) {

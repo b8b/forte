@@ -26,9 +26,8 @@ class BinaryMul private constructor(
         } catch (ex: Exception) {
             return when (left) {
                 is CharSequence -> {
-                    if (right !is Int) {
-                        binOpTypeError("plus", left, right)
-                    }
+                    val right = number(right).toIntOrNull()
+                        ?: binOpTypeError("mul", left, right)
                     StringConcatenation.replicate(left, right)
                 }
 

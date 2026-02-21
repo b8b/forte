@@ -50,16 +50,16 @@ fun <R> Context.Builder<R>.defineCoreExtensions(): Context.Builder<R> {
     defineControlTag(ControlBlock.KEY, ControlBlock())
 
     defineMethod(FilterDefault.KEY, FilterDefault())
-    defineMethod(FilterGet.KEY, FilterGet.Hidden)
+    defineMethod(FilterNumber.KEY, FilterNumber.DefaultFilterNumber())
+    defineMethod(FilterGet.KEY, FilterGet.Hidden(this))
     defineMethod(
         FilterComparable.KEY,
         FilterComparable.DefaultFilterComparable()
     )
-    defineMethod(FilterNumber.KEY, FilterNumber.DefaultFilterNumber())
 
     defineMethod(IsInTest.KEY, IsInTest.DefaultIsInTest(this))
 
-    defineFunction("range", RangeFunction() as Function)
+    defineFunction("range", RangeFunction(this) as Function)
 
     defineOpFunction("not", UnaryNot())
     defineOpFunction("minus", UnaryMinus(this))

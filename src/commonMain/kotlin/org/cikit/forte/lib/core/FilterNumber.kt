@@ -1,6 +1,7 @@
 package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
+import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.reflect.KClass
 
@@ -60,9 +61,10 @@ interface FilterNumber : FilterMethod {
             } ?: error("operand of type ${typeName(subject)} is not a number")
         }
     }
+
     private class IntNumericValue(
         val value: Int
-    ) : Number(), NumericValue {
+    ) : NumericValue {
 
         override val result: Int
             get() = value
@@ -239,6 +241,8 @@ interface FilterNumber : FilterMethod {
             )
         }
 
+        override fun negate(): NumericValue = IntNumericValue(value * -1)
+
         override fun toComparableValue(originalValue: Any?): ComparableValue {
             return FilterComparable.FloatComparableValue(this, value.toDouble())
         }
@@ -251,17 +255,9 @@ interface FilterNumber : FilterMethod {
 
         override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toDouble(): Double = value.toDouble()
+        override fun toIntOrNull(): Int = value
 
-        override fun toFloat(): Float = value.toFloat()
-
-        override fun toLong(): Long = value.toLong()
-
-        override fun toInt(): Int = value
-
-        override fun toShort(): Short = value.toShort()
-
-        override fun toByte(): Byte = value.toByte()
+        override fun toDoubleOrNull(): Double? = null
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -283,7 +279,7 @@ interface FilterNumber : FilterMethod {
 
     private class LongNumericValue(
         val value: Long
-    ) : Number(), NumericValue {
+    ) : NumericValue {
 
         override val result: Long
             get() = value
@@ -460,6 +456,8 @@ interface FilterNumber : FilterMethod {
             )
         }
 
+        override fun negate(): NumericValue = LongNumericValue(value * -1L)
+
         override fun toComparableValue(originalValue: Any?): ComparableValue {
             return FilterComparable.LongComparableValue(this, value)
         }
@@ -472,17 +470,15 @@ interface FilterNumber : FilterMethod {
 
         override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toDouble(): Double = value.toDouble()
+        override fun toIntOrNull(): Int? {
+            val converted = value.toInt()
+            if (converted.toLong() != value) {
+                return null
+            }
+            return converted
+        }
 
-        override fun toFloat(): Float = value.toFloat()
-
-        override fun toLong(): Long = value
-
-        override fun toInt(): Int = value.toInt()
-
-        override fun toShort(): Short = value.toInt().toShort()
-
-        override fun toByte(): Byte = value.toInt().toByte()
+        override fun toDoubleOrNull(): Double? = null
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -504,7 +500,7 @@ interface FilterNumber : FilterMethod {
 
     private class FloatNumericValue(
         val value: Double
-    ) : Number(), NumericValue {
+    ) : NumericValue {
 
         override val result: Double
             get() = value
@@ -657,6 +653,8 @@ interface FilterNumber : FilterMethod {
             )
         }
 
+        override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
+
         override fun toComparableValue(originalValue: Any?): ComparableValue {
             return FilterComparable.FloatComparableValue(this, value)
         }
@@ -669,17 +667,9 @@ interface FilterNumber : FilterMethod {
 
         override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toDouble(): Double = value
+        override fun toIntOrNull(): Int? = null
 
-        override fun toFloat(): Float = value.toFloat()
-
-        override fun toLong(): Long = value.toLong()
-
-        override fun toInt(): Int = value.toInt()
-
-        override fun toShort(): Short = value.toInt().toShort()
-
-        override fun toByte(): Byte = value.toInt().toByte()
+        override fun toDoubleOrNull(): Double = value
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true

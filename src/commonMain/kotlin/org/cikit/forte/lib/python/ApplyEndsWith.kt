@@ -1,10 +1,14 @@
 package org.cikit.forte.lib.python
 
+import org.cikit.forte.core.Context
+import org.cikit.forte.core.DependencyAware
 import org.cikit.forte.core.Method
 import org.cikit.forte.core.NamedArgs
 import org.cikit.forte.core.optional
 import org.cikit.forte.core.require
 import org.cikit.forte.core.typeName
+import org.cikit.forte.lib.core.FilterNumber
+import org.cikit.forte.lib.core.filterNumber
 
 /**
  * Python 3.13
@@ -24,7 +28,19 @@ import org.cikit.forte.core.typeName
  * * `end` seems nonInclusive
  * * `length` seems to be added to negative indices
  */
-class ApplyEndsWith : Method {
+class ApplyEndsWith private constructor(
+    private val number: FilterNumber
+) : Method, DependencyAware {
+    constructor(ctx: Context<*>) : this(ctx.filterNumber)
+
+    override fun withDependencies(ctx: Context<*>): DependencyAware {
+        val number = ctx.filterNumber
+        if (number === this.number) {
+            return this
+        }
+        return ApplyEndsWith(number)
+    }
+
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val input = when (subject) {
             is CharSequence -> subject
@@ -39,8 +55,24 @@ class ApplyEndsWith : Method {
         var end: Int
         args.use {
             suffix = require("suffix")
-            start = optional("start") { 0 }
-            end = optional("end") { input.length }
+            start = optional(
+                "start",
+                convertValue = { v ->
+                    number(v).toIntOrNull() ?: error(
+                        "cannot convert arg 'start' to int"
+                    )
+                },
+                defaultValue = { 0 }
+            )
+            end = optional(
+                "end",
+                convertValue = { v ->
+                    number(v).toIntOrNull() ?: error(
+                        "cannot convert arg 'end' to int"
+                    )
+                },
+                defaultValue = { input.length }
+            )
         }
         if (start >= input.length) {
             return false

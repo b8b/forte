@@ -24,6 +24,8 @@ val dynamicPow = { a: dynamic, b: dynamic ->
     eval("a ** b")
 }
 
+val dynamicUnaryMinus = { a: dynamic -> eval("a * -1n") }
+
 val toBigInt = { a: Any -> js("BigInt(a)") }
 
 val dynamicToNumber = { a: dynamic ->

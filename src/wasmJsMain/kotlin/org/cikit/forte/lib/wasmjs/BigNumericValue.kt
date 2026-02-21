@@ -197,6 +197,8 @@ class BigNumericValue(
         }
     }
 
+    override fun negate(): NumericValue = BigNumericValue(value.times(-1))
+
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return BigComparableValue(originalValue, value)
     }
@@ -210,6 +212,14 @@ class BigNumericValue(
     override fun toStringValue(): CharSequence {
         return value.toString(10)
     }
+
+    override fun toIntOrNull(): Int? = try {
+        value.intValue(true)
+    } catch (_: ArithmeticException) {
+        null
+    }
+
+    override fun toDoubleOrNull(): Double? = null
 
     override fun toDouble(): Double = value.doubleValue()
 
@@ -237,6 +247,6 @@ class BigNumericValue(
     }
 
     override fun toString(): String {
-        return "BigNumericValue($value)"
+        return value.toString()
     }
 }

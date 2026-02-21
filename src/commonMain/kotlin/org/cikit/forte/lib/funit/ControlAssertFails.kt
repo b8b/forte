@@ -15,7 +15,7 @@ class ControlAssertFails : ControlTag {
         val branch = branches.single()
         try {
             ctx.scope().evalNodes(template, branch.body)
-        } catch (ex: Exception) {
+        } catch (ex: Throwable) {
             ctx.emitValue(ex.toString())
             return
         }

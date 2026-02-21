@@ -22,9 +22,9 @@ class FilterInt private constructor(
         args.requireEmpty()
         return when (subject) {
             is Number -> number(subject).toIntValue().result
-            is Boolean -> if (subject) 1 else 0
+            is Boolean -> number(if (subject) 1 else 0).toIntValue().result
             is CharSequence -> parseInt(subject)
-            is Char -> subject.digitToInt()
+            is Char -> number(subject.digitToInt()).toIntValue().result
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"
             )

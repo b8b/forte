@@ -6,9 +6,9 @@ import org.cikit.forte.core.NamedArgs
 import org.cikit.forte.core.typeName
 
 class FilterLength : FilterMethod {
-    override fun invoke(subject: Any?, args: NamedArgs): Int {
+    override fun invoke(subject: Any?, args: NamedArgs): Long {
         args.requireEmpty()
-        return when (subject) {
+        val result = when (subject) {
             is Map<*, *> -> subject.size
             is Collection<*> -> subject.size
             is CharSequence -> subject.length
@@ -17,5 +17,6 @@ class FilterLength : FilterMethod {
                 "invalid operand of type '${typeName(subject)}'"
             )
         }
+        return result.toLong()
     }
 }

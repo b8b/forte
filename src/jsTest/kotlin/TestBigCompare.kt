@@ -8,12 +8,10 @@ class TestBigCompare {
 
     @Test
     fun testPow() = runTest {
-        val result = Forte.scope()
-            .setVar("a", 2)
-            .setVar("b", 40)
-            .evalExpression(Forte.parseExpression("a ** b + 1"))
+        val expr = Forte.parseExpression("""(2|int) ** (40|int) + 1""")
+        val result = Forte.scope().evalExpression(expr)
         val expect = js("BigInt('1099511627777')")
-        assertEquals(BigNumericValue(expect), result)
+        assertEquals(expect, result)
     }
 
     @Test

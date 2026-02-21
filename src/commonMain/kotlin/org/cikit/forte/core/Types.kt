@@ -88,7 +88,7 @@ interface ComparableValue : Comparable<ComparableValue> {
 }
 
 interface NumericValue {
-    val result: Any?
+    val result: Number
 
     val isInt: Boolean
     val isFloat: Boolean
@@ -104,11 +104,15 @@ interface NumericValue {
     fun tdiv(other: NumericValue): NumericValue
     fun rem(other: NumericValue): NumericValue
     fun pow(other: NumericValue): NumericValue
+    fun negate(): NumericValue
 
     fun toComparableValue(originalValue: Any?): ComparableValue
     fun toIntValue(): NumericValue
     fun toFloatValue(): NumericValue
     fun toStringValue(): CharSequence
+
+    fun toIntOrNull(): Int?
+    fun toDoubleOrNull(): Double?
 }
 
 class Branch(

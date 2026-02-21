@@ -50,7 +50,10 @@ interface FilterGet : FilterMethod {
 
     fun getSlice(subject: Any?, args: NamedArgs): Any?
 
-    sealed class DefaultFilterGet : FilterGet {
+    sealed class DefaultFilterGet(
+        protected val number: FilterNumber
+    ) : FilterGet {
+
         override val isRescue: Boolean
             get() = true
 
@@ -73,23 +76,32 @@ interface FilterGet : FilterMethod {
                     else -> getFromMap(subject, key.concatToString())
                 }
 
-                is Int -> when (subject) {
-                    is List<*> -> subject.getOrElse(key) {
-                        Undefined(
-                            "index $key out of bounds for List " +
-                                "operand of type '${typeName(subject)}' " +
-                                "with size ${subject.size}")
-                    }
-                    is CharSequence -> if (key !in subject.indices) {
-                        Undefined(
-                            "index $key out of bounds for String " +
-                                "operand of type '${typeName(subject)}' " +
-                                "with size ${subject.length}")
-                    } else {
-                        subject[key]
-                    }
+                is Number -> {
+                    val key = number(key).toIntOrNull() ?: error(
+                        "cannot convert argument 'key' " +
+                                "of type ${typeName(key)} to int"
+                    )
+                    when (subject) {
+                        is List<*> -> subject.getOrElse(key) {
+                            Undefined(
+                                "index $key out of bounds for List operand " +
+                                        "of type '${typeName(subject)}' " +
+                                        "with size ${subject.size}"
+                            )
+                        }
 
-                    else -> getFromMap(subject, key)
+                        is CharSequence -> if (key !in subject.indices) {
+                            Undefined(
+                                "index $key out of bounds for String operand " +
+                                        "of type '${typeName(subject)}' " +
+                                        "with size ${subject.length}"
+                            )
+                        } else {
+                            subject[key]
+                        }
+
+                        else -> getFromMap(subject, key)
+                    }
                 }
 
                 else -> getFromMap(subject, key)
@@ -171,9 +183,33 @@ interface FilterGet : FilterMethod {
             var defaultEnd = false
             val step: Int
             args.use {
-                start = optional("start") { defaultStart = true; 0 }
-                end = optional("end") { defaultEnd = true; size }
-                step = optional("step") { 1 }
+                start = optional(
+                    "start",
+                    convertValue = { v ->
+                        number(v).toIntOrNull() ?: error(
+                            "cannot convert arg 'start' to int"
+                        )
+                    },
+                    defaultValue = { defaultStart = true; 0 }
+                )
+                end = optional(
+                    "end",
+                    convertValue = { v ->
+                        number(v).toIntOrNull() ?: error(
+                            "cannot convert arg 'end' to int"
+                        )
+                    },
+                    defaultValue = { defaultEnd = true; size }
+                )
+                step = optional(
+                    "step",
+                    convertValue = { v ->
+                        number(v).toIntOrNull() ?: error(
+                            "cannot convert arg 'step' of type ${typeName(v)} to int"
+                        )
+                    },
+                    defaultValue = { 1 }
+                )
             }
             if (step > 0) {
                 if (size <= 0 || start >= size) {
@@ -235,7 +271,19 @@ interface FilterGet : FilterMethod {
         }
     }
 
-    object Hidden : DefaultFilterGet() {
+    class Hidden private constructor(
+        number: FilterNumber
+    ) : DefaultFilterGet(number), DependencyAware {
+        constructor(ctx: Context<*>) : this(ctx.filterNumber)
+
+        override fun withDependencies(ctx: Context<*>): DependencyAware {
+            val number = ctx.filterNumber
+            if (number === this.number) {
+                return this
+            }
+            return Hidden(number)
+        }
+
         override val isHidden: Boolean
             get() = true
     }

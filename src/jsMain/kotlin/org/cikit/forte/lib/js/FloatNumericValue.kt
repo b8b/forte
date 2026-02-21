@@ -7,7 +7,7 @@ import kotlin.math.pow
 
 class FloatNumericValue(
     val value: Double
-): Number(), NumericValue {
+): NumericValue {
 
     override val result: Double
         get() = value
@@ -22,18 +22,13 @@ class FloatNumericValue(
         get() = value %1 != 0.0
 
     override fun plus(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
+        is FloatNumericValue -> {
             val newValue = value + other.value
             FloatNumericValue(newValue)
         }
 
         is BigNumericValue -> {
             val newValue = value + dynamicToNumber(other.value)
-            FloatNumericValue(newValue)
-        }
-
-        is FloatNumericValue -> {
-            val newValue = value + other.value
             FloatNumericValue(newValue)
         }
 
@@ -44,18 +39,13 @@ class FloatNumericValue(
     }
 
     override fun minus(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
+        is FloatNumericValue -> {
             val newValue = value - other.value
             FloatNumericValue(newValue)
         }
 
         is BigNumericValue -> {
             val newValue = value - dynamicToNumber(other.value)
-            FloatNumericValue(newValue)
-        }
-
-        is FloatNumericValue -> {
-            val newValue = value - other.value
             FloatNumericValue(newValue)
         }
 
@@ -66,18 +56,13 @@ class FloatNumericValue(
     }
 
     override fun mul(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
-            val newValue = value * other.value
+        is FloatNumericValue -> {
+            val newValue = other.value * value
             FloatNumericValue(newValue)
         }
 
         is BigNumericValue -> {
             val newValue = value * dynamicToNumber(other.value)
-            FloatNumericValue(newValue)
-        }
-
-        is FloatNumericValue -> {
-            val newValue = other.value * value
             FloatNumericValue(newValue)
         }
 
@@ -88,18 +73,13 @@ class FloatNumericValue(
     }
 
     override fun div(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
+        is FloatNumericValue -> {
             val newValue = value / other.value
             FloatNumericValue(newValue)
         }
 
         is BigNumericValue -> {
             val newValue = value / dynamicToNumber(other.value)
-            FloatNumericValue(newValue)
-        }
-
-        is FloatNumericValue -> {
-            val newValue = value / other.value
             FloatNumericValue(newValue)
         }
 
@@ -117,18 +97,13 @@ class FloatNumericValue(
     }
 
     override fun rem(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
-            val newValue = value % other.value.toDouble()
+        is FloatNumericValue -> {
+            val newValue = value % other.value
             FloatNumericValue(newValue)
         }
 
         is BigNumericValue -> {
             val newValue = value % dynamicToNumber(other.value)
-            FloatNumericValue(newValue)
-        }
-
-        is FloatNumericValue -> {
-            val newValue = value % other.value
             FloatNumericValue(newValue)
         }
 
@@ -139,7 +114,7 @@ class FloatNumericValue(
     }
 
     override fun pow(other: NumericValue): NumericValue = when (other) {
-        is IntNumericValue -> {
+        is FloatNumericValue -> {
             val newValue = value.pow(other.value)
             FloatNumericValue(newValue)
         }
@@ -149,16 +124,13 @@ class FloatNumericValue(
             FloatNumericValue(newValue)
         }
 
-        is FloatNumericValue -> {
-            val newValue = value.pow(other.value)
-            FloatNumericValue(newValue)
-        }
-
         else -> error(
             "binary operator pow is undefined for operands of type " +
                     "'${typeName(this)}' and '${typeName(other)}'"
         )
     }
+
+    override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
 
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return FloatComparableValue(originalValue, value)
@@ -175,17 +147,9 @@ class FloatNumericValue(
         return value.toString()
     }
 
-    override fun toDouble(): Double = value
+    override fun toIntOrNull(): Int? = null
 
-    override fun toFloat(): Float = value.toFloat()
-
-    override fun toLong(): Long = value.toLong()
-
-    override fun toInt(): Int = value.toInt()
-
-    override fun toShort(): Short = value.toInt().toShort()
-
-    override fun toByte(): Byte = value.toInt().toByte()
+    override fun toDoubleOrNull(): Double = value
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

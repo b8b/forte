@@ -31,6 +31,9 @@ kotlin {
                 }
             }
         }
+        compilerOptions {
+            freeCompilerArgs.add("-Xes-long-as-bigint")
+        }
     }
     wasmJs {
         nodejs {

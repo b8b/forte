@@ -76,7 +76,7 @@ class TestEval {
         val result = Forte.scope().evalExpression(
             Forte.parseExpression("1 + 1")
         )
-        assertEquals(2, result)
+        assertEquals(2, (result as Number).toInt())
     }
 
     @Test
@@ -265,8 +265,9 @@ class TestEval {
     fun testIfExpression() = runTest {
         assertEquals(
             1,
-            Forte.scope()
-                .evalExpression(Forte.parseExpression("1 if true else 2"))
+            Forte.scope().evalExpression(
+                Forte.parseExpression("1 if true else 2")
+            ).let { it as Number }.toInt()
         )
         assertFailsWith<EvalException> {
             Forte.renderToString()
@@ -275,8 +276,9 @@ class TestEval {
         }
         assertEquals(
             4,
-            Forte.scope()
-                .evalExpression(Forte.parseExpression("3 if false else 4"))
+            Forte.scope().evalExpression(
+                Forte.parseExpression("3 if false else 4")
+            ).let { it as Number }.toInt()
         )
     }
 }

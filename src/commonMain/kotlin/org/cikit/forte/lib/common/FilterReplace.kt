@@ -1,6 +1,8 @@
 package org.cikit.forte.lib.common
 
 import org.cikit.forte.core.*
+import org.cikit.forte.lib.core.FilterNumber
+import org.cikit.forte.lib.core.filterNumber
 
 /**
  * jinja-filters.replace(s: str, old: str, new: str, count: int | None = None) → str
@@ -15,7 +17,19 @@ import org.cikit.forte.core.*
  *     {{ "aaaaargh"|replace("a", "d'oh, ", 2) }}
  *         -> d'oh, d'oh, aaargh
  */
-class FilterReplace : FilterMethod {
+class FilterReplace private constructor(
+    private val number: FilterNumber
+) : FilterMethod, DependencyAware {
+    constructor(ctx: Context<*>): this(ctx.filterNumber)
+
+    override fun withDependencies(ctx: Context<*>): DependencyAware {
+        val number = ctx.filterNumber
+        if (number === this.number) {
+            return this
+        }
+        return FilterReplace(number)
+    }
+
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val search: String
         val replacement: CharSequence
@@ -23,7 +37,15 @@ class FilterReplace : FilterMethod {
         args.use {
             search = require<CharSequence>("old").concatToString()
             replacement = require("new")
-            count = optional("count") { -1 }
+            count = optional(
+                "count",
+                convertValue = { v ->
+                    number(v).toIntOrNull() ?: error(
+                        "cannot convert arg 'count' to int"
+                    )
+                },
+                defaultValue =  { -1 }
+            )
         }
         require(subject is CharSequence) {
             "invalid operand of type'${typeName(subject)}'"

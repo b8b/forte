@@ -8,7 +8,7 @@ import kotlin.math.pow
 
 class FloatNumericValue(
     val value: Double,
-): Number(), NumericValue {
+): NumericValue {
 
     override val result: Double
         get() = value
@@ -161,6 +161,8 @@ class FloatNumericValue(
         )
     }
 
+    override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
+
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return FloatComparableValue(originalValue, value)
     }
@@ -176,17 +178,9 @@ class FloatNumericValue(
         return value.toString()
     }
 
-    override fun toDouble(): Double = value
+    override fun toIntOrNull(): Int? = null
 
-    override fun toFloat(): Float = value.toFloat()
-
-    override fun toLong(): Long = value.toLong()
-
-    override fun toInt(): Int = value.toInt()
-
-    override fun toShort(): Short = value.toInt().toShort()
-
-    override fun toByte(): Byte = value.toInt().toByte()
+    override fun toDoubleOrNull(): Double = value
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
