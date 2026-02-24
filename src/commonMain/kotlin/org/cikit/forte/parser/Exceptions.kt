@@ -140,7 +140,8 @@ fun Expression.sourceTokenRange(): Pair<Token, Token> = when (val node = this) {
         node.children.first().sourceTokenRange().first to
                 node.children.last().sourceTokenRange().second
     }
-    is Expression.NumericLiteral -> node.first to node.last
+    is Expression.IntegerLiteral -> node.first to node.last
+    is Expression.FloatLiteral -> node.first to node.last
     is Expression.BooleanLiteral -> node.token to node.token
     is Expression.NullLiteral -> node.token to node.token
     is Expression.Variable -> node.first to node.first

@@ -76,11 +76,9 @@ interface FilterGet : FilterMethod {
                     else -> getFromMap(subject, key.concatToString())
                 }
 
+                is NumericValue,
                 is Number -> {
-                    val key = number(key).toIntOrNull() ?: error(
-                        "cannot convert argument 'key' " +
-                                "of type ${typeName(key)} to int"
-                    )
+                    val key = number.requireInt(key)
                     when (subject) {
                         is List<*> -> subject.getOrElse(key) {
                             Undefined(
@@ -183,33 +181,15 @@ interface FilterGet : FilterMethod {
             var defaultEnd = false
             val step: Int
             args.use {
-                start = optional(
-                    "start",
-                    convertValue = { v ->
-                        number(v).toIntOrNull() ?: error(
-                            "cannot convert arg 'start' to int"
-                        )
-                    },
-                    defaultValue = { defaultStart = true; 0 }
-                )
-                end = optional(
-                    "end",
-                    convertValue = { v ->
-                        number(v).toIntOrNull() ?: error(
-                            "cannot convert arg 'end' to int"
-                        )
-                    },
-                    defaultValue = { defaultEnd = true; size }
-                )
-                step = optional(
-                    "step",
-                    convertValue = { v ->
-                        number(v).toIntOrNull() ?: error(
-                            "cannot convert arg 'step' of type ${typeName(v)} to int"
-                        )
-                    },
-                    defaultValue = { 1 }
-                )
+                start = optional("start", number::requireInt) {
+                    defaultStart = true
+                    0
+                }
+                end = optional("end", number::requireInt) {
+                    defaultEnd = true;
+                    size
+                }
+                step = optional("step", number::requireInt) { 1 }
             }
             if (step > 0) {
                 if (size <= 0 || start >= size) {

@@ -2,6 +2,7 @@ package org.cikit.forte.emitter
 
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.KSerializer
+import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.typeName
 
 interface Emitter {
@@ -9,6 +10,7 @@ interface Emitter {
 
     fun emitScalar(value: Boolean)
     fun emitScalar(value: Number)
+    fun emitScalar(value: NumericValue)
     fun emitScalar(value: CharSequence)
     fun emitScalar(value: ByteArray)
     fun emitScalar(value: ByteString)

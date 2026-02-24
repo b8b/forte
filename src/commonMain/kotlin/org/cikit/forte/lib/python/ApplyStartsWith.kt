@@ -54,24 +54,8 @@ class ApplyStartsWith private constructor(
         var end: Int
         args.use {
             prefix = require("prefix")
-            start = optional(
-                "start",
-                convertValue = { v ->
-                    number(v).toIntOrNull() ?: error(
-                        "cannot convert arg 'start' to int"
-                    )
-                },
-                defaultValue = { 0 }
-            )
-            end = optional(
-                "end",
-                convertValue = { v ->
-                    number(v).toIntOrNull() ?: error(
-                        "cannot convert arg 'end' to int"
-                    )
-                },
-                defaultValue =  { input.length }
-            )
+            start = optional("start", number::requireInt) { 0 }
+            end = optional("end", number::requireInt) { input.length }
         }
         if (start >= input.length) {
             return false

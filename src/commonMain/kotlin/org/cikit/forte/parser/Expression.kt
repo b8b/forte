@@ -77,7 +77,7 @@ sealed class Expression(
         override fun toString() = "Literal($value)"
     }
 
-    class NumericLiteral(
+    class IntegerLiteral(
         val first: Token,
         val last: Token,
         val value: Number,
@@ -85,7 +85,18 @@ sealed class Expression(
     ) : Expression(operations) {
         override val children: Iterable<Expression>
             get() = emptyList()
-        override fun toString() = "Literal($value)"
+        override fun toString() = "Integer($value)"
+    }
+
+    class FloatLiteral(
+        val first: Token,
+        val last: Token,
+        val value: Number,
+        operations: List<Operation> = UNCOMPILED_EXPRESSION
+    ) : Expression(operations) {
+        override val children: Iterable<Expression>
+            get() = emptyList()
+        override fun toString() = "Float($value)"
     }
 
     class StringLiteral(

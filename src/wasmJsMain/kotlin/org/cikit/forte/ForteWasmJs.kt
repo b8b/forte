@@ -24,33 +24,36 @@ actual fun <R>
                 (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
         Byte::class to { orig, value, _: Boolean ->
             value as Byte
-            FloatComparableValue(orig, value.toDouble())
+            FloatComparableValue.DirectComparableValue(orig, value.toDouble())
         },
         Short::class to { orig, value, _: Boolean ->
             value as Short
-            FloatComparableValue(orig, value.toDouble())
+            FloatComparableValue.DirectComparableValue(orig, value.toDouble())
         },
         Int::class to { orig, value, _: Boolean ->
             value as Int
-            FloatComparableValue(orig, value.toDouble())
+            FloatComparableValue.DirectComparableValue(orig, value.toDouble())
         },
         Long::class to { orig, value, _: Boolean ->
             value as Long
             if (value == 0L ||
                 64 - value.absoluteValue.countLeadingZeroBits() <= 53)
             {
-                FloatComparableValue(orig, value.toDouble())
+                FloatComparableValue.DirectComparableValue(
+                    orig,
+                    value.toDouble()
+                )
             } else {
                 BigComparableValue(orig, BigInteger.fromLong(value))
             }
         },
         Float::class to { orig, value, _: Boolean ->
-            value as Float
-            FloatComparableValue(orig, value.toDouble())
+            value as Double
+            FloatNumericValue(value).toComparableValue(orig)
         },
         Double::class to { orig, value, _: Boolean ->
             value as Double
-            FloatComparableValue(orig, value)
+            FloatNumericValue(value).toComparableValue(orig)
         },
         BigInteger::class to { orig, value, _: Boolean ->
             BigComparableValue(orig, value as BigInteger)

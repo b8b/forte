@@ -4,6 +4,8 @@ import org.cikit.forte.core.ComparableValue
 import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.typeName
 import kotlin.math.pow
+import kotlin.math.sign
+import kotlin.math.truncate
 
 class FloatNumericValue(
     val value: Double
@@ -19,7 +21,7 @@ class FloatNumericValue(
         get() = true
 
     override val hasDecimalPart: Boolean
-        get() = value %1 != 0.0
+        get() = value % 1.0 != 0.0
 
     override fun plus(other: NumericValue): NumericValue = when (other) {
         is FloatNumericValue -> {
@@ -28,7 +30,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value + dynamicToNumber(other.value)
+            val newValue = value + (Number(other.value) as Double)
             FloatNumericValue(newValue)
         }
 
@@ -45,7 +47,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value - dynamicToNumber(other.value)
+            val newValue = value - (Number(other.value) as Double)
             FloatNumericValue(newValue)
         }
 
@@ -62,7 +64,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value * dynamicToNumber(other.value)
+            val newValue = value * (Number(other.value) as Double)
             FloatNumericValue(newValue)
         }
 
@@ -79,7 +81,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value / dynamicToNumber(other.value)
+            val newValue = value / (Number(other.value) as Double)
             FloatNumericValue(newValue)
         }
 
@@ -103,7 +105,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value % dynamicToNumber(other.value)
+            val newValue = value % (Number(other.value) as Double)
             FloatNumericValue(newValue)
         }
 
@@ -120,7 +122,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value.pow(dynamicToNumber(other.value))
+            val newValue = value.pow(Number(other.value) as Double)
             FloatNumericValue(newValue)
         }
 
@@ -130,26 +132,46 @@ class FloatNumericValue(
         )
     }
 
-    override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
+    override fun negate(): NumericValue = FloatNumericValue(-value)
 
     override fun toComparableValue(originalValue: Any?): ComparableValue {
-        return FloatComparableValue(originalValue, value)
+        if (value.isNaN()) {
+            error("NaN is not comparable")
+        }
+        if (!hasDecimalPart && value.isFinite()) {
+            return FloatComparableValue.DirectComparableValue(
+                originalValue,
+                value
+            )
+        }
+        if (value.sign == -1.0) {
+            return FloatComparableValue.NegativeComparableValue(
+                originalValue,
+                value
+            )
+        }
+        return FloatComparableValue.PositiveComparableValue(
+            originalValue,
+            value
+        )
     }
 
     override fun toIntValue(): NumericValue {
-        val newValue = toBigInt(value)
+        val newValue = BigInt(truncate(value))
         return BigNumericValue(newValue)
     }
 
     override fun toFloatValue(): NumericValue = this
 
     override fun toStringValue(): CharSequence {
-        return value.toString()
+        return numberToString(value)
     }
 
-    override fun toIntOrNull(): Int? = null
+    override fun intOrNull(): Int? = null
 
-    override fun toDoubleOrNull(): Double = value
+    override fun longOrNull(): Long? = null
+
+    override fun doubleOrNull(): Double = value
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

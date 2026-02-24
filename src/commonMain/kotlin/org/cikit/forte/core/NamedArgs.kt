@@ -72,36 +72,31 @@ class NamedArgsIterator(
         return values[nextIndex]
     }
 
-    @Suppress("DEPRECATION")
-    @Deprecated("does not work correctly on js target")
-    fun <T : Any> requireNullable(name: String, type: KClass<T>): T? {
-        val nextIndex = next(name)
-        require(nextIndex >= 0) { "missing required arg '$name'" }
-        return castNullable(name, type, values[nextIndex])
-    }
-
-    @Suppress("DEPRECATION")
-    @Deprecated("does not work correctly on js target")
-    fun <T : Any> require(name: String, type: KClass<T>): T {
-        val nextIndex = next(name)
-        require(nextIndex >= 0) { "missing required arg '$name'" }
-        return cast(name, type, values[nextIndex])
-    }
-
-    @Suppress("DEPRECATION")
-    @Deprecated("does not work correctly on js target")
-    fun <T : Any> optionalNullable(
-        name: String,
-        type: KClass<T>,
-        defaultValue: () -> T?,
-    ): T? {
-        val nextIndex = next(name)
-        val finalValue = if (nextIndex < 0) {
-            defaultValue()
-        } else {
-            cast(name, type, values[nextIndex])
+    fun <T: Any> requireNullable(name: String, convertValue: (Any?) -> T?): T? {
+        val value = requireAny(name)
+        try {
+            return convertValue(value)
+        } catch (ex: Throwable) {
+            throw IllegalArgumentException(
+                "cannot convert arg '$name' of type '${typeName(value)}': $ex",
+                ex
+            )
         }
-        return finalValue
+    }
+
+    fun <T: Any> require(name: String, convertValue: (Any?) -> T): T {
+        val value = requireAny(name)
+        require(value != null) {
+            "invalid null value for arg '$name'"
+        }
+        try {
+            return convertValue(value)
+        } catch (ex: Throwable) {
+            throw IllegalArgumentException(
+                "cannot convert arg '$name' of type '${typeName(value)}': $ex",
+                ex
+            )
+        }
     }
 
     fun <T : Any> optionalNullable(
@@ -110,25 +105,17 @@ class NamedArgsIterator(
         defaultValue: () -> T?,
     ): T? {
         val nextIndex = next(name)
-        return if (nextIndex < 0) {
-            defaultValue()
-        } else {
-            convertValue(values[nextIndex])
+        if (nextIndex < 0) {
+            return defaultValue()
         }
-    }
-
-    @Suppress("DEPRECATION")
-    @Deprecated("does not work correctly on js target")
-    fun <T : Any> optional(
-        name: String,
-        type: KClass<T>,
-        defaultValue: () -> T
-    ): T {
-        val nextIndex = next(name)
-        return if (nextIndex < 0) {
-            defaultValue()
-        } else {
-            cast(name, type, values[nextIndex])
+        val value = values[nextIndex]
+        try {
+            return convertValue(value)
+        } catch (ex: Throwable) {
+            throw IllegalArgumentException(
+                "cannot convert arg '$name' of type '${typeName(value)}': $ex",
+                ex
+            )
         }
     }
 
@@ -138,44 +125,18 @@ class NamedArgsIterator(
         defaultValue: () -> T
     ): T {
         val nextIndex = next(name)
-        return if (nextIndex < 0) {
-            defaultValue()
-        } else {
-            val value = values[nextIndex]
-            convertValue(value)
+        if (nextIndex < 0) {
+            return defaultValue()
         }
-    }
-
-    @Deprecated("does not work correctly on js target")
-    private fun <T: Any> cast(
-        name: String,
-        type: KClass<T>,
-        value: Any?
-    ): T {
-        require(value != null) { "invalid null value for arg '$name'" }
-        val result = type.safeCast(value)
-        require(result != null) {
-            "invalid type '${typeName(value)}' " +
-                    "for arg '$name': expected '$type'"
+        val value = values[nextIndex]
+        try {
+            return convertValue(value)
+        } catch (ex: Throwable) {
+            throw IllegalArgumentException(
+                "cannot convert arg '$name' of type '${typeName(value)}': $ex",
+                ex
+            )
         }
-        return result
-    }
-
-    @Deprecated("does not work correctly on js target")
-    private fun <T: Any> castNullable(
-        name: String,
-        type: KClass<T>,
-        value: Any?
-    ): T? {
-        if (value == null) {
-            return null
-        }
-        val result = type.safeCast(value)
-        require(result != null) {
-            "invalid type '${typeName(value)}' " +
-                    "for arg '$name': expected '$type'"
-        }
-        return result
     }
 
     private fun next(name: String): Int {

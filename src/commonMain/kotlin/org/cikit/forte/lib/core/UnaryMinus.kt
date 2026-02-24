@@ -19,6 +19,6 @@ class UnaryMinus private constructor(
     }
 
     override fun invoke(arg: Any?): Any {
-        return number(arg).negate().result
+        return number.requireNumber(arg).negate()
     }
 }

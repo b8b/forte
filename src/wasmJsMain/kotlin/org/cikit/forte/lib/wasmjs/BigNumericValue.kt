@@ -1,7 +1,6 @@
 package org.cikit.forte.lib.wasmjs
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import dev.erikchristensen.javamath2kmp.timesExact
 import org.cikit.forte.core.ComparableValue
 import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.typeName
@@ -163,26 +162,37 @@ class BigNumericValue(
         )
     }
 
+    private fun pow(exp: Int): NumericValue {
+        // handle small numbers
+        val lower = BigInteger.fromInt(-2)
+        val upper = BigInteger.fromInt(2)
+        if (exp in -1..1) {
+            return BigNumericValue(value.pow(exp))
+        }
+        if (value > lower && value < upper) {
+            return BigNumericValue(value.pow(exp))
+        }
+        // BitLength(result) ~ BitLength(base) * exp
+        // BitLength(result) < maxBitLength
+        // => BitLength(base) * exp < maxBitLength
+        // => BitLength(base) < maxBitLength / exp
+        // => maxBase = 2 ^ (maxBitLength / exp)
+        val exp2 = maxBitLength / exp
+        val maxBase = upper.pow(exp2)
+        if (value > maxBase) {
+            throw ArithmeticException("base or exponent too high")
+        }
+        return BigNumericValue(value.pow(exp))
+    }
+
     override fun pow(other: NumericValue): NumericValue {
-        val bitLength = value.bitLength()
         return when (other) {
-            is IntNumericValue -> {
-                val bitLength = bitLength.timesExact(other.value)
-                if (bitLength > maxBitLength) {
-                    throw ArithmeticException("exponent too high")
-                }
-                val newValue = value.pow(other.value)
-                BigNumericValue(newValue)
+            is BigNumericValue -> {
+                pow(other.value.intValue(exactRequired = true))
             }
 
-            is BigNumericValue -> {
-                val exp = other.value.intValue(true)
-                val bitLength = bitLength.timesExact(exp)
-                if (bitLength > maxBitLength) {
-                    throw ArithmeticException("exponent too high")
-                }
-                val newValue = value.pow(exp)
-                BigNumericValue(newValue)
+            is IntNumericValue -> {
+                pow(other.value)
             }
 
             is FloatNumericValue -> {
@@ -213,13 +223,19 @@ class BigNumericValue(
         return value.toString(10)
     }
 
-    override fun toIntOrNull(): Int? = try {
+    override fun intOrNull(): Int? = try {
         value.intValue(true)
     } catch (_: ArithmeticException) {
         null
     }
 
-    override fun toDoubleOrNull(): Double? = null
+    override fun longOrNull(): Long? = try {
+        return value.longValue(true)
+    } catch (_: ArithmeticException) {
+        null
+    }
+
+    override fun doubleOrNull(): Double? = null
 
     override fun toDouble(): Double = value.doubleValue()
 
@@ -247,6 +263,6 @@ class BigNumericValue(
     }
 
     override fun toString(): String {
-        return value.toString()
+        return value.toString(10)
     }
 }

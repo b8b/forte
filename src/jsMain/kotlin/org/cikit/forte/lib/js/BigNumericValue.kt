@@ -6,7 +6,7 @@ import org.cikit.forte.core.typeName
 import kotlin.math.pow
 
 class BigNumericValue(
-    val value: Long
+    val value: dynamic
 ) : NumericValue {
 
     override val result: Number
@@ -21,14 +21,16 @@ class BigNumericValue(
     override val hasDecimalPart: Boolean
         get() = false
 
-    override fun plus(other: NumericValue): NumericValue = when (other) {
+    override infix operator fun plus(
+        other: NumericValue
+    ): NumericValue = when (other) {
         is BigNumericValue -> {
-            val newValue = dynamicPlus(value, other.value)
+            val newValue = BigInt.add(value, other.value)
             BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = dynamicToNumber(value) + other.value
+            val newValue = Number(value) + other.value
             FloatNumericValue(newValue)
         }
 
@@ -40,12 +42,12 @@ class BigNumericValue(
 
     override fun minus(other: NumericValue): NumericValue = when (other) {
         is BigNumericValue -> {
-            val newValue = dynamicMinus(value, other.value)
+            val newValue = BigInt.subtract(value, other.value)
             BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = dynamicToNumber(value) - other.value
+            val newValue = Number(value) - other.value
             FloatNumericValue(newValue)
         }
 
@@ -57,12 +59,12 @@ class BigNumericValue(
 
     override fun mul(other: NumericValue): NumericValue = when (other) {
         is BigNumericValue -> {
-            val newValue = dynamicMultiply(value, other.value)
+            val newValue = BigInt.multiply(value, other.value)
             BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = dynamicToNumber(value) * other.value
+            val newValue = Number(value) * other.value
             FloatNumericValue(newValue)
         }
 
@@ -74,22 +76,17 @@ class BigNumericValue(
 
     override fun div(other: NumericValue): NumericValue = when (other) {
         is BigNumericValue -> {
-            val newValue = dynamicDivide(value, other.value)
-            val chk = dynamicCompareTo(
-                value,
-                dynamicMultiply(newValue, other.value)
-            )
-            if (chk == 0) {
+            val newValue = BigInt.divide(value, other.value)
+            if (BigInt.eq(value, BigInt.multiply(newValue, other.value))) {
                 BigNumericValue(newValue)
             } else {
-                val newValue = dynamicToNumber(value) /
-                        dynamicToNumber(other.value)
+                val newValue = Number(value) / Number(other.value)
                 FloatNumericValue(newValue)
             }
         }
 
         is FloatNumericValue -> {
-            val newValue = dynamicToNumber(value) / other.value
+            val newValue = Number(value) / other.value
             FloatNumericValue(newValue)
         }
 
@@ -101,7 +98,7 @@ class BigNumericValue(
 
     override fun tdiv(other: NumericValue): NumericValue = when (other) {
         is BigNumericValue -> {
-            val newValue = dynamicDivide(value, other.value)
+            val newValue = BigInt.divide(value, other.value)
             return BigNumericValue(newValue)
         }
 
@@ -113,12 +110,12 @@ class BigNumericValue(
 
     override fun rem(other: NumericValue): NumericValue = when (other) {
         is BigNumericValue -> {
-            val newValue = dynamicReminder(value, other.value)
+            val newValue = BigInt.remainder(value, other.value)
             return BigNumericValue(newValue)
         }
 
         is FloatNumericValue -> {
-            val newValue = dynamicToNumber(value).rem(other.value)
+            val newValue = Number(value).rem(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -129,27 +126,43 @@ class BigNumericValue(
     }
 
     override fun pow(other: NumericValue): NumericValue {
-        val maxValueAsDouble = 2.0.pow(maxBitLength.toDouble() + 1.0)
-        if (dynamicCompareTo(value, maxValueAsDouble) > 0) {
-            throw ArithmeticException("base too high")
-        }
-        val bitLength = value.toString(2).length
         return when (other) {
             is BigNumericValue -> {
-                val bitLength = dynamicMultiply(
-                    toBigInt(bitLength),
+                // handle small numbers
+                val lower = BigInt(-2)
+                val upper = BigInt(2)
+                if (BigInt.gt(value, lower) && BigInt.lt(value, upper)) {
+                    return BigNumericValue(BigInt.pow(value, other.value))
+                }
+                if (BigInt.gt(other.value, lower) &&
+                    BigInt.lt(other.value, upper))
+                {
+                    return BigNumericValue(BigInt.pow(value, other.value))
+                }
+                // BitLength(result) ~ BitLength(base) * exp
+                // BitLength(result) < maxBitLength
+                // => BitLength(base) * exp < maxBitLength
+                // => BitLength(base) < maxBitLength / exp
+                // => maxBase = 2 ^ (maxBitLength / exp)
+                val exp2 = BigInt.divide(
+                    BigInt(maxBitLength),
                     other.value
                 )
-                val chk = dynamicCompareTo(bitLength, toBigInt(maxBitLength))
-                if (chk > 0) {
-                    throw ArithmeticException("exponent too high")
+                val maxBase = BigInt.pow(
+                    upper,
+                    exp2
+                )
+                if (BigInt.gt(value, maxBase)) {
+                    throw ArithmeticException("base or exponent too high")
                 }
-                val newValue = dynamicPow(value, other.value)
+                val newValue = BigInt.pow(value, other.value)
                 BigNumericValue(newValue)
             }
 
             is FloatNumericValue -> {
-                val newValue = dynamicToNumber(value).pow(other.value)
+                val a = Number(value) as Double
+                val b = other.value
+                val newValue = a.pow(b)
                 FloatNumericValue(newValue)
             }
 
@@ -161,7 +174,7 @@ class BigNumericValue(
     }
 
     override fun negate(): NumericValue {
-        val newValue = dynamicUnaryMinus(value)
+        val newValue = BigInt.negate(value)
         return BigNumericValue(newValue)
     }
 
@@ -172,21 +185,30 @@ class BigNumericValue(
     override fun toIntValue(): NumericValue = this
 
     override fun toFloatValue(): NumericValue {
-        return FloatNumericValue(dynamicToNumber(value))
+        return FloatNumericValue(Number(value))
     }
 
     override fun toStringValue(): CharSequence {
         return value.toString()
     }
 
-    override fun toIntOrNull(): Int? {
-        if (value in Int.MIN_VALUE .. Int.MAX_VALUE) {
-            return value.toInt()
+    override fun intOrNull(): Int? {
+        val truncated = BigInt.asIntN(32, value)
+        if (BigInt.eq(truncated, value)) {
+            return Number(truncated) as Int
         }
         return null
     }
 
-    override fun toDoubleOrNull(): Double? = null
+    override fun longOrNull(): Long? {
+        val truncated = BigInt.asIntN(64, value)
+        if (BigInt.eq(truncated, value)) {
+            return truncated
+        }
+        return null
+    }
+
+    override fun doubleOrNull(): Double? = null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

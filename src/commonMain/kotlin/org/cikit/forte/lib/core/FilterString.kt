@@ -19,7 +19,7 @@ class FilterString : FilterMethod {
             is CharSequence -> subject.concatToString()
             is Char -> subject.toString()
             is NumericValue -> subject.toStringValue()
-            is Number -> /* FIXME avoid toString() */ subject.toString()
+            is Number -> subject.toString()
             is Boolean -> if (subject) "True" else "False"
             null -> "None"
             else -> throw IllegalArgumentException(

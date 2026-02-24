@@ -1,8 +1,9 @@
 import kotlinx.coroutines.test.runTest
 import org.cikit.forte.Forte
-import org.cikit.forte.lib.js.BigNumericValue
+import org.cikit.forte.lib.core.filterNumber
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 
 class TestBigCompare {
 
@@ -10,8 +11,11 @@ class TestBigCompare {
     fun testPow() = runTest {
         val expr = Forte.parseExpression("""(2|int) ** (40|int) + 1""")
         val result = Forte.scope().evalExpression(expr)
-        val expect = js("BigInt('1099511627777')")
+        val expect = Forte.scope().filterNumber("1099511627777")
         assertEquals(expect, result)
+        assertFails {
+            Forte.scope().evalExpression(Forte.parseExpression("1000 ** 1000"))
+        }
     }
 
     @Test

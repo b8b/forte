@@ -3,8 +3,8 @@ package org.cikit.forte.emitter
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.encode
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.cikit.forte.core.NumericValue
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -18,6 +18,7 @@ class YamlEmitter(val target: Appendable) : Emitter {
     override fun emitNull() = emitter.emitNull()
     override fun emitScalar(value: Boolean) = emitter.emitScalar(value)
     override fun emitScalar(value: Number) = emitter.emitScalar(value)
+    override fun emitScalar(value: NumericValue) = emitter.emitScalar(value)
     override fun emitScalar(value: CharSequence) = emitter.emitScalar(value)
     override fun emitScalar(value: ByteString) = emitter.emitScalar(value)
 
@@ -151,12 +152,23 @@ private class YamlShallowEmitter(
 
     override fun emitScalar(value: Number) {
         when (value) {
-            Float.NaN, Double.NaN -> emitEncoded(".nan")
             Float.POSITIVE_INFINITY,
             Double.POSITIVE_INFINITY -> emitEncoded("+.inf")
             Float.NEGATIVE_INFINITY,
             Double.NEGATIVE_INFINITY -> emitEncoded("-.inf")
+            is Float if value.isNaN() -> emitEncoded(".nan")
+            is Double if value.isNaN() -> emitEncoded(".nan")
             else -> emitEncoded(value.toString())
+        }
+    }
+
+    override fun emitScalar(value: NumericValue) {
+        when (val doubleValue = value.doubleOrNull()) {
+            null -> emitEncoded(value.toStringValue().toString())
+            Double.POSITIVE_INFINITY -> emitEncoded("+.inf")
+            Double.NEGATIVE_INFINITY -> emitEncoded("-.inf")
+            else if doubleValue.isNaN() -> emitEncoded(".nan")
+            else -> emitEncoded(value.toStringValue().toString())
         }
     }
 

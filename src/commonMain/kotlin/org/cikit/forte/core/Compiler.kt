@@ -47,9 +47,18 @@ private fun compileExpressionInternal(
                 operations.opSubList(firstOperation, operations.size)
             )
         }
-        is Expression.NumericLiteral -> {
-            operations.add(Operation.Const(expression, expression.value))
-            Expression.NumericLiteral(
+        is Expression.IntegerLiteral -> {
+            operations.add(Operation.ConstInteger(expression, expression.value))
+            Expression.IntegerLiteral(
+                expression.first,
+                expression.last,
+                expression.value,
+                operations.opSubList(firstOperation, operations.size)
+            )
+        }
+        is Expression.FloatLiteral -> {
+            operations.add(Operation.ConstFloat(expression, expression.value))
+            Expression.FloatLiteral(
                 expression.first,
                 expression.last,
                 expression.value,

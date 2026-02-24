@@ -17,13 +17,14 @@ class FilterFloat private constructor(
         }
     }
 
-    override fun invoke(subject: Any?, args: NamedArgs): Any? {
+    override fun invoke(subject: Any?, args: NamedArgs): NumericValue {
         args.requireEmpty()
         return when (subject) {
-            is Number -> number(subject).toFloatValue().result
-            is Boolean -> if (subject) 1.0 else 0.0
-            is CharSequence -> subject.concatToString().toDouble()
-            is Char -> subject.digitToInt().toDouble()
+            is NumericValue -> subject.toFloatValue()
+            is Number -> number.requireNumber(subject).toFloatValue()
+            is Boolean -> number(if (subject) 1 else 0).toFloatValue()
+            is CharSequence -> number(subject).toFloatValue()
+            is Char -> number(subject.digitToInt()).toFloatValue()
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"
             )

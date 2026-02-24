@@ -1,5 +1,6 @@
 package org.cikit.forte.core
 
+import org.cikit.forte.lib.core.filterNumber
 import org.cikit.forte.parser.Expression
 
 sealed class Operation {
@@ -17,6 +18,38 @@ sealed class Operation {
 
         override fun invoke(ctx: Context<*>, state: EvaluatorState) {
             state.addLast(expression, value)
+        }
+    }
+
+    class ConstInteger(
+        override val expression: Expression,
+        val value: Number
+    ) : Operation() {
+        override fun toString(): String {
+            return expression.toString()
+        }
+
+        override fun invoke(ctx: Context<*>, state: EvaluatorState) {
+            state.addLast(
+                expression,
+                ctx.filterNumber.requireNumber(value).toIntValue()
+            )
+        }
+    }
+
+    class ConstFloat(
+        override val expression: Expression,
+        val value: Number
+    ) : Operation() {
+        override fun toString(): String {
+            return expression.toString()
+        }
+
+        override fun invoke(ctx: Context<*>, state: EvaluatorState) {
+            state.addLast(
+                expression,
+                ctx.filterNumber.requireNumber(value).toFloatValue()
+            )
         }
     }
 

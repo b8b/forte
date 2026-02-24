@@ -682,8 +682,8 @@ fun ExpressionParser.expect(value: Boolean): Expression.BooleanLiteral {
     )
 }
 
-fun ExpressionParser.expect(value: Number): Expression.NumericLiteral {
-    val n = this.expect<Expression.NumericLiteral>()
+fun ExpressionParser.expect(value: Number): Expression.IntegerLiteral {
+    val n = this.expect<Expression.IntegerLiteral>()
     if (n.value == value) {
         return n
     }

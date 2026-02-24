@@ -3,6 +3,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import org.cikit.forte.Forte
 import org.cikit.forte.core.EvalException
+import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.loadJson
 import org.cikit.forte.lib.funit.defineFUnitExtensions
 import org.cikit.forte.lib.funit.fUnitDeclarations
@@ -76,7 +77,7 @@ class TestEval {
         val result = Forte.scope().evalExpression(
             Forte.parseExpression("1 + 1")
         )
-        assertEquals(2, (result as Number).toInt())
+        assertEquals(2, (result as NumericValue).intOrNull())
     }
 
     @Test
@@ -101,7 +102,7 @@ class TestEval {
             .captureTo { println("--> $it") }
             .setVar("x", 2)
             .evalTemplate(template)
-        assertEquals(3, result.getVar("y"))
+        assertEquals(3, (result.getVar("y") as NumericValue).intOrNull())
     }
 
     @Test
@@ -109,9 +110,9 @@ class TestEval {
         with (Forte.captureTo { println("--> $it") }) {
             setVar("x", 2)
             evalTemplate(Forte.parseTemplate("{% if true %}{% set y = x + 1 %}{% endif %}{{ y }}"))
-            assertEquals(3, getVar("y"))
+            assertEquals(3, (getVar("y") as NumericValue).intOrNull())
             evalTemplate(Forte.parseTemplate("{% for x in [1] %}{% set y = x + 1 %}{% endfor %}{{ y }}"))
-            assertEquals(3, getVar("y"))
+            assertEquals(3, (getVar("y") as NumericValue).intOrNull())
         }
     }
 
@@ -267,7 +268,7 @@ class TestEval {
             1,
             Forte.scope().evalExpression(
                 Forte.parseExpression("1 if true else 2")
-            ).let { it as Number }.toInt()
+            ).let { it as NumericValue }.intOrNull()
         )
         assertFailsWith<EvalException> {
             Forte.renderToString()
@@ -278,7 +279,7 @@ class TestEval {
             4,
             Forte.scope().evalExpression(
                 Forte.parseExpression("3 if false else 4")
-            ).let { it as Number }.toInt()
+            ).let { it as NumericValue }.intOrNull()
         )
     }
 }

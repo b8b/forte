@@ -27,25 +27,14 @@ class RangeFunction(
         if (args.values.size == 1) {
             args.use {
                 start = 0
-                end = number(require<Number>("stop")).toIntOrNull()
-                    ?: error("cannot convert argument 'end' to int")
+                end = require("stop", number::requireInt)
                 step = 1
             }
         } else {
             args.use {
-                start = number(require<Number>("start")).toIntOrNull()
-                    ?: error("cannot convert argument 'start' to int")
-                end = number(require<Number>("stop")).toIntOrNull()
-                    ?: error("cannot convert argument 'end' to int")
-                step = optional(
-                    "step",
-                    convertValue = { v ->
-                        number(v).toIntOrNull() ?: error(
-                            "cannot convert argument 'step' to int"
-                        )
-                    },
-                    defaultValue = { 1 }
-                )
+                start = require("start", number::requireInt)
+                end = require("stop", number::requireInt)
+                step = optional("step", number::requireInt) { 1 }
             }
         }
         return if (step == 1) {

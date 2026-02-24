@@ -22,7 +22,7 @@ class BinaryPlus private constructor(
 
     override fun invoke(left: Any?, right: Any?): Any? {
         val leftNumber = try {
-            number(left)
+            number.requireNumber(left)
         } catch (ex: Exception) {
             return when (left) {
                 is CharSequence -> {
@@ -41,7 +41,6 @@ class BinaryPlus private constructor(
                 else -> throw ex
             }
         }
-        return leftNumber.plus(number(right)).result
+        return leftNumber.plus(number.requireNumber(right))
     }
 }
-

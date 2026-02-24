@@ -111,8 +111,9 @@ interface NumericValue {
     fun toFloatValue(): NumericValue
     fun toStringValue(): CharSequence
 
-    fun toIntOrNull(): Int?
-    fun toDoubleOrNull(): Double?
+    fun intOrNull(): Int?
+    fun longOrNull(): Long?
+    fun doubleOrNull(): Double?
 }
 
 class Branch(

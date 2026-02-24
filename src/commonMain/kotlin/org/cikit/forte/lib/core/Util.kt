@@ -89,7 +89,7 @@ fun <R> Context.Builder<R>.defineCoreExtensions(): Context.Builder<R> {
     defineBinaryOpFunction("if", BinaryIf())
     defineBinaryOpFunction("else", BinaryElse())
 
-    val filterLength = FilterLength()
+    val filterLength = FilterLength(this)
     defineMethod("length", filterLength)
     defineMethod("count", filterLength)
 

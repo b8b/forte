@@ -1,7 +1,7 @@
 package org.cikit.forte.lib.core
 
 import org.cikit.forte.core.*
-import kotlin.math.absoluteValue
+import org.cikit.forte.internal.parseInt
 import kotlin.math.pow
 import kotlin.reflect.KClass
 
@@ -20,6 +20,23 @@ interface FilterNumber : FilterMethod {
     }
 
     operator fun invoke(subject: Any?): NumericValue
+
+    fun requireNumber(n: Any?): NumericValue
+
+    fun requireInt(n: Any?): Int {
+        return requireNumber(n).intOrNull()
+            ?: error("cannot convert argument 'n' to int")
+    }
+
+    fun requireLong(n: Any?): Long {
+        return requireNumber(n).longOrNull()
+            ?: error("cannot convert argument 'n' to long")
+    }
+
+    fun requireDouble(n: Any?): Double {
+        return requireNumber(n).doubleOrNull()
+            ?: error("cannot convert argument 'n' to double")
+    }
 
     class DefaultFilterNumber(
         override val types: Map<KClass<*>, (Any) -> NumericValue> = hashMapOf(
@@ -55,10 +72,31 @@ interface FilterNumber : FilterMethod {
 
         override operator fun invoke(subject: Any?): NumericValue {
             return when (subject) {
-                null -> null
                 is NumericValue -> subject
+                null -> null
+                is Boolean -> IntNumericValue(if (subject) 1 else 0)
+                is CharSequence -> try {
+                    requireNumber(parseInt(subject))
+                } catch (_: Throwable) {
+                    val str: String = subject.toString()
+                    FloatNumericValue(str.toDouble())
+                }
+                is Char -> IntNumericValue(subject.digitToInt())
+
                 else -> types[subject::class]?.invoke(subject)
-            } ?: error("operand of type ${typeName(subject)} is not a number")
+            } ?: error(
+                "cannot convert operand of type ${typeName(subject)} to number"
+            )
+        }
+
+        override fun requireNumber(n: Any?): NumericValue {
+            return when (n) {
+                is NumericValue -> n
+                null -> null
+                else -> types[n::class]?.invoke(n)
+            } ?: throw IllegalArgumentException(
+                "operand of type ${typeName(n)} is not a number"
+            )
         }
     }
 
@@ -255,9 +293,11 @@ interface FilterNumber : FilterMethod {
 
         override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toIntOrNull(): Int = value
+        override fun intOrNull(): Int = value
 
-        override fun toDoubleOrNull(): Double? = null
+        override fun longOrNull(): Long = value.toLong()
+
+        override fun doubleOrNull(): Double? = null
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -470,15 +510,17 @@ interface FilterNumber : FilterMethod {
 
         override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toIntOrNull(): Int? {
-            val converted = value.toInt()
-            if (converted.toLong() != value) {
-                return null
+        override fun intOrNull(): Int? {
+            val truncated = value.toInt()
+            if (truncated.compareTo(value) == 0) {
+                return truncated
             }
-            return converted
+            return null
         }
 
-        override fun toDoubleOrNull(): Double? = null
+        override fun longOrNull(): Long = value
+
+        override fun doubleOrNull(): Double? = null
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -667,9 +709,11 @@ interface FilterNumber : FilterMethod {
 
         override fun toStringValue(): CharSequence = value.toString()
 
-        override fun toIntOrNull(): Int? = null
+        override fun intOrNull(): Int? = null
 
-        override fun toDoubleOrNull(): Double = value
+        override fun longOrNull(): Long? = null
+
+        override fun doubleOrNull(): Double = value
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true

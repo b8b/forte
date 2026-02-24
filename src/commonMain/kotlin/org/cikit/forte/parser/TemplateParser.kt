@@ -586,7 +586,7 @@ private class ExpressionParserImpl(
                         input.substring(rhs.token.first .. rhs.token.last),
                         Expression.NamedArgs()
                     )
-                    is Expression.NumericLiteral -> {
+                    is Expression.FloatLiteral -> {
                         val source = input.substring(
                             rhs.first.first ..rhs.first.last
                         )
@@ -854,10 +854,10 @@ private class ExpressionParserImpl(
                         "None", "none" -> Expression.NullLiteral(t)
                         "True", "true" -> Expression.BooleanLiteral(t, true)
                         "False", "false" -> Expression.BooleanLiteral(t, false)
-                        "NaN" -> Expression.NumericLiteral(
+                        "NaN" -> Expression.FloatLiteral(
                             t, t, Double.NaN
                         )
-                        "Infinity" -> Expression.NumericLiteral(
+                        "Infinity" -> Expression.FloatLiteral(
                             t, t, Double.POSITIVE_INFINITY
                         )
 
@@ -869,12 +869,13 @@ private class ExpressionParserImpl(
                 is Token.Number -> {
                     tokenizer.consume(t)
                     val s = input.substring(t.first .. t.last)
-                    val v: Number = try {
-                        parseInt(s)
+                    primary = try {
+                        val intValue = parseInt(s)
+                        Expression.IntegerLiteral(t, t, intValue)
                     } catch (_: NumberFormatException) {
-                        s.toDouble()
+                        val floatValue = s.toDouble()
+                        Expression.FloatLiteral(t, t, floatValue)
                     }
-                    primary = Expression.NumericLiteral(t, t, v)
                     break
                 }
 

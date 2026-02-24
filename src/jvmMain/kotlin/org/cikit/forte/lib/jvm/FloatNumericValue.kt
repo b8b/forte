@@ -163,6 +163,9 @@ class FloatNumericValue(
     override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
 
     override fun toComparableValue(originalValue: Any?): ComparableValue {
+        if (value.isNaN()) {
+            error("NaN is not comparable")
+        }
         return FloatComparableValue(originalValue, value)
     }
 
@@ -177,9 +180,11 @@ class FloatNumericValue(
         return value.toString()
     }
 
-    override fun toIntOrNull(): Int? = null
+    override fun intOrNull(): Int? = null
 
-    override fun toDoubleOrNull(): Double = value
+    override fun longOrNull(): Long? = null
+
+    override fun doubleOrNull(): Double = value
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

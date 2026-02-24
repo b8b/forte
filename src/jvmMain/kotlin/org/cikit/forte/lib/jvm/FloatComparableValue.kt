@@ -11,8 +11,14 @@ class FloatComparableValue(
     override fun compareTo(other: ComparableValue): Int {
         return when (other) {
             is FloatComparableValue -> converted.compareTo(other.converted)
-            is BigComparableValue -> BigDecimal.valueOf(converted)
-                .compareTo(BigDecimal(other.converted))
+            is BigComparableValue -> when (converted) {
+                Double.POSITIVE_INFINITY -> 1
+                Double.NEGATIVE_INFINITY -> -1
+
+                else -> BigDecimal
+                    .valueOf(converted)
+                    .compareTo(BigDecimal(other.converted))
+            }
             else -> error(
                 "compareTo undefined for operands of type " +
                         "'${typeName(value)}' and '${typeName(other)}'"

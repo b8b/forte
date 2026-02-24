@@ -20,6 +20,6 @@ class BinaryTDiv private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).tdiv(number(right)).result
+        return number.requireNumber(left).tdiv(number.requireNumber(right))
     }
 }

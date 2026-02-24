@@ -20,8 +20,14 @@ class IsNumberTest private constructor(
     override fun invoke(subject: Any?, args: NamedArgs): Boolean {
         args.requireEmpty()
         return when (subject) {
-            is NumericValue -> true
-            is Number -> true
+            is NumericValue -> !subject.isFloat ||
+                    subject.doubleOrNull()?.isNaN() != true
+            is Number -> when (subject) {
+                is Double -> !subject.isNaN()
+                is Float -> !subject.isNaN()
+
+                else -> true
+            }
             is Long -> true
             null -> false
             else -> subject::class in number.types

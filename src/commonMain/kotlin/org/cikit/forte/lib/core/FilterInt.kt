@@ -18,13 +18,14 @@ class FilterInt private constructor(
         }
     }
 
-    override fun invoke(subject: Any?, args: NamedArgs): Any? {
+    override fun invoke(subject: Any?, args: NamedArgs): NumericValue {
         args.requireEmpty()
         return when (subject) {
-            is Number -> number(subject).toIntValue().result
-            is Boolean -> number(if (subject) 1 else 0).toIntValue().result
-            is CharSequence -> parseInt(subject)
-            is Char -> number(subject.digitToInt()).toIntValue().result
+            is NumericValue -> subject.toIntValue()
+            is Number -> number.requireNumber(subject).toIntValue()
+            is Boolean -> number(if (subject) 1 else 0).toIntValue()
+            is CharSequence -> number(subject).toIntValue()
+            is Char -> number(subject.digitToInt()).toIntValue()
             else -> throw IllegalArgumentException(
                 "invalid operand of type '${typeName(subject)}'"
             )

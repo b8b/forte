@@ -75,6 +75,9 @@ interface FilterComparable : FilterMethod {
             },
             Double::class to { orig, value, _: Boolean ->
                 value as Double
+                if (value.isNaN()) {
+                    error("NaN is not comparable")
+                }
                 FloatComparableValue(orig, value)
             },
             Char::class to { orig, value, ignoreCase ->
@@ -98,8 +101,7 @@ interface FilterComparable : FilterMethod {
         ): ComparableValue? {
             return when (subject) {
                 null -> null
-                is ComparableValue -> subject
-                is NumericValue -> subject.toComparableValue(subject)
+                is NumericValue -> subject.toComparableValue(originalValue)
                 is CharSequence -> StringComparableValue(
                     originalValue,
                     subject.concatToString(),

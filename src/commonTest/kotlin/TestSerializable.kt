@@ -5,6 +5,7 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.encodeToMap
 import org.cikit.forte.Forte
+import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.loadJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +22,7 @@ class TestSerializable {
             .evalExpression(
                 Forte.parseExpression("input.a + input.b")
             )
-        assertEquals(3, (result as Number).toInt())
+        assertEquals(3, (result as NumericValue).intOrNull())
         val result2 = Forte.scope()
             .loadJson("input", input)
             .evalExpression(
@@ -42,7 +43,7 @@ class TestSerializable {
             .evalExpression(
                 Forte.parseExpression("input.x + 1")
             )
-        assertEquals(2, result)
+        assertEquals(2, (result as NumericValue).intOrNull())
     }
 
     @Test
@@ -53,6 +54,6 @@ class TestSerializable {
             .evalExpression(
                 Forte.parseExpression("input.x + 1")
             )
-        assertEquals(2, (result as Number).toInt())
+        assertEquals(2, (result as NumericValue).intOrNull())
     }
 }

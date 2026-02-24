@@ -5,8 +5,7 @@ import org.cikit.forte.lib.core.FilterNumber
 import org.cikit.forte.lib.core.filterNumber
 
 class IsOddTest private constructor(
-    private val number: FilterNumber,
-    private val two: NumericValue = number(2)
+    private val number: FilterNumber
 ) : TestMethod, DependencyAware {
 
     constructor(ctx: Context<*>) : this(ctx.filterNumber)
@@ -22,7 +21,15 @@ class IsOddTest private constructor(
 
     override fun invoke(subject: Any?, args: NamedArgs): Boolean {
         args.requireEmpty()
-        //FIXME have to find out what jinja actually does
-        return number(subject).div(two).isInt
+        return when (subject) {
+            is NumericValue -> {
+                subject.rem(number(2)).intOrNull() == 0
+            }
+            is Number -> {
+                number.requireNumber(subject).rem(number(2)).intOrNull() == 0
+            }
+
+            else -> false
+        }
     }
 }

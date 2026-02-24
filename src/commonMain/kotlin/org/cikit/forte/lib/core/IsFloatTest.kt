@@ -3,6 +3,7 @@ package org.cikit.forte.lib.core
 import org.cikit.forte.core.Context
 import org.cikit.forte.core.DependencyAware
 import org.cikit.forte.core.NamedArgs
+import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.TestMethod
 
 class IsFloatTest private constructor(
@@ -22,6 +23,11 @@ class IsFloatTest private constructor(
 
     override fun invoke(subject: Any?, args: NamedArgs): Boolean {
         args.requireEmpty()
-        return number(subject).isFloat
+        return when (subject) {
+            is NumericValue -> subject.isFloat
+            is Number -> number(subject).isFloat
+
+            else -> false
+        }
     }
 }

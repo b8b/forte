@@ -160,26 +160,37 @@ class BigNumericValue(
         )
     }
 
+    private fun pow(exp: Int): NumericValue {
+        // handle small numbers
+        val lower = BigInteger.valueOf(-2)
+        val upper = BigInteger.valueOf(2)
+        if (exp in -1..1) {
+            return BigNumericValue(value.pow(exp))
+        }
+        if (value > lower && value < upper) {
+            return BigNumericValue(value.pow(exp))
+        }
+        // BitLength(result) ~ BitLength(base) * exp
+        // BitLength(result) < maxBitLength
+        // => BitLength(base) * exp < maxBitLength
+        // => BitLength(base) < maxBitLength / exp
+        // => maxBase = 2 ^ (maxBitLength / exp)
+        val exp2 = maxBitLength / exp
+        val maxBase = upper.pow(exp2)
+        if (value > maxBase) {
+            throw ArithmeticException("base or exponent too high")
+        }
+        return BigNumericValue(value.pow(exp))
+    }
+
     override fun pow(other: NumericValue): NumericValue {
-        val bitLength = value.bitLength()
         return when (other) {
             is BigNumericValue -> {
-                val exp = other.value.intValueExact()
-                val bitLength = Math.multiplyExact(bitLength, exp)
-                if (bitLength > maxBitLength) {
-                    throw ArithmeticException("exponent too high")
-                }
-                val newValue = value.pow(exp)
-                BigNumericValue(newValue)
+                pow(other.value.intValueExact())
             }
 
             is IntNumericValue -> {
-                val bitLength = Math.multiplyExact(bitLength, other.value)
-                if (bitLength > maxBitLength) {
-                    throw ArithmeticException("exponent too high")
-                }
-                val newValue = value.pow(other.value)
-                BigNumericValue(newValue)
+                pow(other.value)
             }
 
             is FloatNumericValue -> {
@@ -213,13 +224,19 @@ class BigNumericValue(
         return value.toString(10)
     }
 
-    override fun toIntOrNull(): Int? = try {
+    override fun intOrNull(): Int? = try {
         value.intValueExact()
     } catch (_: ArithmeticException) {
         null
     }
 
-    override fun toDoubleOrNull(): Double? = null
+    override fun longOrNull(): Long? = try {
+        value.longValueExact()
+    } catch (_: ArithmeticException) {
+        null
+    }
+
+    override fun doubleOrNull(): Double? = null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

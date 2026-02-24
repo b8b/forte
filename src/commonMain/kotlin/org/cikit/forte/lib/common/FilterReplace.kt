@@ -37,15 +37,7 @@ class FilterReplace private constructor(
         args.use {
             search = require<CharSequence>("old").concatToString()
             replacement = require("new")
-            count = optional(
-                "count",
-                convertValue = { v ->
-                    number(v).toIntOrNull() ?: error(
-                        "cannot convert arg 'count' to int"
-                    )
-                },
-                defaultValue =  { -1 }
-            )
+            count = optional("count", number::requireInt) { -1 }
         }
         require(subject is CharSequence) {
             "invalid operand of type'${typeName(subject)}'"

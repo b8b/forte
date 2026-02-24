@@ -4,7 +4,6 @@ import org.cikit.forte.core.Context
 import org.cikit.forte.core.DependencyAware
 import org.cikit.forte.core.Method
 import org.cikit.forte.core.NamedArgs
-import org.cikit.forte.core.optional
 import org.cikit.forte.core.require
 import org.cikit.forte.core.typeName
 import org.cikit.forte.lib.core.FilterNumber
@@ -55,24 +54,8 @@ class ApplyEndsWith private constructor(
         var end: Int
         args.use {
             suffix = require("suffix")
-            start = optional(
-                "start",
-                convertValue = { v ->
-                    number(v).toIntOrNull() ?: error(
-                        "cannot convert arg 'start' to int"
-                    )
-                },
-                defaultValue = { 0 }
-            )
-            end = optional(
-                "end",
-                convertValue = { v ->
-                    number(v).toIntOrNull() ?: error(
-                        "cannot convert arg 'end' to int"
-                    )
-                },
-                defaultValue = { input.length }
-            )
+            start = optional("start", number::requireInt) { 0 }
+            end = optional("end", number::requireInt) { input.length }
         }
         if (start >= input.length) {
             return false

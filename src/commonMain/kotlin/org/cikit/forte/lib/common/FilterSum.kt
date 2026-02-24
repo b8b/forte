@@ -4,9 +4,9 @@ import org.cikit.forte.core.Context
 import org.cikit.forte.core.DependencyAware
 import org.cikit.forte.core.FilterMethod
 import org.cikit.forte.core.NamedArgs
+import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.Suspended
 import org.cikit.forte.core.Undefined
-import org.cikit.forte.core.optional
 import org.cikit.forte.core.typeName
 import org.cikit.forte.lib.core.FilterGet
 import org.cikit.forte.lib.core.FilterNumber
@@ -39,7 +39,7 @@ class FilterSum private constructor(
 
     override fun invoke(subject: Any?, args: NamedArgs): Any? {
         val getArgs: NamedArgs?
-        val start: Number
+        var sum: NumericValue
         args.use {
             getArgs = optionalNullable(
                 "attribute",
@@ -48,17 +48,16 @@ class FilterSum private constructor(
                 },
                 { null }
             )
-            start = optional("start") { 0 }
+            sum = optional("start", number::requireNumber) { number(0) }
         }
         require(subject is Iterable<*>) {
             "invalid operand of type '${typeName(subject)}'"
         }
-        var sum = number(start)
         if (getArgs == null) {
             for (item in subject) {
-                sum = sum.plus(number(item))
+                sum = sum.plus(number.requireNumber(item))
             }
-            return sum.result
+            return sum
         }
         return Suspended { ctx ->
             for (item in subject) {
@@ -69,9 +68,9 @@ class FilterSum private constructor(
                 if (value is Undefined) {
                     error(value.message)
                 }
-                sum = sum.plus(number(value))
+                sum = sum.plus(number.requireNumber(value))
             }
-            sum.result
+            sum
         }
     }
 }

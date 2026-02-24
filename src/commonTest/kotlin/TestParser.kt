@@ -62,7 +62,7 @@ class TestParser {
         val arrayList =  methodAccess.left
         assertTrue(arrayList is Expression.ArrayLiteral)
         val result = arrayList.children.map { child ->
-            (child as Expression.NumericLiteral).value.toInt()
+            (child as Expression.IntegerLiteral).value.toInt()
         }
         assertEquals(listOf(1, 2, 3), result)
     }
@@ -76,12 +76,12 @@ class TestParser {
         println(nodeEmit.content)
         (nodeEmit.content as Expression.BinOp).let { plusOperation ->
             assertEquals("plus", plusOperation.decl.name)
-            assertEquals(1, (plusOperation.left as Expression.NumericLiteral).value.toInt())
+            assertEquals(1, (plusOperation.left as Expression.IntegerLiteral).value.toInt())
             plusOperation.right as Expression.BinOp
         }.let { mulOperation ->
             assertEquals("mul", mulOperation.decl.name)
-            assertEquals(2, (mulOperation.left as Expression.NumericLiteral).value.toInt())
-            assertEquals(3, (mulOperation.right as Expression.NumericLiteral).value.toInt())
+            assertEquals(2, (mulOperation.left as Expression.IntegerLiteral).value.toInt())
+            assertEquals(3, (mulOperation.right as Expression.IntegerLiteral).value.toInt())
         }
     }
 
@@ -94,12 +94,12 @@ class TestParser {
         println(nodeEmit.content)
         (nodeEmit.content as Expression.BinOp).let { plusOperation ->
             assertEquals("plus", plusOperation.decl.name)
-            assertEquals(1, (plusOperation.right as Expression.NumericLiteral).value.toInt())
+            assertEquals(1, (plusOperation.right as Expression.IntegerLiteral).value.toInt())
             plusOperation.left as Expression.BinOp
         }.let { mulOperation ->
             assertEquals("mul", mulOperation.decl.name)
-            assertEquals(2, (mulOperation.left as Expression.NumericLiteral).value.toInt())
-            assertEquals(3, (mulOperation.right as Expression.NumericLiteral).value.toInt())
+            assertEquals(2, (mulOperation.left as Expression.IntegerLiteral).value.toInt())
+            assertEquals(3, (mulOperation.right as Expression.IntegerLiteral).value.toInt())
         }
     }
 

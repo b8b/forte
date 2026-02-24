@@ -16,7 +16,7 @@ private object Patterns {
 
     val space =          """\s+""".toRegex() to Token::Space
 
-    val number =         """(?:0|[1-9]\d*)(?:\.\d+)?(?:[Ee][+-]\d+)?"""
+    val number =         """(?:0|[1-9]\d*)(?:\.\d+)?(?:[Ee][+-]?\d+)?"""
         .toRegex() to Token::Number
     val identifier =     """[A-Za-z_][A-Za-z0-9_]*"""
         .toRegex() to Token::Identifier

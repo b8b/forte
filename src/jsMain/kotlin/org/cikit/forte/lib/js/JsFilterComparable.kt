@@ -22,8 +22,7 @@ class JsFilterComparable(
     ): ComparableValue? {
         return when (subject) {
             null -> null
-            is ComparableValue -> subject
-            is NumericValue -> subject.toComparableValue(subject)
+            is NumericValue -> subject.toComparableValue(originalValue)
             is CharSequence -> StringComparableValue(
                 originalValue,
                 subject.concatToString(),
@@ -37,7 +36,8 @@ class JsFilterComparable(
 
             else -> when (js("typeof(subject)")) {
                 "number" -> {
-                    FloatComparableValue(originalValue, subject as Double)
+                    FloatNumericValue(subject as Double)
+                        .toComparableValue(originalValue)
                 }
                 "bigint" -> {
                     BigComparableValue(originalValue, subject as Long)

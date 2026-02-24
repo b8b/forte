@@ -22,18 +22,23 @@ class BinaryMul private constructor(
 
     override fun invoke(left: Any?, right: Any?): Any? {
         val leftNumber = try {
-            number(left)
+            number.requireNumber(left)
         } catch (ex: Exception) {
             return when (left) {
                 is CharSequence -> {
-                    val right = number(right).toIntOrNull()
+                    val right = number.requireNumber(right).intOrNull()
                         ?: binOpTypeError("mul", left, right)
                     StringConcatenation.replicate(left, right)
+                }
+                is Char -> {
+                    val right = number.requireNumber(right).intOrNull()
+                        ?: binOpTypeError("mul", left, right)
+                    StringConcatenation.replicate(left.toString(), right)
                 }
 
                 else -> throw ex
             }
         }
-        return leftNumber.mul(number(right)).result
+        return leftNumber.mul(number.requireNumber(right))
     }
 }

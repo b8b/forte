@@ -3,18 +3,35 @@ package org.cikit.forte.emitter
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.encode
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.concatToString
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 class JsonEmitter(
     val target: Appendable,
-    val byteStringEncoding: ByteStringEncoding = ByteStringEncoding.ARRAY
+    val byteStringEncoding: ByteStringEncoding = ByteStringEncoding.ARRAY,
+    val indent: Int = 0
 ) : Emitter {
+    constructor(
+        target: Appendable,
+        byteStringEncoding: ByteStringEncoding = ByteStringEncoding.ARRAY
+    ) : this(target, byteStringEncoding, 0)
+
+    constructor(
+        target: Appendable,
+        indent: Int
+    ) : this(target, ByteStringEncoding.ARRAY, indent)
+
     private val state = ArrayDeque(listOf(State.DOCUMENT_START))
     private val json = Json
+
+    init {
+        if (indent > 0) {
+            TODO("indentation is not implemented")
+        }
+    }
 
     enum class State {
         DOCUMENT_START,
@@ -118,6 +135,10 @@ class JsonEmitter(
     override fun emitScalar(value: Number) =
         emitEncoded(value.toString())
 
+    override fun emitScalar(value: NumericValue) {
+        emitEncoded(value.toStringValue().concatToString())
+    }
+
     override fun emitScalar(value: CharSequence) =
         emitEncoded(json.encodeToString(value.concatToString()))
 
@@ -167,6 +188,18 @@ class JsonEmitter(
         ): String {
             val result = StringBuilder()
             val emitter = JsonEmitter(result, byteStringEncoding)
+            emitter.block()
+            emitter.close()
+            return result.toString()
+        }
+
+        fun encodeToString(
+            byteStringEncoding: ByteStringEncoding = ByteStringEncoding.ARRAY,
+            indent: Int = 0,
+            block: Emitter.() -> Unit
+        ): String {
+            val result = StringBuilder()
+            val emitter = JsonEmitter(result, byteStringEncoding, indent)
             emitter.block()
             emitter.close()
             return result.toString()

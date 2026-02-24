@@ -20,6 +20,6 @@ class BinaryMinus private constructor(
     }
 
     override fun invoke(left: Any?, right: Any?): Any? {
-        return number(left).minus(number(right)).result
+        return number.requireNumber(left).minus(number.requireNumber(right))
     }
 }

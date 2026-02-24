@@ -184,38 +184,46 @@ class IntNumericValue(
         )
     }
 
-    override fun pow(other: NumericValue): NumericValue {
-        val bitLength = when (value) {
-            0, 1 -> return this
-            in 2 .. Int.MAX_VALUE -> {
-                Int.SIZE_BITS - value.countLeadingZeroBits()
-            }
-
-            else -> {
-                Int.SIZE_BITS - (0 - value).countLeadingZeroBits()
-            }
+    private fun pow(exp: Int): BigInteger {
+        val base = BigInteger.fromInt(value)
+        // handle small numbers
+        if (exp in -1..1) {
+            return base.pow(exp)
         }
+        if (value in -1..1) {
+            return base.pow(exp)
+        }
+        // BitLength(result) ~ BitLength(base) * exp
+        // BitLength(result) < maxBitLength
+        // => BitLength(base) * exp < maxBitLength
+        // => BitLength(base) < maxBitLength / exp
+        // => maxBase = 2 ^ (maxBitLength / exp)
+        val exp2 = maxBitLength / exp
+        val maxBase = BigInteger.fromInt(2).pow(exp2)
+        if (base > maxBase) {
+            throw ArithmeticException("base or exponent too high")
+        }
+        return base.pow(exp)
+    }
+
+    override fun pow(other: NumericValue): NumericValue {
         return when (other) {
-            is IntNumericValue -> {
-                val bitLength = bitLength * other.value
-                if (bitLength <= 30) {
-                    val newValue = value.toDouble()
-                        .pow(other.value)
-                        .toInt()
-                    IntNumericValue(newValue)
-                } else if (bitLength > maxBitLength) {
-                    throw ArithmeticException("exponent too high")
-                } else {
-                    val newValue = BigInteger.fromInt(value)
-                        .pow(BigInteger.fromInt(other.value))
-                    BigNumericValue(newValue)
+            is BigNumericValue -> {
+                val result = pow(other.value.intValue(exactRequired = true))
+                try {
+                    IntNumericValue(result.intValue(exactRequired = true))
+                } catch (_: ArithmeticException) {
+                    BigNumericValue(result)
                 }
             }
 
-            is BigNumericValue -> {
-                val newValue = BigInteger.fromInt(value)
-                    .pow(other.value)
-                BigNumericValue(newValue)
+            is IntNumericValue -> {
+                val result = pow(other.value)
+                try {
+                    IntNumericValue(result.intValue(exactRequired = true))
+                } catch (_: ArithmeticException) {
+                    BigNumericValue(result)
+                }
             }
 
             is FloatNumericValue -> {
@@ -233,7 +241,10 @@ class IntNumericValue(
     override fun negate(): NumericValue = IntNumericValue(value * -1)
 
     override fun toComparableValue(originalValue: Any?): ComparableValue {
-        return FloatComparableValue(originalValue, value.toDouble())
+        return FloatComparableValue.DirectComparableValue(
+            originalValue,
+            value.toDouble()
+        )
     }
 
     override fun toIntValue(): NumericValue = this
@@ -246,9 +257,11 @@ class IntNumericValue(
         return value.toString()
     }
 
-    override fun toIntOrNull(): Int = value
+    override fun intOrNull(): Int = value
 
-    override fun toDoubleOrNull(): Double? = null
+    override fun longOrNull(): Long = value.toLong()
+
+    override fun doubleOrNull(): Double? = null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

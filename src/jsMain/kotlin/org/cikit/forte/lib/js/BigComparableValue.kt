@@ -9,10 +9,12 @@ class BigComparableValue(
 ) : ComparableValue {
     override fun compareTo(other: ComparableValue): Int {
         return when (other) {
-            is BigComparableValue ->
-                dynamicCompareTo(converted, other.converted)
-            is FloatComparableValue ->
-                dynamicCompareTo(converted, other.converted)
+            is BigComparableValue -> {
+                BigInt.compare(converted, other.converted)
+            }
+            is FloatComparableValue -> {
+                other.compareTo(this) * -1
+            }
             else -> error(
                 "compareTo undefined for operands of type " +
                         "'${typeName(value)}' and '${typeName(other)}'"
