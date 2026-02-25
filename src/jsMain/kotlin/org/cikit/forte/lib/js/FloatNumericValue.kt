@@ -134,9 +134,9 @@ class FloatNumericValue(
 
     override fun negate(): NumericValue = FloatNumericValue(-value)
 
-    override fun toComparableValue(originalValue: Any?): ComparableValue {
+    override fun toComparableValue(originalValue: Any?): ComparableValue? {
         if (value.isNaN()) {
-            error("NaN is not comparable")
+            return null
         }
         if (!hasDecimalPart && value.isFinite()) {
             return FloatComparableValue.DirectComparableValue(

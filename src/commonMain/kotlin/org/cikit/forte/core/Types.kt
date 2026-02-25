@@ -106,7 +106,7 @@ interface NumericValue {
     fun pow(other: NumericValue): NumericValue
     fun negate(): NumericValue
 
-    fun toComparableValue(originalValue: Any?): ComparableValue
+    fun toComparableValue(originalValue: Any?): ComparableValue?
     fun toIntValue(): NumericValue
     fun toFloatValue(): NumericValue
     fun toStringValue(): CharSequence

@@ -697,7 +697,10 @@ interface FilterNumber : FilterMethod {
 
         override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
 
-        override fun toComparableValue(originalValue: Any?): ComparableValue {
+        override fun toComparableValue(originalValue: Any?): ComparableValue? {
+            if (value.isNaN()) {
+                return null
+            }
             return FilterComparable.FloatComparableValue(this, value)
         }
 

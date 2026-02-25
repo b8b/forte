@@ -57,18 +57,28 @@
     {% assert_false (1 ** Infinity) is number %}
     {% assert_that (1 ** Infinity) is sameas(NaN) %}
 
-## Comparisons with NaN do fail
+## Comparisons with NaN return false
 
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN < 5 }}{% endassert %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN <= 5 }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN > 5 }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN >= 5 }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN == 5 }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN < NaN }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN <= NaN }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN > NaN }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN >= NaN }}{% endassert  %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ NaN == NaN }}{% endassert  %}{% endassert %}
+    {% assert_false NaN < 5 %}
+    {% assert_false NaN <= 5 %}
+    {% assert_false NaN > 5 %}
+    {% assert_false NaN >= 5 %}
+    {% assert_false NaN == 5 %}
+    {% assert_false NaN < NaN %}
+    {% assert_false NaN <= NaN %}
+    {% assert_false NaN > NaN %}
+    {% assert_false NaN >= NaN %}
+    {% assert_false NaN == NaN %}
+
+## Sort fails on NaN
+
+    {% set v = [5.2, 3.2, NaN, 4.0] %}
+    {% assert contains("not comparable") %}
+        {% assert_fails %}{{ v|sort }}{% endassert %}
+    {% endassert %}
+    {% assert eq("3.2,4.0,5.2") %}
+        {{- v|reject("sameas", NaN)|sort|join(",") -}}
+    {% endassert %}
 
 ## Comparison between int and float
 
@@ -134,8 +144,8 @@
     {% assert_true 1.0 is not lt(-Infinity) %}
     {% assert_true (-2 ** 8000) is not lt(-Infinity) %}
 
-    {% assert contains("not comparable") %}{% assert_fails %}{{ 1 is eq(NaN) }}{% endassert %}{% endassert %}
-    {% assert contains("not comparable") %}{% assert_fails %}{{ 1.0 is eq(NaN) }}{% endassert %}{% endassert %}
+    {% assert_false 1 is eq(NaN) %}
+    {% assert_false 1.0 is eq(NaN) %}
 
     {% assert_that 0.0 is eq(-0.0) %}
 

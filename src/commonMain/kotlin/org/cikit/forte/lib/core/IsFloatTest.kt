@@ -25,7 +25,7 @@ class IsFloatTest private constructor(
         args.requireEmpty()
         return when (subject) {
             is NumericValue -> subject.isFloat
-            is Number -> number(subject).isFloat
+            is Number -> number.requireNumber(subject).isFloat
 
             else -> false
         }

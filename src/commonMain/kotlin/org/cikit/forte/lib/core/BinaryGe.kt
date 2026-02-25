@@ -19,7 +19,9 @@ class BinaryGe private constructor(
         }
     }
 
-    override fun invoke(left: Any?, right: Any?): Any? {
-        return comparable(left) >= comparable(right)
+    override fun invoke(left: Any?, right: Any?): Boolean {
+        val leftComparable = comparable.test(left) ?: return false
+        val rightComparable = comparable.test(right) ?: return false
+        return leftComparable >= rightComparable
     }
 }

@@ -21,7 +21,7 @@ actual fun <R>
         ?.types
         ?: error("${FilterComparable.KEY} is not defined")
     val jvmComparableTypes: Map<KClass<*>,
-                (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
+                (Any?, Any, Boolean) -> ComparableValue?> = hashMapOf(
         Byte::class to { orig, value, _: Boolean ->
             value as Byte
             FloatComparableValue(orig, value.toDouble())
@@ -46,11 +46,19 @@ actual fun <R>
         },
         Float::class to { orig, value, _: Boolean ->
             value as Float
-            FloatComparableValue(orig, value.toDouble())
+            if (value.isNaN()) {
+                null
+            } else {
+                FloatComparableValue(orig, value.toDouble())
+            }
         },
         Double::class to { orig, value, _: Boolean ->
             value as Double
-            FloatComparableValue(orig, value)
+            if (value.isNaN()) {
+                null
+            } else {
+                FloatComparableValue(orig, value)
+            }
         },
         BigInteger::class to { orig, value, _: Boolean ->
             value as BigInteger

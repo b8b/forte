@@ -25,7 +25,7 @@ class IsIntegerTest private constructor(
         args.requireEmpty()
         return when (subject) {
             is NumericValue -> subject.isInt
-            is Number -> number(subject).isInt
+            is Number -> number.requireNumber(subject).isInt
 
             else -> false
         }

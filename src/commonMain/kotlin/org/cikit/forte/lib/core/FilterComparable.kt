@@ -19,7 +19,7 @@ interface FilterComparable : FilterMethod {
             Context.Key.Apply.create("comparable", FilterMethod.OPERATOR)
     }
 
-    val types: Map<KClass<*>, (Any?, Any, Boolean) -> ComparableValue>
+    val types: Map<KClass<*>, (Any?, Any, Boolean) -> ComparableValue?>
 
     override fun invoke(subject: Any?, args: NamedArgs): Any {
         val caseSensitive: Boolean
@@ -46,7 +46,7 @@ interface FilterComparable : FilterMethod {
 
     class DefaultFilterComparable(
         override val types: Map<KClass<*>,
-                    (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
+                    (Any?, Any, Boolean) -> ComparableValue?> = hashMapOf(
             Byte::class to { orig, value, _: Boolean ->
                 value as Byte
                 FloatComparableValue(orig, value.toDouble())
@@ -71,14 +71,19 @@ interface FilterComparable : FilterMethod {
             },
             Float::class to { orig, value, _: Boolean ->
                 value as Float
-                FloatComparableValue(orig, value.toDouble())
+                if (value.isNaN()) {
+                    null
+                } else {
+                    FloatComparableValue(orig, value.toDouble())
+                }
             },
             Double::class to { orig, value, _: Boolean ->
                 value as Double
                 if (value.isNaN()) {
-                    error("NaN is not comparable")
+                    null
+                } else {
+                    FloatComparableValue(orig, value)
                 }
-                FloatComparableValue(orig, value)
             },
             Char::class to { orig, value, ignoreCase ->
                 value as Char

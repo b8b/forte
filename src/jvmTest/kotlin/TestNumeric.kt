@@ -1,3 +1,5 @@
+import kotlinx.coroutines.test.runTest
+import org.cikit.forte.Forte
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -41,5 +43,12 @@ class TestNumeric {
         assertFalse(n < n)
 
         assertEquals(n, n + 1.0)
+    }
+
+    @Test
+    fun testNaNEval() = runTest {
+        val expr = Forte.parseExpression("NaN < 5")
+        val result = Forte.scope().evalExpression(expr)
+        assertFalse(result as Boolean)
     }
 }

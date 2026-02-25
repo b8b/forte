@@ -25,6 +25,8 @@ class IsGeTest private constructor(
         args.use {
             other = requireAny("other")
         }
-        return comparable(subject) > comparable(other)
+        val left = comparable.test(subject) ?: return false
+        val right = comparable.test(other) ?: return false
+        return left > right
     }
 }

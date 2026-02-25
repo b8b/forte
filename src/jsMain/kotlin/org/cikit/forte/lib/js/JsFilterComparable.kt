@@ -9,7 +9,7 @@ import org.cikit.forte.lib.core.FilterComparable.StringComparableValue
 import kotlin.reflect.KClass
 
 class JsFilterComparable(
-    override val types: Map<KClass<*>, (Any?, Any, Boolean) -> ComparableValue>
+    override val types: Map<KClass<*>, (Any?, Any, Boolean) -> ComparableValue?>
 ) : FilterComparable {
 
     override val isHidden: Boolean

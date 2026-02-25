@@ -21,7 +21,7 @@ actual fun <R>
         ?.types
         ?: error("${FilterComparable.KEY} is not defined")
     val wasmJsComparableTypes: Map<KClass<*>,
-                (Any?, Any, Boolean) -> ComparableValue> = hashMapOf(
+                (Any?, Any, Boolean) -> ComparableValue?> = hashMapOf(
         Byte::class to { orig, value, _: Boolean ->
             value as Byte
             FloatComparableValue.DirectComparableValue(orig, value.toDouble())
@@ -48,12 +48,20 @@ actual fun <R>
             }
         },
         Float::class to { orig, value, _: Boolean ->
-            value as Double
-            FloatNumericValue(value).toComparableValue(orig)
+            value as Float
+            if (value.isNaN()) {
+                null
+            } else {
+                FloatNumericValue(value.toDouble()).toComparableValue(orig)
+            }
         },
         Double::class to { orig, value, _: Boolean ->
             value as Double
-            FloatNumericValue(value).toComparableValue(orig)
+            if (value.isNaN()) {
+                null
+            } else {
+                FloatNumericValue(value).toComparableValue(orig)
+            }
         },
         BigInteger::class to { orig, value, _: Boolean ->
             BigComparableValue(orig, value as BigInteger)
