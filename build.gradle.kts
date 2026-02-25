@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "org.cikit"
-version = "0.8.5-dev"
+version = "0.8.5"
 
 repositories {
     mavenCentral()
