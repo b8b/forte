@@ -18,11 +18,11 @@ class JsFilterNumber(
             return subject
         }
         if (js("typeof(subject) === 'bigint'")) {
-            return BigNumericValue(subject as Long)
+            return BigNumericValue(subject.asDynamic())
         }
         if (js("typeof(subject) === 'number'")) {
             return try {
-                BigNumericValue(BigInt(subject))
+                BigNumericValue(BigInt(subject as Double))
             } catch (_: Throwable) {
                 FloatNumericValue(subject as Double)
             }
@@ -31,7 +31,7 @@ class JsFilterNumber(
             null -> null
             is Boolean -> FloatNumericValue(if (subject) 1.0 else 0.0)
             is CharSequence -> try {
-                BigNumericValue(parseInt(subject) as Long)
+                BigNumericValue(parseInt(subject).asDynamic())
             } catch (_: Throwable) {
                 val str: String = subject.toString()
                 FloatNumericValue(str.toDouble())
@@ -49,16 +49,16 @@ class JsFilterNumber(
             return n
         }
         if (js("typeof(n) === 'bigint'")) {
-            return BigNumericValue(n)
+            return BigNumericValue(n.asDynamic())
         }
         require(js("typeof(n) === 'number'")) {
             "not a number"
         }
-        val truncated = numberToInt32(n)
+        val truncated: Double = numberToInt32(n as Double)
         return if (truncated == n) {
             BigNumericValue(BigInt(truncated))
         } else {
-            FloatNumericValue(n as Double)
+            FloatNumericValue(n)
         }
     }
 
@@ -75,20 +75,20 @@ class JsFilterNumber(
             return result
         }
         if (js("typeof(n) === 'bigint'")) {
-            val truncated = BigInt.asIntN(32, n)
-            require(BigInt.eq(truncated, n)) {
+            val truncated = BigInt.asIntN(32, n.asDynamic())
+            require(bigIntEq(truncated, n.asDynamic())) {
                 "integer not in int32 range"
             }
-            return numberToInt32(Number(truncated))
+            return numberToInt32(Number(truncated)).toInt()
         }
         require(js("typeof(n) === 'number'")) {
             "value is not a number"
         }
-        val truncated = numberToInt32(n)
+        val truncated = numberToInt32(n as Double)
         require(truncated == n) {
             "value is not an integer"
         }
-        return truncated
+        return truncated.toInt()
     }
 
     override fun requireLong(n: Any?): Long {
@@ -106,11 +106,11 @@ class JsFilterNumber(
         require(js("typeof(n) === 'bigint'")) {
             "value is not a long integer"
         }
-        val truncated = BigInt.asIntN(64, n)
+        val truncated = BigInt.asIntN(64, n.asDynamic())
         require(truncated == n) {
             "integer not in int64 range"
         }
-        return truncated
+        return truncated.asDynamic()
     }
 
     override fun requireDouble(n: Any?): Double {

@@ -18,7 +18,7 @@ sealed interface FloatComparableValue : ComparableValue {
                 }
 
                 is BigComparableValue -> {
-                    BigInt.compare(BigInt(truncate(converted)), other.converted)
+                    bigIntCompare(BigInt(truncate(converted)), other.converted)
                 }
 
                 else -> error(
@@ -42,9 +42,10 @@ sealed interface FloatComparableValue : ComparableValue {
                     if (converted == Double.NEGATIVE_INFINITY) {
                         -1
                     } else {
-                        val cmp = BigInt.compare(
+                        val cmp = bigIntCompare(
                             BigInt(truncate(converted)),
-                            other.converted)
+                            other.converted
+                        )
                         if (cmp == 0) {
                             -1
                         } else {
@@ -74,7 +75,7 @@ sealed interface FloatComparableValue : ComparableValue {
                     if (converted == Double.POSITIVE_INFINITY) {
                         1
                     } else {
-                        val cmp = BigInt.compare(
+                        val cmp = bigIntCompare(
                             BigInt(truncate(converted)),
                             other.converted
                         )
@@ -93,5 +94,4 @@ sealed interface FloatComparableValue : ComparableValue {
             }
         }
     }
-
 }

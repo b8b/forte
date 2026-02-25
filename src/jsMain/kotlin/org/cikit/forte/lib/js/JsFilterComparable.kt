@@ -40,7 +40,7 @@ class JsFilterComparable(
                         .toComparableValue(originalValue)
                 }
                 "bigint" -> {
-                    BigComparableValue(originalValue, subject as Long)
+                    BigComparableValue(originalValue, subject.asDynamic())
                 }
 
                 else -> types[subject::class]?.invoke(

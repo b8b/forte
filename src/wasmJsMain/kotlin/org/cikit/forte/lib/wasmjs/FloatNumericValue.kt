@@ -1,14 +1,14 @@
 package org.cikit.forte.lib.wasmjs
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import org.cikit.forte.core.ComparableValue
 import org.cikit.forte.core.NumericValue
 import org.cikit.forte.core.typeName
 import kotlin.math.pow
 import kotlin.math.sign
+import kotlin.math.truncate
 
 class FloatNumericValue(
-    val value: Double,
+    val value: Double
 ): NumericValue {
 
     override val result: Double
@@ -21,7 +21,7 @@ class FloatNumericValue(
         get() = true
 
     override val hasDecimalPart: Boolean
-        get() = value % 1 != 0.0
+        get() = value % 1.0 != 0.0
 
     override fun plus(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
@@ -30,7 +30,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value + other.value.doubleValue()
+            val newValue = value + Number(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -52,7 +52,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value - other.value.doubleValue()
+            val newValue = value - Number(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -74,7 +74,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value * other.value.doubleValue()
+            val newValue = value * Number(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -96,7 +96,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value / other.value.doubleValue()
+            val newValue = value / Number(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -125,7 +125,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value % other.value.doubleValue()
+            val newValue = value % Number(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -147,7 +147,7 @@ class FloatNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = value.pow(other.value.doubleValue())
+            val newValue = value.pow(Number(other.value))
             FloatNumericValue(newValue)
         }
 
@@ -162,7 +162,7 @@ class FloatNumericValue(
         )
     }
 
-    override fun negate(): NumericValue = FloatNumericValue(value * -1.0)
+    override fun negate(): NumericValue = FloatNumericValue(-value)
 
     override fun toComparableValue(originalValue: Any?): ComparableValue? {
         if (value.isNaN()) {
@@ -187,7 +187,7 @@ class FloatNumericValue(
     }
 
     override fun toIntValue(): NumericValue {
-        val newValue = BigInteger.tryFromDouble(value)
+        val newValue = BigInt(truncate(value))
         return BigNumericValue(newValue)
     }
 

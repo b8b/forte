@@ -1,12 +1,12 @@
 package org.cikit.forte
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import org.cikit.forte.core.ComparableValue
 import org.cikit.forte.core.Context
 import org.cikit.forte.core.NumericValue
 import org.cikit.forte.lib.core.FilterComparable
 import org.cikit.forte.lib.core.FilterNumber
 import org.cikit.forte.lib.wasmjs.BigComparableValue
+import org.cikit.forte.lib.wasmjs.BigInt
 import org.cikit.forte.lib.wasmjs.BigNumericValue
 import org.cikit.forte.lib.wasmjs.FloatComparableValue
 import org.cikit.forte.lib.wasmjs.FloatNumericValue
@@ -44,7 +44,7 @@ actual fun <R>
                     value.toDouble()
                 )
             } else {
-                BigComparableValue(orig, BigInteger.fromLong(value))
+                BigComparableValue(orig, BigInt(value.toString()))
             }
         },
         Float::class to { orig, value, _: Boolean ->
@@ -62,9 +62,6 @@ actual fun <R>
             } else {
                 FloatNumericValue(value).toComparableValue(orig)
             }
-        },
-        BigInteger::class to { orig, value, _: Boolean ->
-            BigComparableValue(orig, value as BigInteger)
         },
     )
     defineMethod(
@@ -89,7 +86,7 @@ actual fun <R>
         },
         Long::class to { value ->
             value as Long
-            BigNumericValue(BigInteger.fromLong(value))
+            BigNumericValue(BigInt(value.toString()))
         },
         Float::class to { value ->
             value as Float
@@ -98,10 +95,6 @@ actual fun <R>
         Double::class to { value ->
             value as Double
             FloatNumericValue(value)
-        },
-        BigInteger::class to { value ->
-            value as BigInteger
-            BigNumericValue(value)
         },
     )
     defineMethod(

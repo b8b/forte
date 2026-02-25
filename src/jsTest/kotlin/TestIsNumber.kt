@@ -87,7 +87,7 @@ class TestIsNumber {
     fun testRequireInt() {
         val number = JsFilterNumber()
         assertEquals(18, number.requireInt(18))
-        assertEquals(18, number.requireInt(BigInt(18)))
+        assertEquals(18, number.requireInt(BigInt(18.0)))
         assertFails { number.requireInt(18.8) }
     }
 

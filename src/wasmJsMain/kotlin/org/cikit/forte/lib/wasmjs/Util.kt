@@ -1,4 +1,4 @@
-package org.cikit.forte.lib.js
+package org.cikit.forte.lib.wasmjs
 
 external class BigInt {
     companion object {
@@ -10,36 +10,34 @@ external fun BigInt(s: String): BigInt
 external fun BigInt(n: Double): BigInt
 external fun Number(n: BigInt): Double
 
-fun numberToInt32(a: Double): Double = js("a | 0")
-
-fun numberToString(n: Double): String {
-    return if (js("Number.isNaN(n)")) {
-        "NaN"
-    } else if (js("n === Infinity")) {
-        "Infinity"
-    } else if (js("n === -Infinity")) {
-        "-Infinity"
-    } else if (js("Object.is(n, -0.0)")) {
-        "-0.0"
-    } else {
-        val result = n.toString()
-        if ("." in result) {
-            result
-        } else {
-            "$result.0"
-        }
-    }
-}
-
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntAdd(a: BigInt, b: BigInt): BigInt = js("a + b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntSubtract(a: BigInt, b: BigInt): BigInt = js("a - b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntMultiply(a: BigInt, b: BigInt): BigInt = js("a * b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntDivide(a: BigInt, b: BigInt): BigInt = js("a / b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntRemainder(a: BigInt, b: BigInt): BigInt = js("a % b")
-fun bigIntPow(a: BigInt, b: BigInt): BigInt = eval("a ** b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
+fun bigIntPow(a: BigInt, b: BigInt): BigInt = js("a ** b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntNegate(a: BigInt): BigInt = js("-a")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntGt(a: BigInt, b: BigInt): Boolean = js("a > b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntLt(a: BigInt, b: BigInt): Boolean = js("a < b")
+
+@OptIn(ExperimentalWasmJsInterop::class)
 fun bigIntEq(a: BigInt, b: BigInt): Boolean = js("a == b")
 
 fun bigIntCompare(a: BigInt, b: BigInt): Int {

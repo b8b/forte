@@ -1,6 +1,7 @@
 package org.cikit.forte.internal
 
 import org.cikit.forte.core.concatToString
+import org.cikit.forte.lib.js.BigInt
 
 actual fun parseInt(input: CharSequence): Number {
     val inputStr = input.concatToString()
@@ -18,9 +19,9 @@ actual fun parseInt(input: CharSequence): Number {
     if (!haveDigit) throw NumberFormatException("no digits")
 
     val newValue = try {
-        js("BigInt(inputStr)")
+        BigInt(inputStr)
     } catch (e: dynamic) {
         throw NumberFormatException(e.toString())
     }
-    return newValue
+    return newValue.asDynamic()
 }

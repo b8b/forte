@@ -108,8 +108,9 @@ class IntNumericValue(
 
     override fun div(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val newValue = value / other.value
-            if (newValue * other.value == value) {
+            val remainder = value % other.value
+            if (remainder == 0) {
+                val newValue = value / other.value
                 IntNumericValue(newValue)
             } else {
                 val newValue = value.toDouble() / other.value
@@ -233,7 +234,9 @@ class IntNumericValue(
         }
     }
 
-    override fun negate(): NumericValue = IntNumericValue(value * -1)
+    override fun negate(): NumericValue {
+        return IntNumericValue(Math.negateExact(value))
+    }
 
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return FloatComparableValue(originalValue, value.toDouble())

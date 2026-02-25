@@ -2,7 +2,9 @@ import kotlinx.coroutines.test.runTest
 import org.cikit.forte.Forte
 import org.cikit.forte.core.NamedArgs
 import org.cikit.forte.lib.core.IsNumberTest
+import org.cikit.forte.lib.wasmjs.BigInt
 import org.cikit.forte.lib.wasmjs.FloatNumericValue
+import org.cikit.forte.lib.wasmjs.bigIntAdd
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,5 +46,12 @@ class TestNumeric {
         val expr = Forte.parseExpression("(2 ** 8000) is lt(Infinity)")
         val result = Forte.scope().evalExpression(expr)
         println(result)
+    }
+
+    @Test
+    fun testBigInt() {
+        val a = BigInt(18.0)
+        val b = BigInt(2.0)
+        println(bigIntAdd(a, b))
     }
 }

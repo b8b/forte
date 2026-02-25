@@ -1,7 +1,7 @@
 package org.cikit.forte.lib.wasmjs
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import dev.erikchristensen.javamath2kmp.minusExact
+import dev.erikchristensen.javamath2kmp.negateExact
 import dev.erikchristensen.javamath2kmp.plusExact
 import dev.erikchristensen.javamath2kmp.timesExact
 import org.cikit.forte.core.ComparableValue
@@ -31,14 +31,16 @@ class IntNumericValue(
                 val newValue = value.plusExact(other.value)
                 IntNumericValue(newValue)
             } catch (_: ArithmeticException) {
-                val newValue = BigInteger.fromInt(value)
-                    .plus(other.value)
+                val newValue = bigIntAdd(
+                    BigInt(value.toDouble()),
+                    BigInt(other.value.toDouble())
+                )
                 BigNumericValue(newValue)
             }
         }
 
         is BigNumericValue -> {
-            val newValue = other.value.plus(value)
+            val newValue = bigIntAdd(BigInt(value.toDouble()), other.value)
             BigNumericValue(newValue)
         }
 
@@ -59,14 +61,16 @@ class IntNumericValue(
                 val newValue = value.minusExact(other.value)
                 IntNumericValue(newValue)
             } catch (_: ArithmeticException) {
-                val newValue = BigInteger.fromInt(value)
-                    .minus(other.value)
+                val newValue = bigIntSubtract(
+                    BigInt(value.toDouble()),
+                    BigInt(other.value.toDouble())
+                )
                 BigNumericValue(newValue)
             }
         }
 
         is BigNumericValue -> {
-            val newValue = BigInteger.fromInt(value).minus(other.value)
+            val newValue = bigIntSubtract(BigInt(value.toDouble()), other.value)
             BigNumericValue(newValue)
         }
 
@@ -87,15 +91,16 @@ class IntNumericValue(
                 val newValue = value.timesExact(other.value)
                 IntNumericValue(newValue)
             } catch (_: ArithmeticException) {
-                val newValue = BigInteger.fromInt(value)
-                    .multiply(BigInteger.fromInt(other.value))
+                val newValue = bigIntMultiply(
+                    BigInt(value.toDouble()),
+                    BigInt(other.value.toDouble())
+                )
                 BigNumericValue(newValue)
             }
         }
 
         is BigNumericValue -> {
-            val newValue = BigInteger.fromInt(value)
-                .multiply(other.value)
+            val newValue = bigIntMultiply(BigInt(value.toDouble()), other.value)
             BigNumericValue(newValue)
         }
 
@@ -112,8 +117,9 @@ class IntNumericValue(
 
     override fun div(other: NumericValue): NumericValue = when (other) {
         is IntNumericValue -> {
-            val newValue = value / other.value
-            if (newValue * other.value == value) {
+            val remainder = value % other.value
+            if (remainder == 0) {
+                val newValue = value / other.value
                 IntNumericValue(newValue)
             } else {
                 val newValue = value.toDouble() / other.value
@@ -122,13 +128,13 @@ class IntNumericValue(
         }
 
         is BigNumericValue -> {
-            val big = BigInteger.fromInt(value)
-            val newValue = big.div(other.value)
-            if (newValue.multiply(other.value) == big) {
+            val big = BigInt(value.toDouble())
+            val remainder = bigIntRemainder(big, other.value)
+            if (bigIntEq(remainder, BigInt(0.0))) {
+                val newValue = bigIntDivide(big, other.value)
                 BigNumericValue(newValue)
             } else {
-                val newValue = value.toDouble() /
-                        other.value.doubleValue()
+                val newValue = value.toDouble() / Number(other.value)
                 FloatNumericValue(newValue)
             }
         }
@@ -151,8 +157,8 @@ class IntNumericValue(
         }
 
         is BigNumericValue -> {
-            val big = BigInteger.fromInt(value)
-            val newValue = big.div(other.value)
+            val big = BigInt(value.toDouble())
+            val newValue = bigIntDivide(big, other.value)
             return BigNumericValue(newValue)
         }
 
@@ -169,7 +175,10 @@ class IntNumericValue(
         }
 
         is BigNumericValue -> {
-            val newValue = BigInteger.fromInt(value).rem(other.value)
+            val newValue = bigIntRemainder(
+                BigInt(value.toDouble()),
+                other.value
+            )
             return BigNumericValue(newValue)
         }
 
@@ -184,45 +193,27 @@ class IntNumericValue(
         )
     }
 
-    private fun pow(exp: Int): BigInteger {
-        val base = BigInteger.fromInt(value)
-        // handle small numbers
-        if (exp in -1..1) {
-            return base.pow(exp)
-        }
-        if (value in -1..1) {
-            return base.pow(exp)
-        }
-        // BitLength(result) ~ BitLength(base) * exp
-        // BitLength(result) < maxBitLength
-        // => BitLength(base) * exp < maxBitLength
-        // => BitLength(base) < maxBitLength / exp
-        // => maxBase = 2 ^ (maxBitLength / exp)
-        val exp2 = maxBitLength / exp
-        val maxBase = BigInteger.fromInt(2).pow(exp2)
-        if (base > maxBase) {
-            throw ArithmeticException("base or exponent too high")
-        }
-        return base.pow(exp)
-    }
-
     override fun pow(other: NumericValue): NumericValue {
         return when (other) {
             is BigNumericValue -> {
-                val result = pow(other.value.intValue(exactRequired = true))
-                try {
-                    IntNumericValue(result.intValue(exactRequired = true))
-                } catch (_: ArithmeticException) {
-                    BigNumericValue(result)
-                }
+                restrictedPow(
+                    BigInt(value.toDouble()),
+                    other.value,
+                    maxBitLength
+                )
             }
 
             is IntNumericValue -> {
-                val result = pow(other.value)
-                try {
-                    IntNumericValue(result.intValue(exactRequired = true))
-                } catch (_: ArithmeticException) {
-                    BigNumericValue(result)
+                val result = restrictedPow(
+                    BigInt(value.toDouble()),
+                    BigInt(other.value.toDouble()),
+                    maxBitLength
+                )
+                val intResult = result.intOrNull()
+                if (intResult == null) {
+                    result
+                } else {
+                    IntNumericValue(intResult)
                 }
             }
 
@@ -238,7 +229,9 @@ class IntNumericValue(
         }
     }
 
-    override fun negate(): NumericValue = IntNumericValue(value * -1)
+    override fun negate(): NumericValue {
+        return IntNumericValue(value.negateExact())
+    }
 
     override fun toComparableValue(originalValue: Any?): ComparableValue {
         return FloatComparableValue.DirectComparableValue(

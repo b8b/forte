@@ -24,13 +24,13 @@ class FloatNumericValue(
         get() = value % 1.0 != 0.0
 
     override fun plus(other: NumericValue): NumericValue = when (other) {
-        is FloatNumericValue -> {
-            val newValue = value + other.value
+        is BigNumericValue -> {
+            val newValue = value + Number(other.value)
             FloatNumericValue(newValue)
         }
 
-        is BigNumericValue -> {
-            val newValue = value + (Number(other.value) as Double)
+        is FloatNumericValue -> {
+            val newValue = value + other.value
             FloatNumericValue(newValue)
         }
 
@@ -41,13 +41,13 @@ class FloatNumericValue(
     }
 
     override fun minus(other: NumericValue): NumericValue = when (other) {
-        is FloatNumericValue -> {
-            val newValue = value - other.value
+        is BigNumericValue -> {
+            val newValue = value - Number(other.value)
             FloatNumericValue(newValue)
         }
 
-        is BigNumericValue -> {
-            val newValue = value - (Number(other.value) as Double)
+        is FloatNumericValue -> {
+            val newValue = value - other.value
             FloatNumericValue(newValue)
         }
 
@@ -58,13 +58,13 @@ class FloatNumericValue(
     }
 
     override fun mul(other: NumericValue): NumericValue = when (other) {
-        is FloatNumericValue -> {
-            val newValue = other.value * value
+        is BigNumericValue -> {
+            val newValue = value * Number(other.value)
             FloatNumericValue(newValue)
         }
 
-        is BigNumericValue -> {
-            val newValue = value * (Number(other.value) as Double)
+        is FloatNumericValue -> {
+            val newValue = other.value * value
             FloatNumericValue(newValue)
         }
 
@@ -75,13 +75,13 @@ class FloatNumericValue(
     }
 
     override fun div(other: NumericValue): NumericValue = when (other) {
-        is FloatNumericValue -> {
-            val newValue = value / other.value
+        is BigNumericValue -> {
+            val newValue = value / Number(other.value)
             FloatNumericValue(newValue)
         }
 
-        is BigNumericValue -> {
-            val newValue = value / (Number(other.value) as Double)
+        is FloatNumericValue -> {
+            val newValue = value / other.value
             FloatNumericValue(newValue)
         }
 
@@ -99,13 +99,13 @@ class FloatNumericValue(
     }
 
     override fun rem(other: NumericValue): NumericValue = when (other) {
-        is FloatNumericValue -> {
-            val newValue = value % other.value
+        is BigNumericValue -> {
+            val newValue = value % Number(other.value)
             FloatNumericValue(newValue)
         }
 
-        is BigNumericValue -> {
-            val newValue = value % (Number(other.value) as Double)
+        is FloatNumericValue -> {
+            val newValue = value % other.value
             FloatNumericValue(newValue)
         }
 
@@ -116,13 +116,13 @@ class FloatNumericValue(
     }
 
     override fun pow(other: NumericValue): NumericValue = when (other) {
-        is FloatNumericValue -> {
-            val newValue = value.pow(other.value)
+        is BigNumericValue -> {
+            val newValue = value.pow(Number(other.value))
             FloatNumericValue(newValue)
         }
 
-        is BigNumericValue -> {
-            val newValue = value.pow(Number(other.value) as Double)
+        is FloatNumericValue -> {
+            val newValue = value.pow(other.value)
             FloatNumericValue(newValue)
         }
 
@@ -187,6 +187,6 @@ class FloatNumericValue(
     }
 
     override fun toString(): String {
-        return "FloatNumericValue($value)"
+        return "FloatNumericValue(${toStringValue()})"
     }
 }
